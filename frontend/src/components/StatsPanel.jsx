@@ -1,4 +1,5 @@
 import { useApp } from "../context/AppContext";
+import { useI18n } from "../i18n/I18nContext";
 
 function StatCard({ label, value, unit, accent }) {
   return (
@@ -14,38 +15,23 @@ function StatCard({ label, value, unit, accent }) {
 
 export default function StatsPanel() {
   const { state } = useApp();
+  const { t } = useI18n();
 
-  const pendingTasks = state.tasks.filter((t) => !t.completed).length;
+  const pendingTasks = state.tasks.filter((task) => !task.completed).length;
   const totalMinutes = state.tasks
-    .filter((t) => !t.completed)
-    .reduce((sum, t) => sum + t.estimatedMinutes, 0);
+    .filter((task) => !task.completed)
+    .reduce((sum, task) => sum + task.estimatedMinutes, 0);
 
   return (
     <div className="animate-fade-in">
       <h2 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-3">
-        Heute
+        {t("stats.today")}
       </h2>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          label="Erledigt"
-          value={state.completedToday}
-          accent="text-success"
-        />
-        <StatCard
-          label="Offen"
-          value={pendingTasks}
-        />
-        <StatCard
-          label="Fokus"
-          value={state.focusMinutesToday}
-          unit="min"
-          accent="text-accent"
-        />
-        <StatCard
-          label="Geschätzt"
-          value={totalMinutes}
-          unit="min"
-        />
+        <StatCard label={t("stats.completed")} value={state.completedToday} accent="text-success" />
+        <StatCard label={t("stats.open")} value={pendingTasks} />
+        <StatCard label={t("stats.focusMin")} value={state.focusMinutesToday} unit={t("stats.min")} accent="text-accent" />
+        <StatCard label={t("stats.estimatedMin")} value={totalMinutes} unit={t("stats.min")} />
       </div>
     </div>
   );
