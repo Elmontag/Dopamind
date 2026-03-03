@@ -532,6 +532,14 @@ export default function TasksPage() {
     return counts;
   }, [state.tasks]);
 
+  // Helper: get display name for a category (strips emoji prefix from i18n if present)
+  const getCatDisplayName = (cat) => {
+    const key = `tasks.categories.${cat.name}`;
+    const translated = t(key);
+    if (translated !== key) return translated.replace(/^[^\s]+\s/, '');
+    return cat.name;
+  };
+
   // Handle drag-and-drop of tasks into categories
   const [dragOverCatId, setDragOverCatId] = useState(null);
   const handleCatDragOver = (e, catId) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCatId(catId); };
@@ -609,7 +617,7 @@ export default function TasksPage() {
                     } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
                   >
                     <span className="flex-shrink-0">{cat.emoji}</span>
-                    <span className="flex-1 text-left truncate">{t(`tasks.categories.${cat.name}`) !== `tasks.categories.${cat.name}` ? t(`tasks.categories.${cat.name}`).replace(/^[^\s]+\s/, '') : cat.name}</span>
+                    <span className="flex-1 text-left truncate">{getCatDisplayName(cat)}</span>
                     <span className="text-[10px] font-mono opacity-60">{taskCountByCategory[cat.id] || 0}</span>
                     {managingCategories && (
                       <span className="flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
@@ -665,7 +673,7 @@ export default function TasksPage() {
               {t("tasks.title")}
               {filterCategory && categories.find((c) => c.id === filterCategory) && (
                 <span className="ml-2 normal-case font-normal">
-                  — {categories.find((c) => c.id === filterCategory)?.emoji} {(() => { const cat = categories.find((c) => c.id === filterCategory); const key = `tasks.categories.${cat.name}`; const translated = t(key); return translated !== key ? translated.replace(/^[^\s]+\s/, '') : cat.name; })()}
+                  — {categories.find((c) => c.id === filterCategory)?.emoji} {getCatDisplayName(categories.find((c) => c.id === filterCategory))}
                 </span>
               )}
             </h2>

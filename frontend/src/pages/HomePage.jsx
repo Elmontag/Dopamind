@@ -171,7 +171,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     const midMin = Math.floor((startTotal + endTotal) / 2);
     let breakStart = midMin;
     // Find a free spot near the middle
-    for (let offset = 0; offset < (endTotal - startTotal) / 2; offset++) {
+    for (let offset = 0; offset < (endTotal - startTotal) / 2; offset += STEP) {
       if (isRangeFree(midMin - offset, midMin - offset + breakMin)) { breakStart = midMin - offset; break; }
       if (isRangeFree(midMin + offset, midMin + offset + breakMin)) { breakStart = midMin + offset; break; }
     }
@@ -208,7 +208,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
       // Place each subtask as its own entry
       let cursor = desiredStart;
       for (const sub of subtasks) {
-        const subDur = Math.max(STEP, sub.estimatedMinutes || STEP);
+        const subDur = Math.max(STEP, sub.estimatedMinutes ?? STEP);
         // Subtask may have its own scheduledTime
         let subStart;
         if (sub.scheduledTime) {
@@ -279,7 +279,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
   for (const task of unscheduledTasks) {
     placeTask(task, nextFree);
     // Advance nextFree past the entries we just placed
-    const justPlaced = entries.filter((e) => e.key.includes(task.id));
+    const justPlaced = entries.filter((e) => e.key === `task-${task.id}` || e.key.startsWith(`sub-${task.id}-`));
     if (justPlaced.length > 0) {
       nextFree = Math.max(...justPlaced.map((e) => e.startMin + e.durationMin));
     }
