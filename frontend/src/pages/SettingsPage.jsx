@@ -526,6 +526,16 @@ export default function SettingsPage() {
                     {iv} min
                   </button>
                 ))}
+                <button
+                  onClick={() => updateSettings("timeline", { gridInterval: "list" })}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    settings.timeline?.gridInterval === "list"
+                      ? "bg-accent text-white"
+                      : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10"
+                  }`}
+                >
+                  {t("home.listMode")}
+                </button>
               </div>
             </Section>
             </>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { useCalendar } from "../context/CalendarContext";
@@ -6,7 +6,7 @@ import { useTimeTracking } from "../context/TimeTrackingContext";
 import { useSettings } from "../context/SettingsContext";
 import {
   CheckCircle, Calendar, Plus,
-  LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical, CalendarPlus,
+  LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical, CalendarPlus, List, Trash2,
 } from "lucide-react";
 
 
@@ -87,17 +87,24 @@ function QuickAddTask({ t, onAdd }) {
   );
 }
 
-function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onToggleSubtask, isTaskOverdue, onEditTask, onEditSubtask, onUpdateScheduledTime, onUpdateSubtaskScheduledTime, onRescheduleNextDay, isToday, isPastDay, gridInterval }) {
+function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onToggleSubtask, isTaskOverdue, onEditTask, onEditSubtask, onUpdateScheduledTime, onUpdateSubtaskScheduledTime, onRescheduleNextDay, isToday, isPastDay, gridInterval, viewDate, removedBreaks, onToggleBreakRemoved, breakTimeOverrides, onUpdateBreakTime, timeTrackingBreaks }) {
   const workStartH = parseInt(settings.workSchedule.start.split(":")[0], 10);
   const workStartM = parseInt(settings.workSchedule.start.split(":")[1] || "0", 10);
   const workEndH = parseInt(settings.workSchedule.end.split(":")[0], 10);
   const workEndM = parseInt(settings.workSchedule.end.split(":")[1] || "0", 10);
   const breakMin = settings.workSchedule.breakMinutes;
   const timeTrackingEnabled = settings.features?.timeTrackingEnabled !== false;
-  const now = new Date();
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    if (!isToday) return;
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, [isToday]);
+  const now = isToday ? currentTime : new Date();
   const nowH = now.getHours();
   const nowM = now.getMinutes();
-  const STEP = gridInterval || 30;
+  const isListMode = gridInterval === "list";
+  const STEP = isListMode ? 30 : (gridInterval || 30);
   const ROW_HEIGHT = STEP === 15 ? 32 : STEP === 30 ? 40 : 52;
 
   const DAY_START = timeTrackingEnabled ? 0 : 6 * 60;
@@ -162,15 +169,28 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     claimRange(evStartMin, evStartMin + dur);
   }
 
-  // 2. Break
-  if (breakMin > 0) {
-    const midMin = Math.floor((workStart + workEnd) / 2);
-    let breakStart = midMin;
-    for (let offset = 0; offset < (workEnd - workStart) / 2; offset += STEP) {
-      if (isRangeFree(midMin - offset, midMin - offset + breakMin)) { breakStart = midMin - offset; break; }
-      if (isRangeFree(midMin + offset, midMin + offset + breakMin)) { breakStart = midMin + offset; break; }
+  // 2. Break (Requirement 6: respect removed breaks and custom break times)
+  const breakRemoved = (removedBreaks || []).includes(viewDate);
+  if (breakMin > 0 && !breakRemoved) {
+    let breakStart;
+    const customBreakTime = breakTimeOverrides?.[viewDate];
+    if (customBreakTime) {
+      const [bh, bm] = customBreakTime.split(":").map(Number);
+      breakStart = toMin(bh, bm || 0);
+    } else {
+      const midMin = Math.floor((workStart + workEnd) / 2);
+      breakStart = midMin;
+      for (let offset = 0; offset < (workEnd - workStart) / 2; offset += STEP) {
+        if (isRangeFree(midMin - offset, midMin - offset + breakMin)) { breakStart = midMin - offset; break; }
+        if (isRangeFree(midMin + offset, midMin + offset + breakMin)) { breakStart = midMin + offset; break; }
+      }
     }
-    entries.push({ key: "break", type: "break", startMin: breakStart, durationMin: breakMin, label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}` });
+    // Match with actual time tracking breaks retrospectively
+    let matchedBreak = null;
+    if (timeTrackingBreaks && timeTrackingBreaks.length > 0) {
+      matchedBreak = timeTrackingBreaks[0];
+    }
+    entries.push({ key: "break", type: "break", startMin: breakStart, durationMin: breakMin, label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}`, matchedBreak });
     claimRange(breakStart, breakStart + breakMin);
   }
 
@@ -188,7 +208,13 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const placeTask = (task, desiredStart) => {
     const subtasks = (task.subtasks || []).filter((s) => !s.completed);
     if (subtasks.length > 0) {
-      let cursor = desiredStart;
+      // Requirement 5: Main task is scheduled independently using its OWN estimatedMinutes.
+      // Subtasks are scheduled separately.
+      const parentDur = Math.max(STEP, task.estimatedMinutes || 25);
+      const parentStart = findFreeStart(desiredStart, parentDur);
+      entries.push({ key: `task-${task.id}`, type: "task-parent", startMin: parentStart, durationMin: parentDur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime, subtaskCount: subtasks.length });
+      claimRange(parentStart, parentStart + parentDur);
+      let cursor = parentStart + parentDur;
       for (const sub of subtasks) {
         const subDur = Math.max(STEP, sub.estimatedMinutes ?? STEP);
         let subStart;
@@ -200,10 +226,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
         claimRange(subStart, subStart + subDur);
         cursor = subStart + subDur;
       }
-      const parentDur = STEP;
-      const parentStart = findFreeStart(cursor, parentDur);
-      entries.push({ key: `task-${task.id}`, type: "task-parent", startMin: parentStart, durationMin: parentDur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime, subtaskCount: subtasks.length });
-      claimRange(parentStart, parentStart + parentDur);
     } else {
       const dur = Math.max(STEP, task.estimatedMinutes || 25);
       const actualStart = findFreeStart(desiredStart, dur);
@@ -269,11 +291,14 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     entryMap.get(slotStart).push(entry);
   }
 
-  // --- Drag handlers ---
+  // --- Drag handlers (Requirement 4: cleaner D&D + Requirement 6: break dragging) ---
   const handleDragStart = (e, key) => {
     setDragKey(key);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", key);
+    // Store the entry's original slot for cleaner snapping
+    const srcEntry = entries.find((en) => en.key === key);
+    if (srcEntry) e.dataTransfer.setData("application/x-offset", String(srcEntry.startMin));
   };
   const handleDragOver = (e, slotMin) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverSlot(slotMin); };
   const handleDragLeave = () => setDragOverSlot(null);
@@ -282,15 +307,16 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     setDragOverSlot(null);
     if (!dragKey) { setDragKey(null); return; }
     const srcEntry = entries.find((en) => en.key === dragKey);
-    const newTime = fmtTime(targetSlotMin);
-    if (srcEntry?.type === "subtask" && srcEntry.parentTask && srcEntry.subtask) {
+    if (!srcEntry) { setDragKey(null); return; }
+    // Snap target to the nearest valid grid slot
+    const snappedTarget = Math.round(targetSlotMin / STEP) * STEP;
+    const newTime = fmtTime(snappedTarget);
+    if (srcEntry.type === "break") {
+      // Requirement 6: breaks can be moved
+      if (onUpdateBreakTime) onUpdateBreakTime(viewDate, newTime);
+    } else if (srcEntry.type === "subtask" && srcEntry.parentTask && srcEntry.subtask) {
       onUpdateSubtaskScheduledTime(srcEntry.parentTask.id, srcEntry.subtask.id, newTime);
-    } else if (srcEntry?.type === "task-parent" && srcEntry.task) {
-      const subtaskEntries = entries.filter((en) => en.type === "subtask" && en.parentTask?.id === srcEntry.task.id);
-      if (subtaskEntries.length > 0) {
-        const latestSubEnd = Math.max(...subtaskEntries.map((se) => se.startMin + se.durationMin));
-        if (targetSlotMin < latestSubEnd) { setDragKey(null); return; }
-      }
+    } else if (srcEntry.type === "task-parent" && srcEntry.task) {
       onUpdateScheduledTime(srcEntry.task.id, newTime);
     } else if (srcEntry?.task) {
       onUpdateScheduledTime(srcEntry.task.id, newTime);
@@ -303,6 +329,170 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   // --- Render ---
   const nowLineSlot = Math.floor(nowTotal / STEP) * STEP;
 
+  // === LIST MODE (Requirement 3) ===
+  if (isListMode) {
+    const sortedEntries = [...entries].sort((a, b) => a.startMin - b.startMin);
+    return (
+      <div className="relative space-y-1">
+        {/* Warning banners */}
+        {warningLevel === "critical" && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-medium mb-2 animate-pulse">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            {t("home.timeWarningCritical").replace("{min}", String(Math.max(0, Math.round(totalFreeMin))))}
+          </div>
+        )}
+        {warningLevel === "moderate" && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warn/10 text-amber-700 dark:text-warn text-xs font-medium mb-2">
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+            {t("home.timeWarningModerate").replace("{min}", String(Math.max(0, Math.round(totalFreeMin))))}
+          </div>
+        )}
+
+        {/* Current time indicator for list mode */}
+        {isToday && (
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-accent/5 border border-accent/20 mb-2">
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <span className="text-lg font-bold font-mono text-accent">{fmtTime(nowTotal)}</span>
+              <span className="text-[10px] text-muted-light dark:text-muted-dark ml-2">{t("home.nowMarker")}</span>
+            </div>
+          </div>
+        )}
+
+        {/* List entries */}
+        {sortedEntries.map((entry) => {
+          const isTask = entry.type === "task" || entry.type === "task-parent";
+          const isSubtask = entry.type === "subtask";
+          const isParentSummary = entry.type === "task-parent";
+          const isPastEntry = isPastDay || (isToday && entry.startMin + entry.durationMin <= nowTotal);
+          const isEditing = editingTaskId === (entry.task?.id || entry.subtask?.id);
+          const todayDate = new Date().toISOString().slice(0, 10);
+          const canReschedule = entry.pushedDown && (isTask || isSubtask) && entry.task &&
+            (!entry.task.deadline || entry.task.deadline >= todayDate);
+
+          return (
+            <div
+              key={entry.key}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group
+                ${isPastEntry ? "opacity-50" : ""}
+                ${isSubtask ? "ml-6" : ""}
+                ${entry.type === "event" ? "bg-accent/5 border border-accent/15" : ""}
+                ${isParentSummary ? "bg-gray-50 dark:bg-white/[0.03] border border-dashed border-gray-200 dark:border-white/10 italic" : ""}
+                ${isTask && !isParentSummary ? "bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5" : ""}
+                ${isSubtask ? "bg-gray-50/50 dark:bg-white/[0.02] border border-gray-100/50 dark:border-white/[0.03]" : ""}
+                ${entry.type === "break" ? "bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-500/10" : ""}
+                ${entry.overdue ? "!border-danger/30 !bg-danger/5" : ""}
+                ${entry.pushedDown ? "!border-orange-300 dark:!border-orange-600/30 !bg-orange-50 dark:!bg-orange-900/10" : ""}
+              `}
+            >
+              {/* Editable time field for list mode */}
+              {(isTask || isSubtask) && !isEditing ? (
+                <input
+                  type="time"
+                  value={fmtTime(entry.startMin)}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    if (isSubtask && entry.parentTask && entry.subtask) {
+                      onUpdateSubtaskScheduledTime(entry.parentTask.id, entry.subtask.id, e.target.value);
+                    } else if (entry.task) {
+                      onUpdateScheduledTime(entry.task.id, e.target.value);
+                    }
+                  }}
+                  className="w-[70px] text-xs font-mono bg-transparent border border-gray-200 dark:border-white/10 rounded px-1.5 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-accent/30 flex-shrink-0"
+                />
+              ) : (
+                <span className="w-[70px] text-xs font-mono text-muted-light dark:text-muted-dark text-center flex-shrink-0">{fmtTime(entry.startMin)}</span>
+              )}
+
+              {/* Icon */}
+              {entry.type === "event" && <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-accent" />}
+              {isTask && entry.overdue && <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-danger" />}
+              {isTask && !entry.overdue && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${entry.priority === "high" ? "bg-danger" : entry.priority === "medium" ? "bg-warn" : "bg-success"}`} />}
+              {isSubtask && <span className="w-1.5 h-1.5 rounded-full bg-accent/40 flex-shrink-0" />}
+              {entry.type === "break" && <Coffee className="w-3.5 h-3.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />}
+
+              {/* Label */}
+              {isEditing ? (
+                <input
+                  autoFocus value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={() => handleEditSave(entry.task?.id || entry.subtask?.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleEditSave(entry.task?.id || entry.subtask?.id);
+                    if (e.key === "Escape") { setEditingTaskId(null); setEditingSubtaskParent(null); }
+                  }}
+                  className="flex-1 bg-transparent outline-none border-b border-accent min-w-0 text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="flex-1 truncate">
+                  {entry.label}
+                  {(isTask || isSubtask) && entry.durationMin > 0 && <span className="ml-1.5 text-[10px] font-mono text-muted-light dark:text-muted-dark">~{entry.durationMin}{t("common.min")}</span>}
+                </span>
+              )}
+
+              {/* Break remove button */}
+              {entry.type === "break" && !isPastEntry && onToggleBreakRemoved && (
+                <button onClick={() => onToggleBreakRemoved(viewDate)}
+                  className="w-5 h-5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                  title={t("home.removeBreak")} aria-label={t("home.removeBreak")}>
+                  <Trash2 className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                </button>
+              )}
+
+              {/* Reschedule */}
+              {canReschedule && !isEditing && (
+                <button onClick={() => onRescheduleNextDay(entry.task.id)}
+                  className="flex-shrink-0 px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-[10px] font-medium hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors"
+                  title={t("home.rescheduleNextDay")}>
+                  <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
+                </button>
+              )}
+
+              {/* Task actions */}
+              {isTask && entry.task && !isPastEntry && !isEditing && (
+                <>
+                  <button onClick={() => onCompleteTask(entry.task.id)}
+                    className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
+                    title={t("tasks.complete")}>
+                    <CheckCircle className="w-3 h-3 text-accent" />
+                  </button>
+                  <button onClick={() => { setEditingTaskId(entry.task.id); setEditText(entry.task.text); }}
+                    className="w-5 h-5 rounded hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                    title={t("common.edit")}>
+                    <Pencil className="w-2.5 h-2.5 text-muted-light dark:text-muted-dark" />
+                  </button>
+                </>
+              )}
+              {isSubtask && entry.subtask && entry.parentTask && !isPastEntry && !isEditing && (
+                <>
+                  <button onClick={() => onToggleSubtask(entry.parentTask.id, entry.subtask.id)}
+                    className={`w-5 h-5 rounded border-2 flex-shrink-0 transition-colors flex items-center justify-center ${
+                      entry.subtask.completed ? "border-success bg-success/10" : "border-gray-300 dark:border-gray-600 hover:border-accent hover:bg-accent/10"
+                    }`}
+                    title={entry.subtask.completed ? t("tasks.reopen") : t("tasks.complete")}>
+                    <CheckCircle className={`w-3 h-3 ${entry.subtask.completed ? "text-success" : "text-accent"}`} />
+                  </button>
+                  <button onClick={() => { setEditingTaskId(entry.subtask.id); setEditingSubtaskParent(entry.parentTask.id); setEditText(entry.subtask.text); }}
+                    className="w-5 h-5 rounded hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                    title={t("common.edit")}>
+                    <Pencil className="w-2.5 h-2.5 text-muted-light dark:text-muted-dark" />
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
+        {sortedEntries.length === 0 && (
+          <p className="text-sm text-muted-light dark:text-muted-dark text-center py-6">{t("home.noTasks")}</p>
+        )}
+      </div>
+    );
+  }
+
+  // === GRID TIMELINE MODE (15/30/60 min) ===
   return (
     <div className="relative">
       {/* Warning banner */}
@@ -329,22 +519,23 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
           const dragOver = dragOverSlot === slotMin && dragKey;
           const isNowSlot = isToday && slotMin <= nowTotal && nowTotal < slotEnd;
 
-          // Req 4: In the past, hide empty grid rows (only show rows with completed tasks or events)
+          // In the past, hide empty grid rows
           if (isPastSlot && isToday && slotEntries.length === 0) return null;
-          // Also hide past slots with only pushed-down entries (they moved away)
           const realEntries = slotEntries.filter((e) => !e.pushedDown);
           if (isPastSlot && isToday && realEntries.length === 0) return null;
 
           return (
             <div key={slotMin} className="relative">
-              {/* "Now" line — full-width colored line */}
+              {/* Requirement 1 & 2: Redesigned "Now" indicator — harmonious with accent color + shows current time */}
               {isNowSlot && (
                 <div
                   className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
                   style={{ top: `${Math.round(((nowTotal - slotMin) / STEP) * 100)}%` }}
                 >
-                  <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 flex-shrink-0" />
-                  <div className="flex-1 h-[2px] bg-red-500" />
+                  <span className="text-[9px] font-bold font-mono text-accent bg-accent/10 rounded-full px-1.5 py-0.5 -ml-0.5 flex-shrink-0 border border-accent/20 shadow-sm">
+                    {fmtTime(nowTotal)}
+                  </span>
+                  <div className="flex-1 h-[1.5px] bg-gradient-to-r from-accent/60 to-accent/10" />
                 </div>
               )}
 
@@ -355,13 +546,13 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                 style={{ minHeight: `${ROW_HEIGHT}px` }}
                 className={`flex items-stretch gap-2 border-t transition-all
                   ${nonWork ? "bg-gray-50/50 dark:bg-white/[0.015] border-gray-100 dark:border-white/[0.03]" : "border-gray-200 dark:border-white/5"}
-                  ${dragOver ? "ring-2 ring-accent/40 bg-accent/5 rounded" : ""}
+                  ${dragOver ? "ring-2 ring-accent/30 bg-accent/5 rounded-md" : ""}
                   ${isPastSlot ? "opacity-60" : ""}
                 `}
               >
                 {/* Time label */}
                 <span className={`w-14 text-[11px] font-mono flex-shrink-0 pt-1 text-right pr-2 select-none
-                  ${isNowSlot ? "text-red-500 font-bold" : nonWork ? "text-gray-300 dark:text-gray-600" : "text-gray-400 dark:text-gray-500"}
+                  ${isNowSlot ? "text-accent font-semibold" : nonWork ? "text-gray-300 dark:text-gray-600" : "text-gray-400 dark:text-gray-500"}
                 `}>
                   {fmtTime(slotMin)}
                 </span>
@@ -380,7 +571,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                     const spanSlots = Math.max(1, Math.ceil(entry.durationMin / STEP));
                     const entryHeight = spanSlots * ROW_HEIGHT - 4;
 
-                    // Can this entry be rescheduled to next day?
                     const todayDate = new Date().toISOString().slice(0, 10);
                     const canReschedule = entry.pushedDown && (isTask || isSubtask) && entry.task &&
                       (!entry.task.deadline || entry.task.deadline >= todayDate);
@@ -453,7 +643,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                           </span>
                         )}
 
-                        {/* Reschedule to next day button (Req 3) */}
+                        {/* Reschedule to next day button */}
                         {canReschedule && !isEditing && (
                           <button
                             onClick={() => onRescheduleNextDay(entry.task.id)}
@@ -462,6 +652,22 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                           >
                             <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
                           </button>
+                        )}
+
+                        {/* Break remove button (Requirement 6) */}
+                        {entry.type === "break" && !isPastSlot && onToggleBreakRemoved && (
+                          <button onClick={() => onToggleBreakRemoved(viewDate)}
+                            className="w-5 h-5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                            title={t("home.removeBreak")} aria-label={t("home.removeBreak")}>
+                            <Trash2 className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          </button>
+                        )}
+
+                        {/* Break matched indicator */}
+                        {entry.type === "break" && entry.matchedBreak && (
+                          <span className="text-[9px] text-amber-600/60 dark:text-amber-400/60 font-mono flex-shrink-0" title={t("home.breakMatched")}>
+                            ✓
+                          </span>
                         )}
 
                         {/* Task action buttons */}
@@ -621,6 +827,34 @@ export default function HomePage() {
   const features = settings.features || {};
   const gridInterval = settings.timeline?.gridInterval || 30;
   const { updateSettings } = useSettings();
+  const { state: ttState } = useTimeTracking();
+
+  // Requirement 6: Break removal and repositioning state (per-day)
+  const [removedBreaks, setRemovedBreaks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("dopamind-removed-breaks") || "[]"); } catch { return []; }
+  });
+  const [breakTimeOverrides, setBreakTimeOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("dopamind-break-overrides") || "{}"); } catch { return {}; }
+  });
+  const handleToggleBreakRemoved = (date) => {
+    setRemovedBreaks((prev) => {
+      const next = prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date];
+      localStorage.setItem("dopamind-removed-breaks", JSON.stringify(next));
+      return next;
+    });
+  };
+  const handleUpdateBreakTime = (date, time) => {
+    setBreakTimeOverrides((prev) => {
+      const next = { ...prev, [date]: time };
+      localStorage.setItem("dopamind-break-overrides", JSON.stringify(next));
+      return next;
+    });
+  };
+  // Get time tracking breaks for the viewed day (for retrospective matching)
+  const viewDayTTBreaks = (ttState.entries || [])
+    .filter((e) => e.date === viewDate)
+    .flatMap((e) => e.breaks || [])
+    .filter((b) => b.start && b.end);
 
   const handleRescheduleNextDay = (taskId) => {
     const tomorrow = shiftDate(todayStr, +1);
@@ -695,7 +929,7 @@ export default function HomePage() {
                 <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}
               </span>
             )}
-            {/* Grid interval selector */}
+            {/* Grid interval selector + List mode */}
             <div className="flex items-center gap-0.5 ml-2 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
               {[15, 30, 60].map((iv) => (
                 <button
@@ -711,6 +945,17 @@ export default function HomePage() {
                   {iv}m
                 </button>
               ))}
+              <button
+                onClick={() => updateSettings("timeline", { gridInterval: "list" })}
+                className={`px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-0.5 ${
+                  gridInterval === "list"
+                    ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
+                    : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}
+                title={t("home.listMode")}
+              >
+                <List className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>
@@ -737,6 +982,12 @@ export default function HomePage() {
           isToday={isToday}
           isPastDay={isPast}
           gridInterval={gridInterval}
+          viewDate={viewDate}
+          removedBreaks={removedBreaks}
+          onToggleBreakRemoved={handleToggleBreakRemoved}
+          breakTimeOverrides={breakTimeOverrides}
+          onUpdateBreakTime={handleUpdateBreakTime}
+          timeTrackingBreaks={viewDayTTBreaks}
         />
       </div>
     </div>

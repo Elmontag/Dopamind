@@ -40,7 +40,11 @@
     "gridInterval": "Grid",
     "grid15": "15min",
     "grid30": "30min",
-    "grid60": "60min"
+    "grid60": "60min",
+    "listMode": "List view",
+    "removeBreak": "Remove break for today",
+    "restoreBreak": "Restore break",
+    "breakMatched": "Matched with time tracking"
   },
   "tasks": {
     "title": "Tasks",
@@ -336,7 +340,7 @@
     "timeWarningsCritical2": "Critical warning 2 (min)",
     "timeWarningsDesc": "Warnings when remaining free time becomes tight.",
     "timelineGridInterval": "Day plan grid interval",
-    "timelineGridIntervalDesc": "Time grid interval for the day plan view (15, 30, or 60 minutes)."
+    "timelineGridIntervalDesc": "Time grid interval for the day plan view (15, 30, 60 minutes or list mode)."
   },
   "rewards": {
     "levelUp": "Level {level} reached – {title}!",
