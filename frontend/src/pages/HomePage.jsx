@@ -6,7 +6,7 @@ import { useTimeTracking } from "../context/TimeTrackingContext";
 import { useSettings } from "../context/SettingsContext";
 import {
   CheckCircle, Calendar, Plus,
-  LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X,
+  LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical,
 } from "lucide-react";
 
 
@@ -87,7 +87,7 @@ function QuickAddTask({ t, onAdd }) {
   );
 }
 
-function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTaskOverdue, onEditTask, isToday, isPastDay }) {
+function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTaskOverdue, onEditTask, onUpdateScheduledTime, isToday, isPastDay }) {
   const startH = parseInt(settings.workSchedule.start.split(":")[0], 10);
   const endH = parseInt(settings.workSchedule.end.split(":")[0], 10);
   const breakMin = settings.workSchedule.breakMinutes;
@@ -96,6 +96,8 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
 
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
 
   const handleEditSave = (taskId) => {
     if (editText.trim()) {
@@ -112,7 +114,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     const event = events.find((ev) => {
       if (ev.allDay) return false;
       if (!ev.start) return false;
-      // Handle both "HH:MM" / "H:MM" time strings and full ISO datetime strings
       let evStartH, evEndH;
       if (isTimeOnly(ev.start)) {
         evStartH = parseInt(ev.start.split(":")[0], 10);
@@ -124,7 +125,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
         evStartH = startDate.getHours();
         evEndH = endDate && !isNaN(endDate) ? endDate.getHours() : evStartH + 1;
       }
-      // If end minute > 0, the event still occupies that hour
       if (ev.end) {
         const endMin = isTimeOnly(ev.end)
           ? parseInt(ev.end.split(":")[1] || "0", 10)
@@ -134,7 +134,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
       return h >= evStartH && h < evEndH;
     });
     if (event) {
-      // Show the event's actual time range in the label
       const timeRange = event.start && event.end ? `${event.start}–${event.end}` : "";
       slots.push({ time: timeStr, hour: h, type: "event", label: event.title || event.summary, eventTime: timeRange });
     } else {
@@ -142,12 +141,34 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     }
   }
 
-  // Fill free slots with pending tasks, respecting creation time for today
-  const pendingTasks = [...tasks];
+  // --- Place tasks with scheduledTime first, then fill remaining free slots ---
+  const scheduledTasks = tasks.filter((tk) => tk.scheduledTime);
+  const unscheduledTasks = tasks.filter((tk) => !tk.scheduledTime);
+
+  // Place scheduled tasks at their exact slot
+  for (const task of scheduledTasks) {
+    const taskH = parseInt(task.scheduledTime.split(":")[0], 10);
+    // For today, hide tasks whose scheduled time hasn't been reached yet: show only at or before current hour
+    if (isToday && taskH > nowH) continue;
+    const slotIdx = slots.findIndex((s) => s.hour === taskH && s.type === "free");
+    if (slotIdx >= 0) {
+      slots[slotIdx] = {
+        ...slots[slotIdx],
+        type: "task",
+        task,
+        label: task.text,
+        priority: task.priority,
+        overdue: isTaskOverdue(task),
+        scheduled: true,
+      };
+    }
+  }
+
+  // Fill remaining free slots with unscheduled tasks
+  const pendingTasks = [...unscheduledTasks];
   for (const slot of slots) {
     if (slot.type === "free" && pendingTasks.length > 0) {
       if (isToday) {
-        // Only schedule a task in a slot at or after the task's creation hour
         const idx = pendingTasks.findIndex((task) => {
           if (!task.createdAt) return true;
           const createdHour = new Date(task.createdAt).getHours();
@@ -183,18 +204,63 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     });
   }
 
+  // --- Drag & drop handlers ---
+  const handleDragStart = (e, idx) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIdx(idx);
+  };
+  const handleDragLeave = () => setDragOverIdx(null);
+  const handleDrop = (e, targetIdx) => {
+    e.preventDefault();
+    setDragOverIdx(null);
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
+    const srcSlot = slots[dragIdx];
+    const tgtSlot = slots[targetIdx];
+    // Only allow dragging tasks/breaks to free or task slots
+    if (srcSlot?.type === "task" && srcSlot.task && tgtSlot) {
+      const newTime = `${String(tgtSlot.hour).padStart(2, "0")}:00`;
+      onUpdateScheduledTime(srcSlot.task.id, newTime);
+    }
+    setDragIdx(null);
+  };
+  const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
+
+  const isDraggable = (slot) => !isPastDay && (slot.type === "task" || slot.type === "break");
+
   return (
     <div className="space-y-1">
       {slots.map((slot, i) => {
         const isPast = isPastDay || (isToday && slot.hour !== undefined && slot.hour < nowH);
         const isCurrent = isToday && slot.hour !== undefined && slot.hour === nowH;
         const isEditing = editingTaskId === slot.task?.id;
+        const dragging = dragIdx === i;
+        const dragOver = dragOverIdx === i && dragIdx !== i;
 
         return (
           <div
             key={i}
-            className={`flex items-center gap-3 group transition-opacity ${isPast ? "opacity-40" : ""}`}
+            draggable={isDraggable(slot) && !isEditing}
+            onDragStart={(e) => handleDragStart(e, i)}
+            onDragOver={(e) => handleDragOver(e, i)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, i)}
+            onDragEnd={handleDragEnd}
+            className={`flex items-center gap-3 group transition-all ${isPast ? "opacity-40" : ""} ${dragging ? "opacity-50 scale-[0.97]" : ""} ${dragOver ? "ring-2 ring-accent/40 rounded-lg" : ""}`}
           >
+            {/* Drag handle */}
+            {isDraggable(slot) && !isPast && (
+              <span className="w-4 flex-shrink-0 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
+                <GripVertical className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+              </span>
+            )}
+            {!isDraggable(slot) && <span className="w-4 flex-shrink-0" />}
+
             {/* Time column */}
             <span className={`w-12 text-[11px] font-mono flex-shrink-0 ${isCurrent ? "text-accent font-bold" : "text-muted-light dark:text-muted-dark"}`}>
               {slot.time}
@@ -215,6 +281,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
             }`}>
               {slot.type === "event" && <Calendar className="w-3 h-3 flex-shrink-0" />}
               {slot.type === "task" && slot.overdue && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+              {slot.type === "task" && slot.scheduled && !slot.overdue && <Clock className="w-3 h-3 flex-shrink-0 text-accent" />}
               {slot.type === "break" && <Coffee className="w-3 h-3 flex-shrink-0" />}
               {slot.type === "free" && <Clock className="w-3 h-3 flex-shrink-0 opacity-30" />}
 
@@ -281,6 +348,17 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     </div>
   );
 }
+
+const CATEGORY_CONFIG = {
+  work:     { emoji: "💼" },
+  personal: { emoji: "👤" },
+  health:   { emoji: "💪" },
+  finance:  { emoji: "💰" },
+  learning: { emoji: "📚" },
+  home:     { emoji: "🏠" },
+  errand:   { emoji: "🏃" },
+  creative: { emoji: "🎨" },
+};
 
 const MAX_TIMELINE_TASKS = 8;
 
@@ -421,6 +499,7 @@ export default function HomePage() {
           onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
           isTaskOverdue={isTaskOverdue}
           onEditTask={(id, text) => dispatch({ type: "UPDATE_TASK", payload: { id, text } })}
+          onUpdateScheduledTime={(id, time) => dispatch({ type: "UPDATE_TASK", payload: { id, scheduledTime: time } })}
           isToday={isToday}
           isPastDay={isPast}
         />

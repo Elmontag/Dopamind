@@ -31,7 +31,8 @@
     "freeSlot": "Free",
     "taskSlot": "Task",
     "previousDay": "Previous Day",
-    "nextDay": "Next Day"
+    "nextDay": "Next Day",
+    "dragHint": "Drag & drop to reorder"
   },
   "tasks": {
     "title": "Tasks",
@@ -66,7 +67,22 @@
     "fromMail": "From mail",
     "mailFrom": "From: {from}",
     "reopen": "Reopen",
-    "complete": "Complete"
+    "complete": "Complete",
+    "scheduledTime": "Scheduled",
+    "scheduledTimePlaceholder": "Time...",
+    "category": "Category",
+    "categories": {
+      "work": "💼 Work",
+      "personal": "👤 Personal",
+      "health": "💪 Health",
+      "finance": "💰 Finance",
+      "learning": "📚 Learning",
+      "home": "🏠 Home",
+      "errand": "🏃 Errand",
+      "creative": "🎨 Creative"
+    },
+    "subtaskMinutes": "min",
+    "noCategory": "None"
   },
   "focus": {
     "title": "Focus Block",

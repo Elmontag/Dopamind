@@ -48,7 +48,22 @@
     "fromMail": "Aus Mail",
     "mailFrom": "Von: {from}",
     "reopen": "Wieder öffnen",
-    "complete": "Erledigen"
+    "complete": "Erledigen",
+    "scheduledTime": "Geplant",
+    "scheduledTimePlaceholder": "Uhrzeit...",
+    "category": "Kategorie",
+    "categories": {
+      "work": "💼 Arbeit",
+      "personal": "👤 Privat",
+      "health": "💪 Gesundheit",
+      "finance": "💰 Finanzen",
+      "learning": "📚 Lernen",
+      "home": "🏠 Haushalt",
+      "errand": "🏃 Besorgung",
+      "creative": "🎨 Kreativ"
+    },
+    "subtaskMinutes": "min",
+    "noCategory": "Ohne"
   },
   "focus": {
     "title": "Fokus-Block",
@@ -259,7 +274,8 @@
     "freeSlot": "Frei",
     "taskSlot": "Aufgabe",
     "previousDay": "Vorheriger Tag",
-    "nextDay": "Nächster Tag"
+    "nextDay": "Nächster Tag",
+    "dragHint": "Verschieben per Drag & Drop"
   },
   "rewards": {
     "levelUp": "Level {level} erreicht – {title}!",

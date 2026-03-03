@@ -3,12 +3,23 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { useMail } from "../context/MailContext";
-import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag } from "lucide-react";
+import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder } from "lucide-react";
 
 const PRIORITY_CONFIG = {
   high: { dot: "bg-danger", color: "bg-danger/10 text-danger dark:bg-danger/20" },
   medium: { dot: "bg-warn", color: "bg-warn/10 text-amber-700 dark:bg-warn/20 dark:text-warn" },
   low: { dot: "bg-success", color: "bg-success/10 text-success dark:bg-success/20" },
+};
+
+const CATEGORY_CONFIG = {
+  work:     { emoji: "💼", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  personal: { emoji: "👤", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  health:   { emoji: "💪", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  finance:  { emoji: "💰", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  learning: { emoji: "📚", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
+  home:     { emoji: "🏠", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
+  errand:   { emoji: "🏃", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300" },
+  creative: { emoji: "🎨", color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
 };
 
 const TAG_COLORS = [
@@ -36,6 +47,8 @@ function isTaskOverdue(task) {
 
 function SubtaskItem({ subtask, taskId, t }) {
   const { dispatch } = useApp();
+  const [editingMin, setEditingMin] = useState(false);
+  const [minVal, setMinVal] = useState(subtask.estimatedMinutes || 0);
   return (
     <div className="flex items-center gap-2 py-1 pl-8">
       <button
@@ -47,6 +60,28 @@ function SubtaskItem({ subtask, taskId, t }) {
       <span className={`text-xs flex-1 ${subtask.completed ? "line-through text-muted-light dark:text-muted-dark" : ""}`}>
         {subtask.text}
       </span>
+      {editingMin ? (
+        <input
+          type="number"
+          min={0}
+          max={120}
+          step={5}
+          value={minVal}
+          autoFocus
+          onChange={(e) => setMinVal(Number(e.target.value))}
+          onBlur={() => { dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } }); setEditingMin(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } }); setEditingMin(false); } }}
+          className="w-12 px-1 py-0.5 rounded text-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-center focus:outline-none focus:ring-1 focus:ring-accent/30"
+        />
+      ) : (
+        <button
+          onClick={() => setEditingMin(true)}
+          className="text-[10px] text-muted-light dark:text-muted-dark hover:text-accent transition-colors font-mono px-1"
+          title={t("tasks.subtaskMinutes")}
+        >
+          {subtask.estimatedMinutes ? `${subtask.estimatedMinutes}${t("common.min")}` : `+${t("common.min")}`}
+        </button>
+      )}
       <button
         onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
         className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-danger transition-all"
@@ -57,7 +92,7 @@ function SubtaskItem({ subtask, taskId, t }) {
   );
 }
 
-function TaskItem({ task, t, onTagClick }) {
+function TaskItem({ task, t, onTagClick, onCategoryClick }) {
   const { dispatch } = useApp();
   const { untagMail } = useMail();
   const priority = PRIORITY_CONFIG[task.priority];
@@ -68,6 +103,8 @@ function TaskItem({ task, t, onTagClick }) {
   const [editPriority, setEditPriority] = useState(task.priority);
   const [editMinutes, setEditMinutes] = useState(task.estimatedMinutes);
   const [editDeadline, setEditDeadline] = useState(task.deadline || "");
+  const [editScheduledTime, setEditScheduledTime] = useState(task.scheduledTime || "");
+  const [editCategory, setEditCategory] = useState(task.category || "");
   const [editTags, setEditTags] = useState(task.tags || []);
   const [editTagInput, setEditTagInput] = useState("");
 
@@ -93,7 +130,16 @@ function TaskItem({ task, t, onTagClick }) {
     if (!editText.trim()) return;
     dispatch({
       type: "UPDATE_TASK",
-      payload: { id: task.id, text: editText.trim(), priority: editPriority, estimatedMinutes: editMinutes, deadline: editDeadline || null, tags: editTags },
+      payload: {
+        id: task.id,
+        text: editText.trim(),
+        priority: editPriority,
+        estimatedMinutes: editMinutes,
+        deadline: editDeadline || null,
+        scheduledTime: editScheduledTime || null,
+        category: editCategory || null,
+        tags: editTags,
+      },
     });
     setEditing(false);
   };
@@ -137,6 +183,15 @@ function TaskItem({ task, t, onTagClick }) {
               onChange={(e) => setEditDeadline(e.target.value)}
               className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
             />
+            <div className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+              <input
+                type="time"
+                value={editScheduledTime}
+                onChange={(e) => setEditScheduledTime(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+              />
+            </div>
             <div className="flex items-center gap-1 ml-auto">
               <input
                 type="number"
@@ -149,6 +204,27 @@ function TaskItem({ task, t, onTagClick }) {
               />
               <span className="text-xs text-muted-light dark:text-muted-dark">{t("common.min")}</span>
             </div>
+          </div>
+          {/* Category selector */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+            <button
+              type="button"
+              onClick={() => setEditCategory("")}
+              className={`px-2 py-1 rounded-lg text-[10px] transition-all ${!editCategory ? "bg-gray-200 dark:bg-white/10 ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}
+            >
+              {t("tasks.noCategory")}
+            </button>
+            {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setEditCategory(key)}
+                className={`px-2 py-1 rounded-lg text-[10px] transition-all ${editCategory === key ? cfg.color + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}
+              >
+                {cfg.emoji}
+              </button>
+            ))}
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
@@ -209,6 +285,14 @@ function TaskItem({ task, t, onTagClick }) {
             </p>
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {task.category && CATEGORY_CONFIG[task.category] && (
+              <button
+                onClick={() => onCategoryClick(task.category)}
+                className={`badge text-[10px] ${CATEGORY_CONFIG[task.category].color} cursor-pointer hover:opacity-80 transition-opacity`}
+              >
+                {CATEGORY_CONFIG[task.category].emoji}
+              </button>
+            )}
             <span className={`badge text-[10px] ${priority.color}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${priority.dot} mr-1`} />
               {t(`tasks.priority.${task.priority}`)}
@@ -216,6 +300,12 @@ function TaskItem({ task, t, onTagClick }) {
             <span className="text-[10px] text-muted-light dark:text-muted-dark font-mono">
               ~{task.estimatedMinutes}{t("common.min")}
             </span>
+            {task.scheduledTime && (
+              <span className="badge text-[10px] bg-accent/10 text-accent flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {task.scheduledTime}
+              </span>
+            )}
             {task.deadline && (
               <span className={`badge text-[10px] flex items-center gap-1 ${isOverdue ? "bg-danger/10 text-danger" : "bg-gray-100 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}>
                 {isOverdue && <AlertCircle className="w-3 h-3" />}
@@ -247,7 +337,7 @@ function TaskItem({ task, t, onTagClick }) {
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
           <button
-            onClick={() => { setEditText(task.text); setEditPriority(task.priority); setEditMinutes(task.estimatedMinutes); setEditDeadline(task.deadline || ""); setEditTags(task.tags || []); setEditing(true); }}
+            onClick={() => { setEditText(task.text); setEditPriority(task.priority); setEditMinutes(task.estimatedMinutes); setEditDeadline(task.deadline || ""); setEditScheduledTime(task.scheduledTime || ""); setEditCategory(task.category || ""); setEditTags(task.tags || []); setEditing(true); }}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
             title={t("common.edit")}
           >
@@ -312,11 +402,14 @@ export default function TasksPage() {
   const [priority, setPriority] = useState("medium");
   const [minutes, setMinutes] = useState(25);
   const [deadline, setDeadline] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [category, setCategory] = useState("");
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("priority");
   const [filterTag, setFilterTag] = useState(null);
+  const [filterCategory, setFilterCategory] = useState(null);
 
   const handleTagKeyDown = (e) => {
     if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
@@ -332,10 +425,20 @@ export default function TasksPage() {
     if (!text.trim()) return;
     dispatch({
       type: "ADD_TASK",
-      payload: { text: text.trim(), priority, estimatedMinutes: minutes, deadline: deadline || null, tags },
+      payload: {
+        text: text.trim(),
+        priority,
+        estimatedMinutes: minutes,
+        deadline: deadline || null,
+        scheduledTime: scheduledTime || null,
+        category: category || null,
+        tags,
+      },
     });
     setText("");
     setDeadline("");
+    setScheduledTime("");
+    setCategory("");
     setTags([]);
     setTagInput("");
   };
@@ -350,6 +453,7 @@ export default function TasksPage() {
     if (filter === "open" && task.completed) return false;
     if (filter === "done" && !task.completed) return false;
     if (filterTag && !(task.tags || []).includes(filterTag)) return false;
+    if (filterCategory && task.category !== filterCategory) return false;
     return true;
   });
 
@@ -417,6 +521,15 @@ export default function TasksPage() {
                 className="px-2 py-1 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
               />
             </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+              <input
+                type="time"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+              />
+            </div>
             <div className="flex items-center gap-1.5 ml-auto">
               <input
                 type="number"
@@ -429,6 +542,20 @@ export default function TasksPage() {
               />
               <span className="text-muted-light dark:text-muted-dark">{t("common.min")}</span>
             </div>
+          </div>
+          {/* Category selector */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+            {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCategory(category === key ? "" : key)}
+                className={`px-2 py-1 rounded-lg text-[10px] transition-all ${category === key ? cfg.color + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}
+              >
+                {cfg.emoji}
+              </button>
+            ))}
           </div>
           {/* Tag input */}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -487,6 +614,28 @@ export default function TasksPage() {
           </div>
         </div>
 
+        {/* Category filter chips */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+          {filterCategory && (
+            <button
+              onClick={() => setFilterCategory(null)}
+              className="badge text-[10px] bg-gray-100 dark:bg-white/10 text-muted-light dark:text-muted-dark flex items-center gap-1"
+            >
+              <X className="w-2.5 h-2.5" /> {t("tasks.clearFilter")}
+            </button>
+          )}
+          {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+            <button
+              key={key}
+              onClick={() => setFilterCategory(filterCategory === key ? null : key)}
+              className={`badge text-[10px] ${cfg.color} transition-opacity ${filterCategory === key ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
+            >
+              {cfg.emoji}
+            </button>
+          ))}
+        </div>
+
         {/* Tag filter chips */}
         {allTags.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-4">
@@ -525,6 +674,7 @@ export default function TasksPage() {
               task={task}
               t={t}
               onTagClick={(tag) => setFilterTag((prev) => (prev === tag ? null : tag))}
+              onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
             />
           ))}
         </div>

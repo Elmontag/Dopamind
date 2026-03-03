@@ -259,6 +259,8 @@ function reducer(state, action) {
         completed: false,
         createdAt: Date.now(),
         deadline: action.payload.deadline || null,
+        scheduledTime: action.payload.scheduledTime || null,
+        category: action.payload.category || null,
         mailRef: action.payload.mailRef || null,
         subtasks: action.payload.subtasks || [],
         tags: action.payload.tags || [],
@@ -275,14 +277,29 @@ function reducer(state, action) {
       };
 
     case "ADD_SUBTASK": {
-      const { taskId, text } = action.payload;
+      const { taskId, text, estimatedMinutes: subMin } = action.payload;
       return {
         ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === taskId
-            ? { ...t, subtasks: [...(t.subtasks || []), { id: Date.now().toString(36), text, completed: false }] }
-            : t
-        ),
+        tasks: state.tasks.map((t) => {
+          if (t.id !== taskId) return t;
+          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0 };
+          const subs = [...(t.subtasks || []), newSub];
+          const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
+          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+        }),
+      };
+    }
+
+    case "UPDATE_SUBTASK": {
+      const { taskId: usId, subtaskId: usSubId, ...subUpdates } = action.payload;
+      return {
+        ...state,
+        tasks: state.tasks.map((t) => {
+          if (t.id !== usId) return t;
+          const subs = (t.subtasks || []).map((s) => s.id === usSubId ? { ...s, ...subUpdates } : s);
+          const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
+          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+        }),
       };
     }
 
@@ -302,11 +319,12 @@ function reducer(state, action) {
       const { taskId: dtId, subtaskId: dsId } = action.payload;
       return {
         ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === dtId
-            ? { ...t, subtasks: (t.subtasks || []).filter((s) => s.id !== dsId) }
-            : t
-        ),
+        tasks: state.tasks.map((t) => {
+          if (t.id !== dtId) return t;
+          const subs = (t.subtasks || []).filter((s) => s.id !== dsId);
+          const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
+          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+        }),
       };
     }
 
