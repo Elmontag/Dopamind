@@ -27,7 +27,9 @@
     "dayPlan": "Day Plan",
     "dayPlanHint": "Suggested time blocks based on events and tasks.",
     "freeSlot": "Free",
-    "taskSlot": "Task"
+    "taskSlot": "Task",
+    "previousDay": "Previous Day",
+    "nextDay": "Next Day"
   },
   "tasks": {
     "title": "Tasks",
@@ -224,7 +226,12 @@
     "mailFilter": "Mail Filter",
     "masterTagEnabled": "Enable key tag for mails",
     "masterTagEnabledDesc": "Only show mails with this tag in the overview. This allows tagging mails for Dopamind from other mail clients.",
-    "masterTag": "Key Tag"
+    "masterTag": "Key Tag",
+    "features": "Features",
+    "featureMail": "Mail enabled",
+    "featureCalendar": "Calendar enabled",
+    "featureTimeTracking": "Time Tracking enabled",
+    "featureGamification": "Gamification enabled"
   },
   "rewards": {
     "levelUp": "Level {level} reached – {title}!",

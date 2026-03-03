@@ -16,6 +16,12 @@ const defaultSettings = {
   gamification: { xpEnabled: true, soundEnabled: false },
   notifications: { enabled: true, focusReminder: true },
   mail: { masterTagEnabled: false, masterTag: "dopamind" },
+  features: {
+    mailEnabled: true,
+    calendarEnabled: true,
+    timeTrackingEnabled: true,
+    gamificationEnabled: true,
+  },
 };
 
 function deepMerge(target, source) {

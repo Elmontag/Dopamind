@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
+import { useSettings } from "../context/SettingsContext";
 import { Home, CheckSquare, Calendar, Briefcase, Timer } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -12,11 +13,19 @@ const NAV_ITEMS = [
 
 export default function MobileNav() {
   const { t } = useI18n();
+  const { settings } = useSettings();
+  const features = settings.features || {};
+
+  const visibleNavItems = NAV_ITEMS.filter(({ key }) => {
+    if (key === "calendar" && !features.calendarEnabled) return false;
+    if (key === "workTime" && !features.timeTrackingEnabled) return false;
+    return true;
+  });
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-t border-gray-200/50 dark:border-white/5 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, key }) => (
+        {visibleNavItems.map(({ to, icon: Icon, key }) => (
           <NavLink
             key={to}
             to={to}

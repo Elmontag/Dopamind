@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { useMail } from "../context/MailContext";
-import FocusTimer from "../components/FocusTimer";
 import StatsPanel from "../components/StatsPanel";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X } from "lucide-react";
 
@@ -175,9 +175,9 @@ function TaskItem({ task, t }) {
               </span>
             )}
             {task.mailRef && (
-              <span className="badge text-[10px] bg-accent/10 text-accent flex items-center gap-1">
+              <Link to="/mail" className="badge text-[10px] bg-accent/10 text-accent flex items-center gap-1 hover:bg-accent/20 transition-colors">
                 <Mail className="w-3 h-3" /> {t("tasks.fromMail")}
-              </span>
+              </Link>
             )}
             {hasSubtasks && (
               <span className="text-[10px] text-muted-light dark:text-muted-dark">
@@ -220,10 +220,11 @@ function TaskItem({ task, t }) {
       {expanded && (
         <div className="pb-3 px-3">
           {task.mailRef && (
-            <div className="pl-8 pb-2 text-xs text-muted-light dark:text-muted-dark">
+            <Link to="/mail" className="pl-8 pb-2 text-xs text-muted-light dark:text-muted-dark block hover:text-accent transition-colors">
+              <Mail className="w-3 h-3 inline mr-1" />
               <span className="font-medium">{task.mailRef.subject}</span>
               {task.mailRef.from && <span className="ml-2">({task.mailRef.from})</span>}
-            </div>
+            </Link>
           )}
           {subtasks.map((s) => (
             <SubtaskItem key={s.id} subtask={s} taskId={task.id} t={t} />
@@ -381,7 +382,6 @@ export default function TasksPage() {
 
         {/* Right column */}
         <div className="lg:col-span-2 space-y-5">
-          <FocusTimer />
           <StatsPanel />
         </div>
       </div>

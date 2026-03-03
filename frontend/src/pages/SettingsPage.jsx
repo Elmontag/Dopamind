@@ -200,6 +200,7 @@ export default function SettingsPage() {
 
           {/* General tab */}
           {activeTab === "general" && (
+            <>
             <Section title={t("settings.general")}>
               <Field label={t("settings.language")}>
                 <div className="flex gap-2">
@@ -242,6 +243,30 @@ export default function SettingsPage() {
                 </div>
               </Field>
             </Section>
+
+            <Section title={t("settings.features")}>
+              <Toggle
+                checked={settings.features.mailEnabled}
+                onChange={(v) => updateSettings("features", { mailEnabled: v })}
+                label={t("settings.featureMail")}
+              />
+              <Toggle
+                checked={settings.features.calendarEnabled}
+                onChange={(v) => updateSettings("features", { calendarEnabled: v })}
+                label={t("settings.featureCalendar")}
+              />
+              <Toggle
+                checked={settings.features.timeTrackingEnabled}
+                onChange={(v) => updateSettings("features", { timeTrackingEnabled: v })}
+                label={t("settings.featureTimeTracking")}
+              />
+              <Toggle
+                checked={settings.features.gamificationEnabled}
+                onChange={(v) => updateSettings("features", { gamificationEnabled: v })}
+                label={t("settings.featureGamification")}
+              />
+            </Section>
+            </>
           )}
 
           {/* Work Time tab */}

@@ -208,7 +208,12 @@
     "mailFilter": "Mail-Filter",
     "masterTagEnabled": "Schlüsseltag für Mails aktivieren",
     "masterTagEnabledDesc": "Nur Mails mit diesem Tag in der Übersicht anzeigen. So können Mails auch aus anderen Clients für Dopamind markiert werden.",
-    "masterTag": "Schlüsseltag"
+    "masterTag": "Schlüsseltag",
+    "features": "Module",
+    "featureMail": "E-Mail aktiviert",
+    "featureCalendar": "Kalender aktiviert",
+    "featureTimeTracking": "Zeiterfassung aktiviert",
+    "featureGamification": "Gamification aktiviert"
   },
   "home": {
     "greeting": "Ein Schritt nach dem anderen.",
@@ -224,7 +229,9 @@
     "dayPlan": "Tagesplanung",
     "dayPlanHint": "Vorgeschlagene Zeitblöcke basierend auf Terminen und Aufgaben.",
     "freeSlot": "Frei",
-    "taskSlot": "Aufgabe"
+    "taskSlot": "Aufgabe",
+    "previousDay": "Vorheriger Tag",
+    "nextDay": "Nächster Tag"
   },
   "rewards": {
     "levelUp": "Level {level} erreicht – {title}!",
