@@ -58,6 +58,7 @@ router.put("/:type", async (req, res) => {
     }
 
     const pool = getPool();
+    // PostgreSQL JSONB columns accept objects directly via the pg driver
     await pool.query(
       `INSERT INTO user_data (user_id, data_type, data, updated_at)
        VALUES ($1, $2, $3, NOW())

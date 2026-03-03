@@ -8,10 +8,12 @@ const DATABASE_URL =
 const pool = new Pool({
   connectionString: DATABASE_URL,
   max: 20,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
 });
 
 pool.on("error", (err) => {
-  console.error("Unexpected PostgreSQL pool error:", err);
+  console.error("Unexpected PostgreSQL pool error:", err.stack || err);
 });
 
 function getPool() {

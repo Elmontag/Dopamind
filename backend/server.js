@@ -75,7 +75,7 @@ async function start() {
     await initDb();
     console.log("PostgreSQL connected and schema initialized.");
   } catch (err) {
-    console.error("Failed to initialize database:", err.message);
+    console.error("Failed to initialize database:", err.stack || err);
     process.exit(1);
   }
 
