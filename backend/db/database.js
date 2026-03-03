@@ -52,6 +52,17 @@ function initSchema() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     );
   `);
+
+  d.exec(`
+    CREATE TABLE IF NOT EXISTS user_data (
+      user_id TEXT NOT NULL,
+      data_type TEXT NOT NULL CHECK(data_type IN ('settings', 'app_state', 'time_tracking')),
+      data TEXT NOT NULL DEFAULT '{}',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, data_type),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
 }
 
 function ensureAdminExists() {

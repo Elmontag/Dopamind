@@ -211,6 +211,44 @@ router.post(
   }
 );
 
+// DELETE /api/auth/account
+router.delete(
+  "/account",
+  authenticate,
+  [body("password").notEmpty().withMessage("Password required for account deletion")],
+  validate,
+  (req, res) => {
+    try {
+      const db = getDb();
+      const user = db.prepare("SELECT id, email, password_hash, role FROM users WHERE id = ?").get(req.user.id);
+
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!bcrypt.compareSync(req.body.password, user.password_hash)) {
+        return res.status(400).json({ error: "Invalid password" });
+      }
+
+      if (user.role === "admin") {
+        const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = 1").get().count;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Cannot delete the last admin account" });
+        }
+      }
+
+      // Delete user data and account (cascade handles user_data)
+      db.prepare("DELETE FROM user_data WHERE user_id = ?").run(user.id);
+      db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+
+      addAuditLog(null, "account_deleted", `User deleted own account: ${user.email}`, req.ip);
+
+      res.json({ message: "Account deleted successfully" });
+    } catch (err) {
+      console.error("Account deletion error:", err);
+      res.status(500).json({ error: "Account deletion failed" });
+    }
+  }
+);
+
 // POST /api/auth/verify-email
 router.post("/verify-email", (req, res) => {
   try {
