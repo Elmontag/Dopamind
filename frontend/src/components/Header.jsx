@@ -1,14 +1,10 @@
 import { useTheme } from "../context/ThemeContext";
-import { useApp, getLevelTitle } from "../context/AppContext";
 import { useI18n } from "../i18n/I18nContext";
 import { Sun, Moon, Globe } from "lucide-react";
-import XpBar from "./XpBar";
 
 export default function Header() {
   const { dark, toggle } = useTheme();
-  const { state } = useApp();
   const { lang, switchLang, availableLanguages } = useI18n();
-  const levelTitle = getLevelTitle(state.level, lang);
 
   return (
     <header className="sticky top-0 z-30 md:relative bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
@@ -21,24 +17,7 @@ export default function Header() {
           <h1 className="text-lg font-semibold tracking-tight">Dopamind</h1>
         </div>
 
-        {/* Desktop: XP Bar */}
-        <div className="hidden md:block flex-1 max-w-xs">
-          <XpBar />
-        </div>
-
-        {/* Mobile (tablet): XP Bar */}
-        <div className="hidden sm:block md:hidden flex-1 max-w-[200px]">
-          <XpBar />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col items-end">
-            <div className="badge bg-accent/10 text-accent dark:bg-accent/20">
-              Lv. {state.level}
-            </div>
-            <span className="text-[10px] text-muted-light dark:text-muted-dark mt-0.5">{levelTitle}</span>
-          </div>
-
+        <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => {
               const idx = availableLanguages.indexOf(lang);
@@ -62,10 +41,6 @@ export default function Header() {
             )}
           </button>
         </div>
-      </div>
-
-      <div className="sm:hidden px-4 pb-2">
-        <XpBar />
       </div>
     </header>
   );
