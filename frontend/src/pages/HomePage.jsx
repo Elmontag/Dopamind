@@ -97,11 +97,12 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
   const nowH = now.getHours();
   const nowM = now.getMinutes();
   const STEP = 15; // 15-minute granularity
+  const PX_PER_MIN = 2.5; // pixels per minute — makes durations visually proportional
 
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editText, setEditText] = useState("");
-  const [dragIdx, setDragIdx] = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const [dragKey, setDragKey] = useState(null);
+  const [dragOverKey, setDragOverKey] = useState(null);
 
   const handleEditSave = (taskId) => {
     if (editText.trim()) {
@@ -123,15 +124,18 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
 
-  // Build initial 15-min slots
   const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
-  const slots = [];
-  for (let i = 0; i < totalSlotCount; i++) {
-    const minOffset = startTotal + i * STEP;
-    slots.push({ time: fmtTime(minOffset), minOffset, type: "free", spanSlots: 1 });
-  }
+  const nowTotal = toMin(nowH, nowM);
 
-  // Block slots occupied by calendar events
+  // --- Build a flat list of timeline entries (not grid slots) ---
+  // Each entry: { key, type, startMin, durationMin, label, ... }
+  const entries = [];
+  let usedRanges = []; // track occupied minute ranges
+
+  const isRangeFree = (from, to) => !usedRanges.some((r) => from < r.to && to > r.from);
+  const claimRange = (from, to) => usedRanges.push({ from, to });
+
+  // 1. Calendar events
   for (const ev of events) {
     if (ev.allDay || !ev.start) continue;
     let evStartMin, evEndMin;
@@ -151,246 +155,273 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
       const ed = ev.end ? new Date(ev.end) : null;
       evEndMin = ed && !isNaN(ed) ? toMin(ed.getHours(), ed.getMinutes()) : evStartMin + 60;
     }
-    // Mark slots that overlap
-    const firstSlot = Math.max(0, Math.floor((evStartMin - startTotal) / STEP));
-    const lastSlot = Math.min(totalSlotCount - 1, Math.ceil((evEndMin - startTotal) / STEP) - 1);
-    let isFirst = true;
-    for (let j = firstSlot; j <= lastSlot; j++) {
-      if (slots[j].type === "free") {
-        const timeRange = ev.start && ev.end ? `${ev.start}–${ev.end}` : "";
-        slots[j].type = "event";
-        slots[j].label = isFirst ? (ev.title || ev.summary) : "";
-        slots[j].eventTime = isFirst ? timeRange : "";
-        slots[j].eventContinuation = !isFirst;
-        isFirst = false;
-      }
-    }
+    const dur = Math.max(STEP, evEndMin - evStartMin);
+    entries.push({
+      key: `ev-${ev.id || ev.title}-${evStartMin}`,
+      type: "event",
+      startMin: evStartMin,
+      durationMin: dur,
+      label: ev.title || ev.summary,
+    });
+    claimRange(evStartMin, evStartMin + dur);
   }
 
-  // --- Place tasks with scheduledTime into the timeline, using their actual duration ---
+  // 2. Break — placed around midday, duration-aware
+  if (breakMin > 0) {
+    const midMin = Math.floor((startTotal + endTotal) / 2);
+    let breakStart = midMin;
+    // Find a free spot near the middle
+    for (let offset = 0; offset < (endTotal - startTotal) / 2; offset++) {
+      if (isRangeFree(midMin - offset, midMin - offset + breakMin)) { breakStart = midMin - offset; break; }
+      if (isRangeFree(midMin + offset, midMin + offset + breakMin)) { breakStart = midMin + offset; break; }
+    }
+    entries.push({
+      key: "break",
+      type: "break",
+      startMin: breakStart,
+      durationMin: breakMin,
+      label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}`,
+    });
+    claimRange(breakStart, breakStart + breakMin);
+  }
+
+  // 3. Tasks — expand subtasks into individual entries
+  // For tasks with subtasks: place each subtask individually, then the parent as a compact summary AFTER.
+  // For tasks without subtasks: place normally.
   const scheduledTasks = tasks.filter((tk) => tk.scheduledTime);
   const unscheduledTasks = tasks.filter((tk) => !tk.scheduledTime);
 
-  const placeTaskInSlots = (task, startSlotIdx) => {
-    const dur = task.estimatedMinutes || 25;
-    const slotsNeeded = Math.max(1, Math.ceil(dur / STEP));
-    // Find contiguous free slots starting from startSlotIdx
-    let canPlace = true;
-    const endIdx = Math.min(startSlotIdx + slotsNeeded, totalSlotCount);
-    for (let j = startSlotIdx; j < endIdx; j++) {
-      if (slots[j].type !== "free") { canPlace = false; break; }
+  const findFreeStart = (desiredStart, dur) => {
+    let s = Math.max(startTotal, desiredStart);
+    while (s + dur <= endTotal) {
+      if (isRangeFree(s, s + dur)) return s;
+      s += STEP;
     }
-    if (!canPlace) {
-      // Just place in the first slot
-      if (slots[startSlotIdx]?.type === "free") {
-        slots[startSlotIdx].type = "task";
-        slots[startSlotIdx].task = task;
-        slots[startSlotIdx].label = task.text;
-        slots[startSlotIdx].priority = task.priority;
-        slots[startSlotIdx].overdue = isTaskOverdue(task);
-        slots[startSlotIdx].scheduled = !!task.scheduledTime;
-        slots[startSlotIdx].spanSlots = 1;
-        slots[startSlotIdx].durationMin = dur;
+    return s; // fallback even if overflows
+  };
+
+  const placeTask = (task, desiredStart) => {
+    const subtasks = (task.subtasks || []).filter((s) => !s.completed);
+    const hasSubtasks = subtasks.length > 0;
+
+    if (hasSubtasks) {
+      // Place each subtask as its own entry
+      let cursor = desiredStart;
+      for (const sub of subtasks) {
+        const subDur = Math.max(STEP, sub.estimatedMinutes || STEP);
+        // Subtask may have its own scheduledTime
+        let subStart;
+        if (sub.scheduledTime) {
+          const [sh, sm] = sub.scheduledTime.split(":").map(Number);
+          subStart = findFreeStart(toMin(sh, sm || 0), subDur);
+        } else {
+          subStart = findFreeStart(cursor, subDur);
+        }
+        entries.push({
+          key: `sub-${task.id}-${sub.id}`,
+          type: "subtask",
+          startMin: subStart,
+          durationMin: subDur,
+          label: sub.text,
+          parentTask: task,
+          subtask: sub,
+          priority: task.priority,
+          overdue: isTaskOverdue(task),
+        });
+        claimRange(subStart, subStart + subDur);
+        cursor = subStart + subDur;
       }
-      return;
-    }
-    // Mark first slot as the task
-    slots[startSlotIdx].type = "task";
-    slots[startSlotIdx].task = task;
-    slots[startSlotIdx].label = task.text;
-    slots[startSlotIdx].priority = task.priority;
-    slots[startSlotIdx].overdue = isTaskOverdue(task);
-    slots[startSlotIdx].scheduled = !!task.scheduledTime;
-    slots[startSlotIdx].spanSlots = endIdx - startSlotIdx;
-    slots[startSlotIdx].durationMin = dur;
-    // Mark subsequent slots as continuation
-    for (let j = startSlotIdx + 1; j < endIdx; j++) {
-      slots[j].type = "task-cont";
-      slots[j].parentIdx = startSlotIdx;
+      // Place the parent task as a compact summary AFTER all subtasks
+      const parentDur = STEP; // compact — just a marker
+      const parentStart = findFreeStart(cursor, parentDur);
+      entries.push({
+        key: `task-${task.id}`,
+        type: "task-parent",
+        startMin: parentStart,
+        durationMin: parentDur,
+        label: task.text,
+        task,
+        priority: task.priority,
+        overdue: isTaskOverdue(task),
+        scheduled: !!task.scheduledTime,
+        subtaskCount: subtasks.length,
+      });
+      claimRange(parentStart, parentStart + parentDur);
+    } else {
+      // Simple task, no subtasks
+      const dur = Math.max(STEP, task.estimatedMinutes || 25);
+      const actualStart = findFreeStart(desiredStart, dur);
+      entries.push({
+        key: `task-${task.id}`,
+        type: "task",
+        startMin: actualStart,
+        durationMin: dur,
+        label: task.text,
+        task,
+        priority: task.priority,
+        overdue: isTaskOverdue(task),
+        scheduled: !!task.scheduledTime,
+      });
+      claimRange(actualStart, actualStart + dur);
     }
   };
 
+  // Place scheduled tasks first
   for (const task of scheduledTasks) {
     const [th, tm] = task.scheduledTime.split(":").map(Number);
     const taskStartMin = toMin(th, tm || 0);
-    // For today: hide tasks whose scheduled time is still in the future
-    if (isToday && taskStartMin > toMin(nowH, nowM)) continue;
-    const slotIdx = Math.max(0, Math.floor((taskStartMin - startTotal) / STEP));
-    if (slotIdx < totalSlotCount && slots[slotIdx]?.type === "free") {
-      placeTaskInSlots(task, slotIdx);
+    if (isToday && taskStartMin > nowTotal) continue;
+    placeTask(task, taskStartMin);
+  }
+
+  // Place unscheduled tasks in remaining free time
+  let nextFree = startTotal;
+  for (const task of unscheduledTasks) {
+    placeTask(task, nextFree);
+    // Advance nextFree past the entries we just placed
+    const justPlaced = entries.filter((e) => e.key.includes(task.id));
+    if (justPlaced.length > 0) {
+      nextFree = Math.max(...justPlaced.map((e) => e.startMin + e.durationMin));
     }
   }
 
-  // Fill remaining free slots with unscheduled tasks (duration-aware)
-  const pendingTasks = [...unscheduledTasks];
-  for (let i = 0; i < totalSlotCount && pendingTasks.length > 0; i++) {
-    if (slots[i].type !== "free") continue;
-    if (isToday) {
-      const idx = pendingTasks.findIndex((task) => {
-        if (!task.createdAt) return true;
-        const created = new Date(task.createdAt);
-        return toMin(created.getHours(), created.getMinutes()) <= slots[i].minOffset;
-      });
-      if (idx >= 0) {
-        const [task] = pendingTasks.splice(idx, 1);
-        placeTaskInSlots(task, i);
-      }
-    } else {
-      const task = pendingTasks.shift();
-      placeTaskInSlots(task, i);
-    }
-  }
-
-  // Insert break in the middle — duration-aware
-  if (breakMin > 0) {
-    const breakSlots = Math.max(1, Math.ceil(breakMin / STEP));
-    const midIdx = Math.floor(totalSlotCount / 2);
-    // Find best position around middle for break
-    let breakStart = midIdx;
-    for (let i = midIdx; i >= 0; i--) {
-      let fits = true;
-      for (let j = i; j < Math.min(i + breakSlots, totalSlotCount); j++) {
-        if (slots[j]?.type === "event") { fits = false; break; }
-      }
-      if (fits) { breakStart = i; break; }
-    }
-    // Insert break (overwrite free/task slots)
-    for (let j = breakStart; j < Math.min(breakStart + breakSlots, totalSlotCount); j++) {
-      const isFirst = j === breakStart;
-      slots[j] = {
-        ...slots[j],
-        type: "break",
-        label: isFirst ? `${breakMin}${t("common.min")} ${t("timeTracking.break")}` : "",
-        breakContinuation: !isFirst,
-        breakIdx: breakStart,
-      };
-    }
-  }
+  // Sort all entries by start time
+  entries.sort((a, b) => a.startMin - b.startMin);
 
   // --- Drag & drop handlers ---
-  const handleDragStart = (e, idx) => {
-    setDragIdx(idx);
+  const handleDragStart = (e, key) => {
+    setDragKey(key);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(idx));
+    e.dataTransfer.setData("text/plain", key);
   };
-  const handleDragOver = (e, idx) => {
+  const handleDragOver = (e, key) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setDragOverIdx(idx);
+    setDragOverKey(key);
   };
-  const handleDragLeave = () => setDragOverIdx(null);
-  const handleDrop = (e, targetIdx) => {
+  const handleDragLeave = () => setDragOverKey(null);
+  const handleDrop = (e, targetEntry) => {
     e.preventDefault();
-    setDragOverIdx(null);
-    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
-    const srcSlot = slots[dragIdx];
-    if (srcSlot?.type === "task" && srcSlot.task) {
-      const newTime = fmtTime(slots[targetIdx].minOffset);
-      onUpdateScheduledTime(srcSlot.task.id, newTime);
+    setDragOverKey(null);
+    if (!dragKey || dragKey === targetEntry.key) { setDragKey(null); return; }
+    const srcEntry = entries.find((en) => en.key === dragKey);
+    if (srcEntry?.task) {
+      const newTime = fmtTime(targetEntry.startMin);
+      onUpdateScheduledTime(srcEntry.task.id, newTime);
     }
-    // Breaks can also be dragged (just visual reorder for now)
-    setDragIdx(null);
+    setDragKey(null);
   };
-  const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
+  const handleDragEnd = () => { setDragKey(null); setDragOverKey(null); };
 
-  const isDraggable = (slot) => !isPastDay && (slot.type === "task" || slot.type === "break");
-
-  // Filter out continuation slots for rendering (they are hidden)
-  const visibleSlots = slots.filter((s) => s.type !== "task-cont" && !s.breakContinuation);
-
-  const nowTotal = toMin(nowH, nowM);
+  const isDraggable = (entry) => !isPastDay && (entry.type === "task" || entry.type === "task-parent" || entry.type === "break");
 
   return (
     <div className="space-y-0.5">
-      {visibleSlots.map((slot, vi) => {
-        const realIdx = slots.indexOf(slot);
-        const isPast = isPastDay || (isToday && slot.minOffset + STEP <= nowTotal);
-        const isCurrent = isToday && slot.minOffset <= nowTotal && nowTotal < slot.minOffset + STEP * (slot.spanSlots || 1);
-        const isEditing = editingTaskId === slot.task?.id;
-        const dragging = dragIdx === realIdx;
-        const dragOver = dragOverIdx === realIdx && dragIdx !== realIdx;
+      {entries.map((entry) => {
+        const isPast = isPastDay || (isToday && entry.startMin + entry.durationMin <= nowTotal);
+        const isCurrent = isToday && entry.startMin <= nowTotal && nowTotal < entry.startMin + entry.durationMin;
+        const isEditing = editingTaskId === (entry.task?.id || entry.subtask?.id);
+        const dragging = dragKey === entry.key;
+        const dragOver = dragOverKey === entry.key && dragKey !== entry.key;
 
-        // Calculate visual height based on span
-        const span = slot.spanSlots || 1;
-        const heightClass = span >= 4 ? "min-h-[4rem]" : span >= 2 ? "min-h-[2.5rem]" : "min-h-[1.75rem]";
+        // Height proportional to duration
+        const heightPx = Math.max(28, Math.round(entry.durationMin * PX_PER_MIN));
+
+        const isTask = entry.type === "task" || entry.type === "task-parent";
+        const isSubtask = entry.type === "subtask";
+        const isParentSummary = entry.type === "task-parent";
 
         return (
           <div
-            key={realIdx}
-            draggable={isDraggable(slot) && !isEditing}
-            onDragStart={(e) => handleDragStart(e, realIdx)}
-            onDragOver={(e) => handleDragOver(e, realIdx)}
+            key={entry.key}
+            draggable={isDraggable(entry) && !isEditing}
+            onDragStart={(e) => handleDragStart(e, entry.key)}
+            onDragOver={(e) => handleDragOver(e, entry.key)}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, realIdx)}
+            onDrop={(e) => handleDrop(e, entry)}
             onDragEnd={handleDragEnd}
-            className={`flex items-center gap-3 group transition-all ${heightClass} ${isPast ? "opacity-40" : ""} ${dragging ? "opacity-50 scale-[0.97]" : ""} ${dragOver ? "ring-2 ring-accent/40 rounded-lg" : ""}`}
+            style={{ minHeight: `${heightPx}px` }}
+            className={`flex items-center gap-3 group transition-all ${isPast ? "opacity-40" : ""} ${dragging ? "opacity-50 scale-[0.97]" : ""} ${dragOver ? "ring-2 ring-accent/40 rounded-lg" : ""} ${isSubtask ? "ml-4" : ""}`}
           >
             {/* Drag handle */}
-            {isDraggable(slot) && !isPast && (
+            {isDraggable(entry) && !isPast && (
               <span className="w-4 flex-shrink-0 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
                 <GripVertical className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
               </span>
             )}
-            {!isDraggable(slot) && <span className="w-4 flex-shrink-0" />}
+            {!isDraggable(entry) && <span className="w-4 flex-shrink-0" />}
 
             {/* Time column */}
             <span className={`w-12 text-[11px] font-mono flex-shrink-0 ${isCurrent ? "text-accent font-bold" : "text-muted-light dark:text-muted-dark"}`}>
-              {slot.time}
+              {fmtTime(entry.startMin)}
               {isCurrent && <span className="ml-0.5 text-accent">◀</span>}
             </span>
 
             {/* Slot content */}
-            <div className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
-              slot.type === "event"
-                ? "bg-accent/10 text-accent font-medium"
-                : slot.type === "task"
-                ? slot.overdue
+            <div
+              style={{ minHeight: `${Math.max(24, heightPx - 4)}px` }}
+              className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                entry.type === "event"
+                  ? "bg-accent/10 text-accent font-medium"
+                  : isParentSummary
+                  ? "bg-gray-200 dark:bg-white/10 border border-dashed border-gray-300 dark:border-white/20 text-muted-light dark:text-muted-dark"
+                  : isSubtask
+                  ? entry.overdue
+                    ? "bg-danger/5 text-danger border-l-2 border-danger/30"
+                    : "bg-gray-50 dark:bg-white/[0.03] border-l-2 border-accent/30"
+                  : (isTask && entry.overdue)
                   ? "bg-danger/10 text-danger"
-                  : "bg-gray-100 dark:bg-white/5"
-                : slot.type === "break"
-                ? "bg-warn/10 text-amber-700 dark:text-warn"
-                : "bg-gray-50 dark:bg-white/[0.02] text-muted-light dark:text-muted-dark"
-            }`}>
-              {slot.type === "event" && <Calendar className="w-3 h-3 flex-shrink-0" />}
-              {slot.type === "task" && slot.overdue && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
-              {slot.type === "task" && slot.scheduled && !slot.overdue && <Clock className="w-3 h-3 flex-shrink-0 text-accent" />}
-              {slot.type === "break" && <Coffee className="w-3 h-3 flex-shrink-0" />}
-              {slot.type === "free" && <Clock className="w-3 h-3 flex-shrink-0 opacity-30" />}
+                  : isTask
+                  ? "bg-gray-100 dark:bg-white/5"
+                  : entry.type === "break"
+                  ? "bg-warn/10 text-amber-700 dark:text-warn"
+                  : ""
+              }`}
+            >
+              {entry.type === "event" && <Calendar className="w-3 h-3 flex-shrink-0" />}
+              {isTask && entry.overdue && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+              {isTask && entry.scheduled && !entry.overdue && <Clock className="w-3 h-3 flex-shrink-0 text-accent" />}
+              {isSubtask && <span className="w-1.5 h-1.5 rounded-full bg-accent/40 flex-shrink-0" />}
+              {isParentSummary && <CheckCircle className="w-3 h-3 flex-shrink-0 opacity-50" />}
+              {entry.type === "break" && <Coffee className="w-3 h-3 flex-shrink-0" />}
 
               {isEditing ? (
                 <input
                   autoFocus
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  onBlur={() => handleEditSave(slot.task.id)}
+                  onBlur={() => handleEditSave(entry.task?.id || entry.subtask?.id)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleEditSave(slot.task.id);
+                    if (e.key === "Enter") handleEditSave(entry.task?.id || entry.subtask?.id);
                     if (e.key === "Escape") setEditingTaskId(null);
                   }}
                   className="flex-1 bg-transparent outline-none border-b border-accent min-w-0"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="flex-1 truncate">
-                  {slot.label || t(`home.${slot.type === "free" ? "freeSlot" : "taskSlot"}`)}
-                  {slot.type === "task" && slot.durationMin && (
-                    <span className="ml-1.5 text-[10px] font-mono opacity-60">~{slot.durationMin}{t("common.min")}</span>
+                <span className={`flex-1 truncate ${isParentSummary ? "italic" : ""}`}>
+                  {entry.label}
+                  {isParentSummary && entry.subtaskCount > 0 && (
+                    <span className="ml-1 text-[10px] font-mono opacity-50">({entry.subtaskCount} ↑)</span>
+                  )}
+                  {(isTask || isSubtask) && entry.durationMin > 0 && (
+                    <span className="ml-1.5 text-[10px] font-mono opacity-60">~{entry.durationMin}{t("common.min")}</span>
                   )}
                 </span>
               )}
 
-              {slot.type === "task" && slot.priority && !isEditing && (
+              {(isTask || isSubtask) && entry.priority && !isEditing && (
                 <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  slot.priority === "high" ? "bg-danger" : slot.priority === "medium" ? "bg-warn" : "bg-success"
+                  entry.priority === "high" ? "bg-danger" : entry.priority === "medium" ? "bg-warn" : "bg-success"
                 }`} />
               )}
             </div>
 
             {/* Task action buttons */}
-            {slot.type === "task" && slot.task && !isPast && !isEditing && (
+            {isTask && entry.task && !isPast && !isEditing && (
               <>
                 <button
-                  onClick={() => onCompleteTask(slot.task.id)}
+                  onClick={() => onCompleteTask(entry.task.id)}
                   className="w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
                   title={t("tasks.complete")}
                   aria-label={t("tasks.complete")}
@@ -398,7 +429,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
                   <CheckCircle className="w-3.5 h-3.5 text-accent" />
                 </button>
                 <button
-                  onClick={() => { setEditingTaskId(slot.task.id); setEditText(slot.task.text); }}
+                  onClick={() => { setEditingTaskId(entry.task.id); setEditText(entry.task.text); }}
                   className="w-6 h-6 rounded-md hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
                   title={t("common.edit")}
                   aria-label={t("common.edit")}
@@ -407,7 +438,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
                 </button>
               </>
             )}
-            {slot.type === "task" && slot.task && !isPast && isEditing && (
+            {isTask && entry.task && !isPast && isEditing && (
               <button
                 onClick={() => setEditingTaskId(null)}
                 className="w-6 h-6 rounded-md hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0 flex items-center justify-center transition-all"

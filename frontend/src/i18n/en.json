@@ -94,7 +94,8 @@
     "categoryEmoji": "Emoji",
     "categoryTasks": "Tasks",
     "addTaskExpand": "Create task ▸",
-    "addTaskCollapse": "▾ Collapse"
+    "addTaskCollapse": "▾ Collapse",
+    "dropToAssign": "Drop task here"
   },
   "focus": {
     "title": "Focus Block",

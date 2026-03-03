@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { useMail } from "../context/MailContext";
-import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2 } from "lucide-react";
+import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical } from "lucide-react";
 
 const PRIORITY_CONFIG = {
   high: { dot: "bg-danger", color: "bg-danger/10 text-danger dark:bg-danger/20" },
@@ -277,8 +277,15 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories }) {
   }
 
   return (
-    <div className={`group rounded-xl transition-all duration-200 ${task.completed ? "opacity-60 scale-[0.98]" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}>
+    <div
+      draggable={!editing}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", task.id); }}
+      className={`group rounded-xl transition-all duration-200 ${task.completed ? "opacity-60 scale-[0.98]" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}
+    >
       <div className="flex items-center gap-3 p-3">
+        <span className="w-4 flex-shrink-0 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
+          <GripVertical className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+        </span>
         <button
           onClick={() => dispatch({ type: task.completed ? "REOPEN_TASK" : "COMPLETE_TASK", payload: task.id })}
           className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
@@ -525,325 +532,360 @@ export default function TasksPage() {
     return counts;
   }, [state.tasks]);
 
+  // Handle drag-and-drop of tasks into categories
+  const [dragOverCatId, setDragOverCatId] = useState(null);
+  const handleCatDragOver = (e, catId) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCatId(catId); };
+  const handleCatDragLeave = () => setDragOverCatId(null);
+  const handleCatDrop = (e, catId) => {
+    e.preventDefault();
+    setDragOverCatId(null);
+    const taskId = e.dataTransfer.getData("text/plain");
+    if (taskId) {
+      dispatch({ type: "UPDATE_TASK", payload: { id: taskId, category: catId === "_none" ? null : catId } });
+    }
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">
-            {t("tasks.title")}
-          </h2>
-          <button
-            onClick={() => setManagingCategories((v) => !v)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
-            title={t("tasks.manageCategories")}
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      <div className="flex gap-4">
+        {/* Category sidebar */}
+        <div className="w-48 flex-shrink-0">
+          <div className="glass-card p-3 space-y-1 sticky top-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("tasks.category")}</h3>
+              <button
+                onClick={() => setManagingCategories((v) => !v)}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
+                title={t("tasks.manageCategories")}
+              >
+                <Settings2 className="w-3 h-3" />
+              </button>
+            </div>
 
-        {/* Category management panel */}
-        {managingCategories && (
-          <div className="mb-4 p-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] space-y-2">
-            <h3 className="text-xs font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("tasks.manageCategories")}</h3>
+            {/* "All" category */}
+            <button
+              onClick={() => setFilterCategory(null)}
+              onDragOver={(e) => handleCatDragOver(e, "_none")}
+              onDragLeave={handleCatDragLeave}
+              onDrop={(e) => handleCatDrop(e, "_none")}
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all ${
+                !filterCategory ? "bg-accent/10 text-accent font-medium" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
+              } ${dragOverCatId === "_none" ? "ring-2 ring-accent/40" : ""}`}
+            >
+              <Folder className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="flex-1 text-left truncate">{t("tasks.filter.all")}</span>
+              <span className="text-[10px] font-mono opacity-60">{state.tasks.length}</span>
+            </button>
+
+            {/* Category list — each is a drop target */}
             {categories.map((cat) => (
-              <div key={cat.id} className="flex items-center gap-2">
+              <div key={cat.id}>
                 {editingCatId === cat.id ? (
-                  <>
+                  <div className="flex items-center gap-1 px-1 py-0.5">
                     <input
                       value={editCatEmoji}
                       onChange={(e) => setEditCatEmoji(e.target.value)}
-                      className="w-10 px-1 py-0.5 rounded text-center text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                      className="w-7 px-0.5 py-0.5 rounded text-center text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
                     />
                     <input
                       value={editCatName}
                       onChange={(e) => setEditCatName(e.target.value)}
-                      className="flex-1 px-2 py-0.5 rounded text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                      className="flex-1 min-w-0 px-1 py-0.5 rounded text-[10px] bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
                     />
                     <button
                       onClick={() => { dispatch({ type: "UPDATE_CATEGORY", payload: { id: cat.id, name: editCatName, emoji: editCatEmoji } }); setEditingCatId(null); }}
-                      className="text-xs text-accent hover:underline"
-                    ><Check className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setEditingCatId(null)} className="text-xs text-muted-light"><X className="w-3.5 h-3.5" /></button>
-                  </>
+                      className="text-accent"
+                    ><Check className="w-3 h-3" /></button>
+                    <button onClick={() => setEditingCatId(null)} className="text-muted-light"><X className="w-3 h-3" /></button>
+                  </div>
                 ) : (
-                  <>
-                    <span className={`badge text-[10px] ${cat.color || "bg-gray-100 text-gray-700"}`}>{cat.emoji} {t(`tasks.categories.${cat.name}`) !== `tasks.categories.${cat.name}` ? t(`tasks.categories.${cat.name}`) : cat.name}</span>
-                    <span className="text-[10px] text-muted-light dark:text-muted-dark font-mono">{taskCountByCategory[cat.id] || 0} {t("tasks.categoryTasks")}</span>
-                    <button
-                      onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji); }}
-                      className="ml-auto text-xs text-muted-light hover:text-accent"
-                    ><Pencil className="w-3 h-3" /></button>
-                    <button
-                      onClick={() => dispatch({ type: "DELETE_CATEGORY", payload: cat.id })}
-                      className="text-xs text-muted-light hover:text-danger"
-                    ><Trash2 className="w-3 h-3" /></button>
-                  </>
+                  <button
+                    onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+                    onDragOver={(e) => handleCatDragOver(e, cat.id)}
+                    onDragLeave={handleCatDragLeave}
+                    onDrop={(e) => handleCatDrop(e, cat.id)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all group/cat ${
+                      filterCategory === cat.id ? (cat.color || "bg-accent/10 text-accent") + " font-medium" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
+                    } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
+                  >
+                    <span className="flex-shrink-0">{cat.emoji}</span>
+                    <span className="flex-1 text-left truncate">{t(`tasks.categories.${cat.name}`) !== `tasks.categories.${cat.name}` ? t(`tasks.categories.${cat.name}`).replace(/^[^\s]+\s/, '') : cat.name}</span>
+                    <span className="text-[10px] font-mono opacity-60">{taskCountByCategory[cat.id] || 0}</span>
+                    {managingCategories && (
+                      <span className="flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji); }}
+                          className="cursor-pointer hover:text-accent"
+                        ><Pencil className="w-2.5 h-2.5" /></span>
+                        <span
+                          onClick={(e) => { e.stopPropagation(); dispatch({ type: "DELETE_CATEGORY", payload: cat.id }); }}
+                          className="cursor-pointer hover:text-danger"
+                        ><Trash2 className="w-2.5 h-2.5" /></span>
+                      </span>
+                    )}
+                  </button>
                 )}
               </div>
             ))}
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                value={newCatEmoji}
-                onChange={(e) => setNewCatEmoji(e.target.value)}
-                placeholder="📁"
-                className="w-10 px-1 py-0.5 rounded text-center text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-              />
-              <input
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                placeholder={t("tasks.categoryName")}
-                className="flex-1 px-2 py-0.5 rounded text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-              />
-              <button
-                onClick={() => {
-                  if (!newCatName.trim()) return;
-                  const colorIdx = categories.length % CATEGORY_COLORS.length;
-                  dispatch({ type: "ADD_CATEGORY", payload: { name: newCatName.trim(), emoji: newCatEmoji || "📁", color: CATEGORY_COLORS[colorIdx] } });
-                  setNewCatName("");
-                  setNewCatEmoji("📁");
-                }}
-                className="btn-primary text-xs py-0.5 px-2"
-              ><Plus className="w-3.5 h-3.5" /></button>
-            </div>
-          </div>
-        )}
 
-        {/* Collapsible Add form */}
-        {!addFormExpanded ? (
-          <div className="mb-5">
-            <form onSubmit={handleAdd} className="flex gap-2">
-              <input
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onFocus={() => setAddFormExpanded(true)}
-                placeholder={t("tasks.addPlaceholder")}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm placeholder:text-muted-light dark:placeholder:text-muted-dark focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
-              />
-              <button type="button" onClick={() => setAddFormExpanded(true)} className="btn-ghost text-xs whitespace-nowrap flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" /> {t("tasks.addTaskExpand")}
-              </button>
-            </form>
+            {/* Add category (visible in manage mode) */}
+            {managingCategories && (
+              <div className="pt-1 flex items-center gap-1">
+                <input
+                  value={newCatEmoji}
+                  onChange={(e) => setNewCatEmoji(e.target.value)}
+                  placeholder="📁"
+                  className="w-7 px-0.5 py-0.5 rounded text-center text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                />
+                <input
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder={t("tasks.categoryName")}
+                  className="flex-1 min-w-0 px-1 py-0.5 rounded text-[10px] bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    if (!newCatName.trim()) return;
+                    const colorIdx = categories.length % CATEGORY_COLORS.length;
+                    dispatch({ type: "ADD_CATEGORY", payload: { name: newCatName.trim(), emoji: newCatEmoji || "📁", color: CATEGORY_COLORS[colorIdx] } });
+                    setNewCatName("");
+                    setNewCatEmoji("📁");
+                  }}
+                  className="text-accent"
+                ><Plus className="w-3.5 h-3.5" /></button>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="mb-5 p-4 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200/50 dark:border-white/5 space-y-3 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("tasks.add")}</h3>
-              <button onClick={() => setAddFormExpanded(false)} className="text-xs text-muted-light dark:text-muted-dark hover:text-accent">{t("tasks.addTaskCollapse")}</button>
-            </div>
-            <form onSubmit={handleAdd} className="space-y-3">
-              <input
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={t("tasks.addPlaceholder")}
-                autoFocus
-                className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm placeholder:text-muted-light dark:placeholder:text-muted-dark focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
-              />
-              {/* Row 1: Priority */}
-              <div className="flex items-center gap-1.5 text-xs">
-                <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+        </div>
+
+        {/* Main task list */}
+        <div className="flex-1 min-w-0">
+          <div className="glass-card p-5">
+            <h2 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">
+              {t("tasks.title")}
+              {filterCategory && categories.find((c) => c.id === filterCategory) && (
+                <span className="ml-2 normal-case font-normal">
+                  — {categories.find((c) => c.id === filterCategory)?.emoji} {(() => { const cat = categories.find((c) => c.id === filterCategory); const key = `tasks.categories.${cat.name}`; const translated = t(key); return translated !== key ? translated.replace(/^[^\s]+\s/, '') : cat.name; })()}
+                </span>
+              )}
+            </h2>
+
+            {/* Collapsible Add form */}
+            {!addFormExpanded ? (
+              <div className="mb-5">
+                <form onSubmit={handleAdd} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onFocus={() => setAddFormExpanded(true)}
+                    placeholder={t("tasks.addPlaceholder")}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm placeholder:text-muted-light dark:placeholder:text-muted-dark focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+                  />
+                  <button type="button" onClick={() => setAddFormExpanded(true)} className="btn-ghost text-xs whitespace-nowrap flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5" /> {t("tasks.addTaskExpand")}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="mb-5 p-4 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200/50 dark:border-white/5 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("tasks.add")}</h3>
+                  <button onClick={() => setAddFormExpanded(false)} className="text-xs text-muted-light dark:text-muted-dark hover:text-accent">{t("tasks.addTaskCollapse")}</button>
+                </div>
+                <form onSubmit={handleAdd} className="space-y-3">
+                  <input
+                    type="text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={t("tasks.addPlaceholder")}
+                    autoFocus
+                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm placeholder:text-muted-light dark:placeholder:text-muted-dark focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+                  />
+                  {/* Row 1: Priority */}
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+                    {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setPriority(key)}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                          priority === key
+                            ? cfg.color + " ring-1 ring-current/20"
+                            : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        {t(`tasks.priority.${key}`)}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Row 2: Dates & Times */}
+                  <div className="flex items-center gap-3 text-xs flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+                      <input
+                        type="date"
+                        value={deadline}
+                        onChange={(e) => setDeadline(e.target.value)}
+                        title={t("tasks.deadline")}
+                        className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        title={t("tasks.scheduledDate")}
+                        className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
+                      <input
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        title={t("tasks.scheduledTime")}
+                        className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <input
+                        type="number"
+                        min={5}
+                        max={480}
+                        step={5}
+                        value={minutes}
+                        onChange={(e) => setMinutes(Number(e.target.value))}
+                        className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-center text-xs focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      />
+                      <span className="text-muted-light dark:text-muted-dark">{t("common.min")}</span>
+                    </div>
+                  </div>
+                  {/* Row 3: Category */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setCategory(category === cat.id ? "" : cat.id)}
+                        className={`px-2 py-1 rounded-lg text-[10px] transition-all ${category === cat.id ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}
+                      >
+                        {cat.emoji}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Row 4: Tags */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+                    {tags.map((tag) => (
+                      <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>
+                        {tag}
+                        <button type="button" onClick={() => setTags(tags.filter((x) => x !== tag))}>
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      placeholder={t("tasks.addTag")}
+                      className="flex-1 min-w-[100px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    />
+                  </div>
+                  {/* Submit */}
+                  <button type="submit" className="btn-primary text-sm w-full">
+                    {t("tasks.add")}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Filter + Sort bar */}
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="flex gap-1">
+                {["all", "open", "done"].map((f) => (
                   <button
-                    key={key}
-                    type="button"
-                    onClick={() => setPriority(key)}
-                    className={`px-2.5 py-1 rounded-lg transition-all ${
-                      priority === key
-                        ? cfg.color + " ring-1 ring-current/20"
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      filter === f
+                        ? "bg-accent/10 text-accent dark:bg-accent/20"
                         : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
                     }`}
                   >
-                    {t(`tasks.priority.${key}`)}
+                    {t(`tasks.filter.${f}`)}
                   </button>
                 ))}
               </div>
-              {/* Row 2: Dates & Times */}
-              <div className="flex items-center gap-3 text-xs flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
-                  <input
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    title={t("tasks.deadline")}
-                    className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
-                  <input
-                    type="date"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    title={t("tasks.scheduledDate")}
-                    className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark" />
-                  <input
-                    type="time"
-                    value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
-                    title={t("tasks.scheduledTime")}
-                    className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <input
-                    type="number"
-                    min={5}
-                    max={480}
-                    step={5}
-                    value={minutes}
-                    onChange={(e) => setMinutes(Number(e.target.value))}
-                    className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-center text-xs focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                  <span className="text-muted-light dark:text-muted-dark">{t("common.min")}</span>
-                </div>
-              </div>
-              {/* Row 3: Category */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                {categories.map((cat) => (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.sortBy")}:</span>
+                {["priority", "deadline", "created"].map((s) => (
                   <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategory(category === cat.id ? "" : cat.id)}
-                    className={`px-2 py-1 rounded-lg text-[10px] transition-all ${category === cat.id ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}
+                    key={s}
+                    onClick={() => setSortBy(s)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                      sortBy === s
+                        ? "bg-accent/10 text-accent dark:bg-accent/20"
+                        : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
+                    }`}
                   >
-                    {cat.emoji}
+                    {t(`tasks.sort.${s}`)}
                   </button>
                 ))}
               </div>
-              {/* Row 4: Tags */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                {tags.map((tag) => (
-                  <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>
-                    {tag}
-                    <button type="button" onClick={() => setTags(tags.filter((x) => x !== tag))}>
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  placeholder={t("tasks.addTag")}
-                  className="flex-1 min-w-[100px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                />
-              </div>
-              {/* Submit */}
-              <button type="submit" className="btn-primary text-sm w-full">
-                {t("tasks.add")}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Filter + Sort bar */}
-        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-          <div className="flex gap-1">
-            {["all", "open", "done"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  filter === f
-                    ? "bg-accent/10 text-accent dark:bg-accent/20"
-                    : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
-                }`}
-              >
-                {t(`tasks.filter.${f}`)}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.sortBy")}:</span>
-            {["priority", "deadline", "created"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setSortBy(s)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  sortBy === s
-                    ? "bg-accent/10 text-accent dark:bg-accent/20"
-                    : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
-                }`}
-              >
-                {t(`tasks.sort.${s}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Category filter chips with task count */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-3">
-          <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-          {filterCategory && (
-            <button
-              onClick={() => setFilterCategory(null)}
-              className="badge text-[10px] bg-gray-100 dark:bg-white/10 text-muted-light dark:text-muted-dark flex items-center gap-1"
-            >
-              <X className="w-2.5 h-2.5" /> {t("tasks.clearFilter")}
-            </button>
-          )}
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
-              className={`badge text-[10px] ${cat.color || "bg-gray-100 text-gray-700"} transition-opacity ${filterCategory === cat.id ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
-            >
-              {cat.emoji} <span className="ml-0.5 font-mono">{taskCountByCategory[cat.id] || 0}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Tag filter chips */}
-        {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-            {filterTag && (
-              <button
-                onClick={() => setFilterTag(null)}
-                className="badge text-[10px] bg-gray-100 dark:bg-white/10 text-muted-light dark:text-muted-dark flex items-center gap-1"
-              >
-                <X className="w-2.5 h-2.5" /> {t("tasks.clearFilter")}
-              </button>
-            )}
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                className={`badge text-[10px] ${getTagColor(tag)} transition-opacity ${filterTag === tag ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Task list */}
-        <div className="space-y-1">
-          {sortedTasks.length === 0 && (
-            <div className="text-center py-8 text-muted-light dark:text-muted-dark">
-              <p className="text-sm">{t("tasks.empty")}</p>
-              <p className="text-xs mt-1">{t("tasks.emptyHint")}</p>
             </div>
-          )}
-          {sortedTasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              t={t}
-              categories={categories}
-              onTagClick={(tag) => setFilterTag((prev) => (prev === tag ? null : tag))}
-              onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
-            />
-          ))}
+
+            {/* Tag filter chips */}
+            {allTags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap mb-4">
+                <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
+                {filterTag && (
+                  <button
+                    onClick={() => setFilterTag(null)}
+                    className="badge text-[10px] bg-gray-100 dark:bg-white/10 text-muted-light dark:text-muted-dark flex items-center gap-1"
+                  >
+                    <X className="w-2.5 h-2.5" /> {t("tasks.clearFilter")}
+                  </button>
+                )}
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                    className={`badge text-[10px] ${getTagColor(tag)} transition-opacity ${filterTag === tag ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Task list */}
+            <div className="space-y-1">
+              {sortedTasks.length === 0 && (
+                <div className="text-center py-8 text-muted-light dark:text-muted-dark">
+                  <p className="text-sm">{t("tasks.empty")}</p>
+                  <p className="text-xs mt-1">{t("tasks.emptyHint")}</p>
+                </div>
+              )}
+              {sortedTasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  t={t}
+                  categories={categories}
+                  onTagClick={(tag) => setFilterTag((prev) => (prev === tag ? null : tag))}
+                  onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -290,12 +290,12 @@ function reducer(state, action) {
       };
 
     case "ADD_SUBTASK": {
-      const { taskId, text, estimatedMinutes: subMin } = action.payload;
+      const { taskId, text, estimatedMinutes: subMin, scheduledTime: subSchedTime, scheduledDate: subSchedDate } = action.payload;
       return {
         ...state,
         tasks: state.tasks.map((t) => {
           if (t.id !== taskId) return t;
-          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0 };
+          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null };
           const subs = [...(t.subtasks || []), newSub];
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
           return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };

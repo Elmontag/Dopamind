@@ -75,7 +75,8 @@
     "categoryEmoji": "Emoji",
     "categoryTasks": "Aufgaben",
     "addTaskExpand": "Aufgabe anlegen ▸",
-    "addTaskCollapse": "▾ Einklappen"
+    "addTaskCollapse": "▾ Einklappen",
+    "dropToAssign": "Aufgabe hierher ziehen"
   },
   "focus": {
     "title": "Fokus-Block",
