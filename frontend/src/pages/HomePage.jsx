@@ -105,26 +105,28 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
   };
 
   // Build hourly slots with proper calendar event blocking
+  const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
   const slots = [];
   for (let h = startH; h < endH; h++) {
     const timeStr = `${String(h).padStart(2, "0")}:00`;
     const event = events.find((ev) => {
       if (ev.allDay) return false;
       if (!ev.start) return false;
-      // Handle both "HH:MM" time strings and full ISO datetime strings
+      // Handle both "HH:MM" / "H:MM" time strings and full ISO datetime strings
       let evStartH, evEndH;
-      if (ev.start.length <= 5) {
+      if (isTimeOnly(ev.start)) {
         evStartH = parseInt(ev.start.split(":")[0], 10);
-        evEndH = ev.end ? parseInt(ev.end.split(":")[0], 10) : evStartH + 1;
+        evEndH = ev.end && isTimeOnly(ev.end) ? parseInt(ev.end.split(":")[0], 10) : evStartH + 1;
       } else {
         const startDate = new Date(ev.start);
+        if (isNaN(startDate)) return false;
         const endDate = ev.end ? new Date(ev.end) : null;
         evStartH = startDate.getHours();
-        evEndH = endDate ? endDate.getHours() : evStartH + 1;
+        evEndH = endDate && !isNaN(endDate) ? endDate.getHours() : evStartH + 1;
       }
       // If end minute > 0, the event still occupies that hour
       if (ev.end) {
-        const endMin = ev.end.length <= 5
+        const endMin = isTimeOnly(ev.end)
           ? parseInt(ev.end.split(":")[1] || "0", 10)
           : new Date(ev.end).getMinutes();
         if (endMin > 0) evEndH += 1;

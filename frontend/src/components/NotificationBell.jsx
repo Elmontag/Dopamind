@@ -32,6 +32,7 @@ export default function NotificationBell() {
 
   for (const task of state.tasks) {
     if (task.completed || !task.deadline) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(task.deadline)) continue;
     const deadlineDate = new Date(task.deadline + "T23:59:59");
     const diffMs = deadlineDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffMs / 86400000);

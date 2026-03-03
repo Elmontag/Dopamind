@@ -184,6 +184,12 @@ Update `nginx/default.conf` for your domain and add SSL:
 
 ```nginx
 server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
     listen 443 ssl;
     server_name your-domain.com;
 
