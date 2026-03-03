@@ -51,49 +51,100 @@ function SubtaskItem({ subtask, taskId, t }) {
   const { dispatch } = useApp();
   const [editingMin, setEditingMin] = useState(false);
   const [minVal, setMinVal] = useState(subtask.estimatedMinutes || 0);
+  const [editingSchedule, setEditingSchedule] = useState(false);
+  const [schedTime, setSchedTime] = useState(subtask.scheduledTime || "");
+  const [schedDate, setSchedDate] = useState(subtask.scheduledDate || "");
   const saveMinutes = () => {
     dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } });
     setEditingMin(false);
   };
+  const saveSchedule = () => {
+    dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, scheduledTime: schedTime || null, scheduledDate: schedDate || null } });
+    setEditingSchedule(false);
+  };
   return (
-    <div className="flex items-center gap-2 py-1 pl-8">
-      <button
-        onClick={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
-        className="w-4 h-4 flex-shrink-0 text-muted-light dark:text-muted-dark hover:text-accent transition-colors"
-      >
-        {subtask.completed ? <CheckSquare className="w-4 h-4 text-success" /> : <Square className="w-4 h-4" />}
-      </button>
-      <span className={`text-xs flex-1 ${subtask.completed ? "line-through text-muted-light dark:text-muted-dark" : ""}`}>
-        {subtask.text}
-      </span>
-      {editingMin ? (
-        <input
-          type="number"
-          min={0}
-          max={480}
-          step={5}
-          value={minVal}
-          autoFocus
-          onChange={(e) => setMinVal(Number(e.target.value))}
-          onBlur={saveMinutes}
-          onKeyDown={(e) => { if (e.key === "Enter") saveMinutes(); }}
-          className="w-12 px-1 py-0.5 rounded text-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-center focus:outline-none focus:ring-1 focus:ring-accent/30"
-        />
-      ) : (
+    <div className="py-1 pl-8">
+      <div className="flex items-center gap-2">
         <button
-          onClick={() => setEditingMin(true)}
-          className="text-[10px] text-muted-light dark:text-muted-dark hover:text-accent transition-colors font-mono px-1"
-          title={t("tasks.subtaskMinutes")}
+          onClick={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
+          className="w-4 h-4 flex-shrink-0 text-muted-light dark:text-muted-dark hover:text-accent transition-colors"
         >
-          {subtask.estimatedMinutes ? `${subtask.estimatedMinutes}${t("common.min")}` : `+${t("common.min")}`}
+          {subtask.completed ? <CheckSquare className="w-4 h-4 text-success" /> : <Square className="w-4 h-4" />}
         </button>
+        <span className={`text-xs flex-1 ${subtask.completed ? "line-through text-muted-light dark:text-muted-dark" : ""}`}>
+          {subtask.text}
+        </span>
+        {editingMin ? (
+          <input
+            type="number"
+            min={0}
+            max={480}
+            step={5}
+            value={minVal}
+            autoFocus
+            onChange={(e) => setMinVal(Number(e.target.value))}
+            onBlur={saveMinutes}
+            onKeyDown={(e) => { if (e.key === "Enter") saveMinutes(); }}
+            className="w-12 px-1 py-0.5 rounded text-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-center focus:outline-none focus:ring-1 focus:ring-accent/30"
+          />
+        ) : (
+          <button
+            onClick={() => setEditingMin(true)}
+            className="text-[10px] text-muted-light dark:text-muted-dark hover:text-accent transition-colors font-mono px-1"
+            title={t("tasks.subtaskMinutes")}
+          >
+            {subtask.estimatedMinutes ? `${subtask.estimatedMinutes}${t("common.min")}` : `+${t("common.min")}`}
+          </button>
+        )}
+        <button
+          onClick={() => setEditingSchedule(!editingSchedule)}
+          className={`text-[10px] transition-colors font-mono px-1 ${subtask.scheduledTime || subtask.scheduledDate ? "text-accent" : "text-muted-light dark:text-muted-dark hover:text-accent"}`}
+          title={t("tasks.scheduledTime")}
+        >
+          <Clock className="w-3 h-3 inline" />
+          {subtask.scheduledTime && <span className="ml-0.5">{subtask.scheduledTime}</span>}
+        </button>
+        <button
+          onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-danger transition-all"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+      {editingSchedule && (
+        <div className="flex items-center gap-2 mt-1 ml-6">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-muted-light dark:text-muted-dark" />
+            <input
+              type="time"
+              value={schedTime}
+              onChange={(e) => setSchedTime(e.target.value)}
+              className="px-1.5 py-0.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-[10px] focus:outline-none focus:ring-1 focus:ring-accent/30"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <CalendarDays className="w-3 h-3 text-muted-light dark:text-muted-dark" />
+            <input
+              type="date"
+              value={schedDate}
+              onChange={(e) => setSchedDate(e.target.value)}
+              className="px-1.5 py-0.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-[10px] focus:outline-none focus:ring-1 focus:ring-accent/30"
+            />
+          </div>
+          <button
+            onClick={saveSchedule}
+            className="text-accent text-[10px] font-medium hover:underline"
+          >
+            <Check className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => setEditingSchedule(false)}
+            className="text-muted-light text-[10px] hover:text-danger"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
       )}
-      <button
-        onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
-        className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-danger transition-all"
-      >
-        <Trash2 className="w-3 h-3" />
-      </button>
     </div>
   );
 }

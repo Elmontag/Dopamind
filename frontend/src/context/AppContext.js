@@ -402,7 +402,7 @@ function reducer(state, action) {
       const updatedState = {
         ...state,
         tasks: state.tasks.map((t) =>
-          t.id === action.payload ? { ...t, completed: true } : t
+          t.id === action.payload ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
         ),
         xp: newXp + bonusXp,
         level: calcLevel(newXp + bonusXp),

@@ -23,6 +23,13 @@ const defaultSettings = {
     timeTrackingEnabled: true,
     gamificationEnabled: true,
   },
+  timeWarnings: {
+    enabled: true,
+    moderateThreshold1: 60,
+    moderateThreshold2: 30,
+    criticalThreshold1: 15,
+    criticalThreshold2: 0,
+  },
 };
 
 function deepMerge(target, source) {

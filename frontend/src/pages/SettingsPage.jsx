@@ -405,6 +405,7 @@ export default function SettingsPage() {
 
           {/* Work Time tab */}
           {activeTab === "worktime" && (
+            <>
             <Section title={t("settings.workSchedule")}>
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t("settings.workStart")}>
@@ -459,6 +460,57 @@ export default function SettingsPage() {
                 </div>
               </Field>
             </Section>
+            <Section title={t("settings.timeWarnings")}>
+              <p className="text-xs text-muted-light dark:text-muted-dark mb-3">{t("settings.timeWarningsDesc")}</p>
+              <Toggle
+                checked={settings.timeWarnings?.enabled !== false}
+                onChange={(v) => updateSettings("timeWarnings", { enabled: v })}
+                label={t("settings.timeWarningsEnabled")}
+              />
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Field label={t("settings.timeWarningsModerate1")}>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={240}
+                    step={5}
+                    value={settings.timeWarnings?.moderateThreshold1 ?? 60}
+                    onChange={(v) => updateSettings("timeWarnings", { moderateThreshold1: Number(v) })}
+                  />
+                </Field>
+                <Field label={t("settings.timeWarningsModerate2")}>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={240}
+                    step={5}
+                    value={settings.timeWarnings?.moderateThreshold2 ?? 30}
+                    onChange={(v) => updateSettings("timeWarnings", { moderateThreshold2: Number(v) })}
+                  />
+                </Field>
+                <Field label={t("settings.timeWarningsCritical1")}>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={120}
+                    step={5}
+                    value={settings.timeWarnings?.criticalThreshold1 ?? 15}
+                    onChange={(v) => updateSettings("timeWarnings", { criticalThreshold1: Number(v) })}
+                  />
+                </Field>
+                <Field label={t("settings.timeWarningsCritical2")}>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={120}
+                    step={5}
+                    value={settings.timeWarnings?.criticalThreshold2 ?? 0}
+                    onChange={(v) => updateSettings("timeWarnings", { criticalThreshold2: Number(v) })}
+                  />
+                </Field>
+              </div>
+            </Section>
+            </>
           )}
 
           {/* Email tab */}
