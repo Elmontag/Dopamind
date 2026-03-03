@@ -567,7 +567,7 @@ export default function TasksPage() {
                   </>
                 ) : (
                   <>
-                    <span className={`badge text-[10px] ${cat.color || "bg-gray-100 text-gray-700"}`}>{cat.emoji} {cat.name}</span>
+                    <span className={`badge text-[10px] ${cat.color || "bg-gray-100 text-gray-700"}`}>{cat.emoji} {t(`tasks.categories.${cat.name}`) !== `tasks.categories.${cat.name}` ? t(`tasks.categories.${cat.name}`) : cat.name}</span>
                     <span className="text-[10px] text-muted-light dark:text-muted-dark font-mono">{taskCountByCategory[cat.id] || 0} {t("tasks.categoryTasks")}</span>
                     <button
                       onClick={() => { setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji); }}
@@ -642,7 +642,7 @@ export default function TasksPage() {
               />
               {/* Row 1: Priority */}
               <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-muted-light dark:text-muted-dark text-[10px] uppercase w-16 flex-shrink-0">{t("tasks.priority.high").split(" ")[0]}</span>
+                <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                 {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
                   <button
                     key={key}

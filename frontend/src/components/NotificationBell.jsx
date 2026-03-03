@@ -80,7 +80,12 @@ export default function NotificationBell() {
       if (isTimeOnly(ev.start)) {
         const [eh, em] = ev.start.split(":").map(Number);
         evStartMin = eh * 60 + (em || 0);
-        evEndMin = ev.end && isTimeOnly(ev.end) ? (() => { const [eeh, eem] = ev.end.split(":").map(Number); return eeh * 60 + (eem || 0); })() : evStartMin + 60;
+        if (ev.end && isTimeOnly(ev.end)) {
+          const [eeh, eem] = ev.end.split(":").map(Number);
+          evEndMin = eeh * 60 + (eem || 0);
+        } else {
+          evEndMin = evStartMin + 60;
+        }
       } else {
         const sd = new Date(ev.start);
         if (isNaN(sd)) continue;
