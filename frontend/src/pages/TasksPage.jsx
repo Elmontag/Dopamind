@@ -49,6 +49,10 @@ function SubtaskItem({ subtask, taskId, t }) {
   const { dispatch } = useApp();
   const [editingMin, setEditingMin] = useState(false);
   const [minVal, setMinVal] = useState(subtask.estimatedMinutes || 0);
+  const saveMinutes = () => {
+    dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } });
+    setEditingMin(false);
+  };
   return (
     <div className="flex items-center gap-2 py-1 pl-8">
       <button
@@ -64,13 +68,13 @@ function SubtaskItem({ subtask, taskId, t }) {
         <input
           type="number"
           min={0}
-          max={120}
+          max={480}
           step={5}
           value={minVal}
           autoFocus
           onChange={(e) => setMinVal(Number(e.target.value))}
-          onBlur={() => { dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } }); setEditingMin(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } }); setEditingMin(false); } }}
+          onBlur={saveMinutes}
+          onKeyDown={(e) => { if (e.key === "Enter") saveMinutes(); }}
           className="w-12 px-1 py-0.5 rounded text-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-center focus:outline-none focus:ring-1 focus:ring-accent/30"
         />
       ) : (

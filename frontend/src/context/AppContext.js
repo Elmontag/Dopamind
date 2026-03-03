@@ -285,7 +285,7 @@ function reducer(state, action) {
           const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0 };
           const subs = [...(t.subtasks || []), newSub];
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
-          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+          return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
         }),
       };
     }
@@ -298,7 +298,7 @@ function reducer(state, action) {
           if (t.id !== usId) return t;
           const subs = (t.subtasks || []).map((s) => s.id === usSubId ? { ...s, ...subUpdates } : s);
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
-          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+          return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
         }),
       };
     }
@@ -323,7 +323,7 @@ function reducer(state, action) {
           if (t.id !== dtId) return t;
           const subs = (t.subtasks || []).filter((s) => s.id !== dsId);
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
-          return { ...t, subtasks: subs, ...(subTotal > 0 ? { estimatedMinutes: subTotal } : {}) };
+          return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
         }),
       };
     }
