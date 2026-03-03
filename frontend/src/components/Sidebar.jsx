@@ -1,16 +1,19 @@
 import { NavLink } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
-import { useApp } from "../context/AppContext";
+import { useApp, getLevelTitle } from "../context/AppContext";
 import { useTimeTracking } from "../context/TimeTrackingContext";
+import { useSettings } from "../context/SettingsContext";
 import {
   Home,
   CheckSquare,
   Calendar,
   Mail,
-  Clock,
+  Briefcase,
+  Timer,
   Settings,
   ChevronLeft,
   ChevronRight,
+  Trophy,
 } from "lucide-react";
 import { useState } from "react";
 import XpBar from "./XpBar";
@@ -20,7 +23,9 @@ const NAV_ITEMS = [
   { to: "/tasks", icon: CheckSquare, key: "tasks" },
   { to: "/calendar", icon: Calendar, key: "calendar" },
   { to: "/mail", icon: Mail, key: "mail" },
-  { to: "/time", icon: Clock, key: "timeTracking" },
+  { to: "/time", icon: Briefcase, key: "workTime" },
+  { to: "/zeitmanagement", icon: Timer, key: "zeitmanagement" },
+  { to: "/achievements", icon: Trophy, key: "achievements" },
   { to: "/settings", icon: Settings, key: "settings" },
 ];
 
@@ -28,7 +33,19 @@ export default function Sidebar() {
   const { t } = useI18n();
   const { state } = useApp();
   const { state: ttState } = useTimeTracking();
+  const { settings } = useSettings();
   const [collapsed, setCollapsed] = useState(false);
+  const { lang } = useI18n();
+  const levelTitle = getLevelTitle(state.level, lang);
+
+  const features = settings.features || {};
+  const visibleNavItems = NAV_ITEMS.filter(({ key }) => {
+    if (key === "mail" && !features.mailEnabled) return false;
+    if (key === "calendar" && !features.calendarEnabled) return false;
+    if (key === "workTime" && !features.timeTrackingEnabled) return false;
+    if (key === "achievements" && !features.gamificationEnabled) return false;
+    return true;
+  });
 
   return (
     <aside
@@ -48,7 +65,7 @@ export default function Sidebar() {
 
       {/* Nav Links */}
       <nav className="flex-1 py-3 px-2 space-y-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, key }) => (
+        {visibleNavItems.map(({ to, icon: Icon, key }) => (
           <NavLink
             key={to}
             to={to}
@@ -70,18 +87,19 @@ export default function Sidebar() {
       {/* Status footer */}
       <div className="px-3 pb-3 space-y-3">
         {/* Active clock indicator */}
-        {ttState.currentSession && (
+        {features.timeTrackingEnabled !== false && ttState.currentSession && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-success/10 text-success text-xs font-medium">
             <div className="w-2 h-2 rounded-full bg-success animate-pulse-soft" />
             {!collapsed && <span>{t("timeTracking.clockIn")}</span>}
           </div>
         )}
 
-        {!collapsed && (
+        {!collapsed && features.gamificationEnabled !== false && (
           <div className="px-1">
-            <div className="text-[10px] text-muted-light dark:text-muted-dark mb-1">
+            <div className="text-[10px] text-muted-light dark:text-muted-dark mb-0.5">
               Lv. {state.level}
             </div>
+            <div className="text-[10px] text-muted-light dark:text-muted-dark mb-1">{levelTitle}</div>
             <XpBar />
           </div>
         )}

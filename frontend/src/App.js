@@ -15,7 +15,9 @@ import TasksPage from "./pages/TasksPage";
 import CalendarPage from "./pages/CalendarPage";
 import MailPage from "./pages/MailPage";
 import TimeTrackingPage from "./pages/TimeTrackingPage";
+import TimeManagementPage from "./pages/TimeManagementPage";
 import SettingsPage from "./pages/SettingsPage";
+import AchievementsPage from "./pages/AchievementsPage";
 
 export default function App() {
   return (
@@ -38,7 +40,9 @@ export default function App() {
                             <Route path="/calendar" element={<CalendarPage />} />
                             <Route path="/mail" element={<MailPage />} />
                             <Route path="/time" element={<TimeTrackingPage />} />
+                            <Route path="/zeitmanagement" element={<TimeManagementPage />} />
                             <Route path="/settings" element={<SettingsPage />} />
+                            <Route path="/achievements" element={<AchievementsPage />} />
                           </Routes>
                         </main>
                         <footer className="hidden md:block text-center py-4 text-[10px] text-muted-light dark:text-muted-dark">

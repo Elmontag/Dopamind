@@ -3,7 +3,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSettings } from "../context/SettingsContext";
 import { discoverCalendars } from "../services/calendarService";
-import { Check, Sun, Moon, Monitor, Globe, Filter, Search, Loader2 } from "lucide-react";
+import { Check, Sun, Moon, Globe, Filter, Search, Loader2, SlidersHorizontal, Briefcase, Mail, Calendar, Gamepad2 } from "lucide-react";
 
 function Section({ title, children }) {
   return (
@@ -162,230 +162,293 @@ export default function SettingsPage() {
   const { t, lang, switchLang, availableLanguages } = useI18n();
   const { dark, toggle } = useTheme();
   const { settings, updateSettings } = useSettings();
-  const [saved, setSaved] = useState(null);
+  const [activeTab, setActiveTab] = useState("general");
 
-  const flash = (section) => {
-    setSaved(section);
-    setTimeout(() => setSaved(null), 2000);
-  };
+  const TABS = [
+    { key: "general",      icon: SlidersHorizontal, label: t("settings.tabGeneral") },
+    { key: "worktime",     icon: Briefcase,          label: t("settings.tabWorkTime") },
+    { key: "email",        icon: Mail,               label: t("settings.tabEmail") },
+    { key: "calendar",     icon: Calendar,           label: t("settings.tabCalendar") },
+    { key: "gamification", icon: Gamepad2,           label: t("settings.tabGamification") },
+  ];
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-2xl">
-      <h2 className="text-xl font-semibold">{t("settings.title")}</h2>
+    <div className="animate-fade-in max-w-3xl">
+      <h2 className="text-xl font-semibold mb-5">{t("settings.title")}</h2>
 
-      {/* General */}
-      <Section title={t("settings.general")}>
-        <Field label={t("settings.language")}>
-          <div className="flex gap-2">
-            {availableLanguages.map((l) => (
-              <button
-                key={l}
-                onClick={() => switchLang(l)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                  lang === l
-                    ? "bg-accent/10 text-accent ring-1 ring-accent/20"
-                    : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                {l === "de" ? "Deutsch" : "English"}
-              </button>
-            ))}
-          </div>
-        </Field>
+      <div className="flex flex-col sm:flex-row gap-5">
+        {/* Tab sidebar */}
+        <nav className="sm:w-44 flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 flex-shrink-0">
+          {TABS.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === key
+                  ? "bg-accent/10 text-accent"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+              }`}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {label}
+            </button>
+          ))}
+        </nav>
 
-        <Field label={t("settings.theme")}>
-          <div className="flex gap-2">
-            {[
-              { key: "light", icon: Sun, active: !dark },
-              { key: "dark", icon: Moon, active: dark },
-            ].map(({ key, icon: Icon, active }) => (
-              <button
-                key={key}
-                onClick={() => { if ((key === "dark") !== dark) toggle(); }}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                  active
-                    ? "bg-accent/10 text-accent ring-1 ring-accent/20"
-                    : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {t(`settings.theme${key.charAt(0).toUpperCase() + key.slice(1)}`)}
-              </button>
-            ))}
-          </div>
-        </Field>
-      </Section>
+        {/* Tab content */}
+        <div className="flex-1 space-y-5 min-w-0">
 
-      {/* Gamification */}
-      <Section title={t("settings.gamification")}>
-        <Toggle
-          checked={settings.gamification.xpEnabled}
-          onChange={(v) => updateSettings("gamification", { xpEnabled: v })}
-          label={t("settings.xpEnabled")}
-        />
-        <Toggle
-          checked={settings.gamification.soundEnabled}
-          onChange={(v) => updateSettings("gamification", { soundEnabled: v })}
-          label={t("settings.soundEnabled")}
-        />
-      </Section>
+          {/* General tab */}
+          {activeTab === "general" && (
+            <>
+            <Section title={t("settings.general")}>
+              <Field label={t("settings.language")}>
+                <div className="flex gap-2">
+                  {availableLanguages.map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => switchLang(l)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                        lang === l
+                          ? "bg-accent/10 text-accent ring-1 ring-accent/20"
+                          : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      <Globe className="w-4 h-4" />
+                      {l === "de" ? "Deutsch" : "English"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
 
-      {/* Work Schedule */}
-      <Section title={t("settings.workSchedule")}>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("settings.workStart")}>
-            <Input
-              type="time"
-              value={settings.workSchedule.start}
-              onChange={(v) => updateSettings("workSchedule", { start: v })}
-            />
-          </Field>
-          <Field label={t("settings.workEnd")}>
-            <Input
-              type="time"
-              value={settings.workSchedule.end}
-              onChange={(v) => updateSettings("workSchedule", { end: v })}
-            />
-          </Field>
-        </div>
-        <Field label={t("settings.breakDuration")}>
-          <Input
-            type="number"
-            min={0}
-            max={120}
-            step={5}
-            value={settings.workSchedule.breakMinutes}
-            onChange={(v) => updateSettings("workSchedule", { breakMinutes: Number(v) })}
-          />
-        </Field>
-        <Field label={t("settings.workDays")}>
-          <div className="flex gap-1.5">
-            {t("settings.weekdaysShort").map((day, i) => {
-              const dayNum = i + 1;
-              const active = settings.workSchedule.workDays.includes(dayNum);
-              return (
-                <button
-                  key={dayNum}
-                  onClick={() => {
-                    const days = active
-                      ? settings.workSchedule.workDays.filter((d) => d !== dayNum)
-                      : [...settings.workSchedule.workDays, dayNum].sort();
-                    updateSettings("workSchedule", { workDays: days });
-                  }}
-                  className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${
-                    active
-                      ? "bg-accent text-white"
-                      : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {day}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-      </Section>
+              <Field label={t("settings.theme")}>
+                <div className="flex gap-2">
+                  {[
+                    { key: "light", icon: Sun, active: !dark },
+                    { key: "dark", icon: Moon, active: dark },
+                  ].map(({ key, icon: Icon, active }) => (
+                    <button
+                      key={key}
+                      onClick={() => { if ((key === "dark") !== dark) toggle(); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                        active
+                          ? "bg-accent/10 text-accent ring-1 ring-accent/20"
+                          : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {t(`settings.theme${key.charAt(0).toUpperCase() + key.slice(1)}`)}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </Section>
 
-      {/* Mail Filter */}
-      <Section title={t("settings.mailFilter")}>
-        <Toggle
-          checked={settings.mail.masterTagEnabled}
-          onChange={(v) => updateSettings("mail", { masterTagEnabled: v })}
-          label={t("settings.masterTagEnabled")}
-        />
-        <p className="text-xs text-muted-light dark:text-muted-dark -mt-2 ml-[52px]">
-          {t("settings.masterTagEnabledDesc")}
-        </p>
-        {settings.mail.masterTagEnabled && (
-          <Field label={t("settings.masterTag")}>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-accent flex-shrink-0" />
-              <Input
-                value={settings.mail.masterTag}
-                onChange={(v) => updateSettings("mail", { masterTag: v })}
-                placeholder="dopamind"
+            <Section title={t("settings.features")}>
+              <Toggle
+                checked={settings.features.mailEnabled}
+                onChange={(v) => updateSettings("features", { mailEnabled: v })}
+                label={t("settings.featureMail")}
               />
-            </div>
-          </Field>
-        )}
-      </Section>
+              <Toggle
+                checked={settings.features.calendarEnabled}
+                onChange={(v) => updateSettings("features", { calendarEnabled: v })}
+                label={t("settings.featureCalendar")}
+              />
+              <Toggle
+                checked={settings.features.timeTrackingEnabled}
+                onChange={(v) => updateSettings("features", { timeTrackingEnabled: v })}
+                label={t("settings.featureTimeTracking")}
+              />
+              <Toggle
+                checked={settings.features.gamificationEnabled}
+                onChange={(v) => updateSettings("features", { gamificationEnabled: v })}
+                label={t("settings.featureGamification")}
+              />
+            </Section>
+            </>
+          )}
 
-      {/* IMAP */}
-      <Section title={t("settings.imap")}>
-        <Field label={t("settings.imapHost")}>
-          <Input
-            value={settings.imap.host}
-            onChange={(v) => updateSettings("imap", { host: v })}
-            placeholder="imap.example.com"
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("settings.imapPort")}>
-            <Input
-              type="number"
-              value={settings.imap.port}
-              onChange={(v) => updateSettings("imap", { port: Number(v) })}
-            />
-          </Field>
-          <Field label="TLS">
-            <Toggle
-              checked={settings.imap.tls}
-              onChange={(v) => updateSettings("imap", { tls: v })}
-              label={t("settings.imapTls")}
-            />
-          </Field>
+          {/* Work Time tab */}
+          {activeTab === "worktime" && (
+            <Section title={t("settings.workSchedule")}>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={t("settings.workStart")}>
+                  <Input
+                    type="time"
+                    value={settings.workSchedule.start}
+                    onChange={(v) => updateSettings("workSchedule", { start: v })}
+                  />
+                </Field>
+                <Field label={t("settings.workEnd")}>
+                  <Input
+                    type="time"
+                    value={settings.workSchedule.end}
+                    onChange={(v) => updateSettings("workSchedule", { end: v })}
+                  />
+                </Field>
+              </div>
+              <Field label={t("settings.breakDuration")}>
+                <Input
+                  type="number"
+                  min={0}
+                  max={120}
+                  step={5}
+                  value={settings.workSchedule.breakMinutes}
+                  onChange={(v) => updateSettings("workSchedule", { breakMinutes: Number(v) })}
+                />
+              </Field>
+              <Field label={t("settings.workDays")}>
+                <div className="flex gap-1.5">
+                  {t("settings.weekdaysShort").map((day, i) => {
+                    const dayNum = i + 1;
+                    const active = settings.workSchedule.workDays.includes(dayNum);
+                    return (
+                      <button
+                        key={dayNum}
+                        onClick={() => {
+                          const days = active
+                            ? settings.workSchedule.workDays.filter((d) => d !== dayNum)
+                            : [...settings.workSchedule.workDays, dayNum].sort();
+                          updateSettings("workSchedule", { workDays: days });
+                        }}
+                        className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${
+                          active
+                            ? "bg-accent text-white"
+                            : "bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            </Section>
+          )}
+
+          {/* Email tab */}
+          {activeTab === "email" && (
+            <>
+              <Section title={t("settings.mailFilter")}>
+                <Toggle
+                  checked={settings.mail.masterTagEnabled}
+                  onChange={(v) => updateSettings("mail", { masterTagEnabled: v })}
+                  label={t("settings.masterTagEnabled")}
+                />
+                <p className="text-xs text-muted-light dark:text-muted-dark -mt-2 ml-[52px]">
+                  {t("settings.masterTagEnabledDesc")}
+                </p>
+                {settings.mail.masterTagEnabled && (
+                  <Field label={t("settings.masterTag")}>
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-accent flex-shrink-0" />
+                      <Input
+                        value={settings.mail.masterTag}
+                        onChange={(v) => updateSettings("mail", { masterTag: v })}
+                        placeholder="dopamind"
+                      />
+                    </div>
+                  </Field>
+                )}
+              </Section>
+
+              <Section title={t("settings.imap")}>
+                <Field label={t("settings.imapHost")}>
+                  <Input
+                    value={settings.imap.host}
+                    onChange={(v) => updateSettings("imap", { host: v })}
+                    placeholder="imap.example.com"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={t("settings.imapPort")}>
+                    <Input
+                      type="number"
+                      value={settings.imap.port}
+                      onChange={(v) => updateSettings("imap", { port: Number(v) })}
+                    />
+                  </Field>
+                  <Field label="TLS">
+                    <Toggle
+                      checked={settings.imap.tls}
+                      onChange={(v) => updateSettings("imap", { tls: v })}
+                      label={t("settings.imapTls")}
+                    />
+                  </Field>
+                </div>
+                <Field label={t("settings.imapUser")}>
+                  <Input
+                    value={settings.imap.user}
+                    onChange={(v) => updateSettings("imap", { user: v })}
+                    placeholder="user@example.com"
+                  />
+                </Field>
+                <Field label={t("settings.imapPassword")}>
+                  <Input
+                    type="password"
+                    value={settings.imap.password}
+                    onChange={(v) => updateSettings("imap", { password: v })}
+                  />
+                </Field>
+              </Section>
+
+              <Section title={t("settings.smtp")}>
+                <Field label={t("settings.smtpHost")}>
+                  <Input
+                    value={settings.smtp.host}
+                    onChange={(v) => updateSettings("smtp", { host: v })}
+                    placeholder="smtp.example.com"
+                  />
+                </Field>
+                <Field label={t("settings.smtpPort")}>
+                  <Input
+                    type="number"
+                    value={settings.smtp.port}
+                    onChange={(v) => updateSettings("smtp", { port: Number(v) })}
+                  />
+                </Field>
+                <Field label={t("settings.smtpUser")}>
+                  <Input
+                    value={settings.smtp.user}
+                    onChange={(v) => updateSettings("smtp", { user: v })}
+                    placeholder="user@example.com"
+                  />
+                </Field>
+                <Field label={t("settings.smtpPassword")}>
+                  <Input
+                    type="password"
+                    value={settings.smtp.password}
+                    onChange={(v) => updateSettings("smtp", { password: v })}
+                  />
+                </Field>
+              </Section>
+            </>
+          )}
+
+          {/* Calendar tab */}
+          {activeTab === "calendar" && (
+            <CalDavSection t={t} settings={settings} updateSettings={updateSettings} />
+          )}
+
+          {/* Gamification tab */}
+          {activeTab === "gamification" && (
+            <Section title={t("settings.gamification")}>
+              <Toggle
+                checked={settings.gamification.xpEnabled}
+                onChange={(v) => updateSettings("gamification", { xpEnabled: v })}
+                label={t("settings.xpEnabled")}
+              />
+              <Toggle
+                checked={settings.gamification.soundEnabled}
+                onChange={(v) => updateSettings("gamification", { soundEnabled: v })}
+                label={t("settings.soundEnabled")}
+              />
+            </Section>
+          )}
+
         </div>
-        <Field label={t("settings.imapUser")}>
-          <Input
-            value={settings.imap.user}
-            onChange={(v) => updateSettings("imap", { user: v })}
-            placeholder="user@example.com"
-          />
-        </Field>
-        <Field label={t("settings.imapPassword")}>
-          <Input
-            type="password"
-            value={settings.imap.password}
-            onChange={(v) => updateSettings("imap", { password: v })}
-          />
-        </Field>
-      </Section>
-
-      {/* SMTP */}
-      <Section title={t("settings.smtp")}>
-        <Field label={t("settings.smtpHost")}>
-          <Input
-            value={settings.smtp.host}
-            onChange={(v) => updateSettings("smtp", { host: v })}
-            placeholder="smtp.example.com"
-          />
-        </Field>
-        <Field label={t("settings.smtpPort")}>
-          <Input
-            type="number"
-            value={settings.smtp.port}
-            onChange={(v) => updateSettings("smtp", { port: Number(v) })}
-          />
-        </Field>
-        <Field label={t("settings.imapUser")}>
-          <Input
-            value={settings.smtp.user}
-            onChange={(v) => updateSettings("smtp", { user: v })}
-            placeholder="user@example.com"
-          />
-        </Field>
-        <Field label={t("settings.imapPassword")}>
-          <Input
-            type="password"
-            value={settings.smtp.password}
-            onChange={(v) => updateSettings("smtp", { password: v })}
-          />
-        </Field>
-      </Section>
-
-      {/* CalDAV */}
-      <CalDavSection t={t} settings={settings} updateSettings={updateSettings} />
+      </div>
     </div>
   );
 }
