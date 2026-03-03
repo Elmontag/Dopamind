@@ -3,3 +3,6 @@ build/
 .env
 .env.local
 *.log
+*.db
+*.db-wal
+*.db-shm
