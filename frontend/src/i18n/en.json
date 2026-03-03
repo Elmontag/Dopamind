@@ -10,6 +10,7 @@
     "mail": "Mail",
     "workTime": "Work Time",
     "zeitmanagement": "Time Management",
+    "time": "Time",
     "settings": "Settings",
     "achievements": "Achievements"
   },
@@ -173,7 +174,9 @@
     "absenceFrom": "From",
     "absenceTo": "To",
     "absenceNote": "Note...",
-    "days": "days"
+    "days": "days",
+    "tabWorkTime": "Work Time",
+    "tabFocus": "Focus"
   },
   "settings": {
     "title": "Settings",
