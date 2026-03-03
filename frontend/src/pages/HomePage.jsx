@@ -89,10 +89,14 @@ function QuickAddTask({ t, onAdd }) {
 
 function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTaskOverdue, onEditTask, onUpdateScheduledTime, isToday, isPastDay }) {
   const startH = parseInt(settings.workSchedule.start.split(":")[0], 10);
+  const startM = parseInt(settings.workSchedule.start.split(":")[1] || "0", 10);
   const endH = parseInt(settings.workSchedule.end.split(":")[0], 10);
+  const endM = parseInt(settings.workSchedule.end.split(":")[1] || "0", 10);
   const breakMin = settings.workSchedule.breakMinutes;
   const now = new Date();
   const nowH = now.getHours();
+  const nowM = now.getMinutes();
+  const STEP = 15; // 15-minute granularity
 
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editText, setEditText] = useState("");
@@ -106,102 +110,161 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     setEditingTaskId(null);
   };
 
-  // Build hourly slots with proper calendar event blocking
+  // Helper: convert hour+min to total minutes from midnight
+  const toMin = (h, m) => h * 60 + m;
+  const startTotal = toMin(startH, startM);
+  const endTotal = toMin(endH, endM);
+  const totalSlotCount = Math.floor((endTotal - startTotal) / STEP);
+
+  // Helper: format minute offset as HH:MM
+  const fmtTime = (totalMin) => {
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
+
+  // Build initial 15-min slots
   const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
   const slots = [];
-  for (let h = startH; h < endH; h++) {
-    const timeStr = `${String(h).padStart(2, "0")}:00`;
-    const event = events.find((ev) => {
-      if (ev.allDay) return false;
-      if (!ev.start) return false;
-      let evStartH, evEndH;
-      if (isTimeOnly(ev.start)) {
-        evStartH = parseInt(ev.start.split(":")[0], 10);
-        evEndH = ev.end && isTimeOnly(ev.end) ? parseInt(ev.end.split(":")[0], 10) : evStartH + 1;
+  for (let i = 0; i < totalSlotCount; i++) {
+    const minOffset = startTotal + i * STEP;
+    slots.push({ time: fmtTime(minOffset), minOffset, type: "free", spanSlots: 1 });
+  }
+
+  // Block slots occupied by calendar events
+  for (const ev of events) {
+    if (ev.allDay || !ev.start) continue;
+    let evStartMin, evEndMin;
+    if (isTimeOnly(ev.start)) {
+      const [eh, em] = ev.start.split(":").map(Number);
+      evStartMin = toMin(eh, em);
+      if (ev.end && isTimeOnly(ev.end)) {
+        const [eeh, eem] = ev.end.split(":").map(Number);
+        evEndMin = toMin(eeh, eem);
       } else {
-        const startDate = new Date(ev.start);
-        if (isNaN(startDate)) return false;
-        const endDate = ev.end ? new Date(ev.end) : null;
-        evStartH = startDate.getHours();
-        evEndH = endDate && !isNaN(endDate) ? endDate.getHours() : evStartH + 1;
+        evEndMin = evStartMin + 60;
       }
-      if (ev.end) {
-        const endMin = isTimeOnly(ev.end)
-          ? parseInt(ev.end.split(":")[1] || "0", 10)
-          : new Date(ev.end).getMinutes();
-        if (endMin > 0) evEndH += 1;
-      }
-      return h >= evStartH && h < evEndH;
-    });
-    if (event) {
-      const timeRange = event.start && event.end ? `${event.start}–${event.end}` : "";
-      slots.push({ time: timeStr, hour: h, type: "event", label: event.title || event.summary, eventTime: timeRange });
     } else {
-      slots.push({ time: timeStr, hour: h, type: "free" });
+      const sd = new Date(ev.start);
+      if (isNaN(sd)) continue;
+      evStartMin = toMin(sd.getHours(), sd.getMinutes());
+      const ed = ev.end ? new Date(ev.end) : null;
+      evEndMin = ed && !isNaN(ed) ? toMin(ed.getHours(), ed.getMinutes()) : evStartMin + 60;
+    }
+    // Mark slots that overlap
+    const firstSlot = Math.max(0, Math.floor((evStartMin - startTotal) / STEP));
+    const lastSlot = Math.min(totalSlotCount - 1, Math.ceil((evEndMin - startTotal) / STEP) - 1);
+    let isFirst = true;
+    for (let j = firstSlot; j <= lastSlot; j++) {
+      if (slots[j].type === "free") {
+        const timeRange = ev.start && ev.end ? `${ev.start}–${ev.end}` : "";
+        slots[j].type = "event";
+        slots[j].label = isFirst ? (ev.title || ev.summary) : "";
+        slots[j].eventTime = isFirst ? timeRange : "";
+        slots[j].eventContinuation = !isFirst;
+        isFirst = false;
+      }
     }
   }
 
-  // --- Place tasks with scheduledTime first, then fill remaining free slots ---
+  // --- Place tasks with scheduledTime into the timeline, using their actual duration ---
   const scheduledTasks = tasks.filter((tk) => tk.scheduledTime);
   const unscheduledTasks = tasks.filter((tk) => !tk.scheduledTime);
 
-  // Place scheduled tasks at their exact slot
+  const placeTaskInSlots = (task, startSlotIdx) => {
+    const dur = task.estimatedMinutes || 25;
+    const slotsNeeded = Math.max(1, Math.ceil(dur / STEP));
+    // Find contiguous free slots starting from startSlotIdx
+    let canPlace = true;
+    const endIdx = Math.min(startSlotIdx + slotsNeeded, totalSlotCount);
+    for (let j = startSlotIdx; j < endIdx; j++) {
+      if (slots[j].type !== "free") { canPlace = false; break; }
+    }
+    if (!canPlace) {
+      // Just place in the first slot
+      if (slots[startSlotIdx]?.type === "free") {
+        slots[startSlotIdx].type = "task";
+        slots[startSlotIdx].task = task;
+        slots[startSlotIdx].label = task.text;
+        slots[startSlotIdx].priority = task.priority;
+        slots[startSlotIdx].overdue = isTaskOverdue(task);
+        slots[startSlotIdx].scheduled = !!task.scheduledTime;
+        slots[startSlotIdx].spanSlots = 1;
+        slots[startSlotIdx].durationMin = dur;
+      }
+      return;
+    }
+    // Mark first slot as the task
+    slots[startSlotIdx].type = "task";
+    slots[startSlotIdx].task = task;
+    slots[startSlotIdx].label = task.text;
+    slots[startSlotIdx].priority = task.priority;
+    slots[startSlotIdx].overdue = isTaskOverdue(task);
+    slots[startSlotIdx].scheduled = !!task.scheduledTime;
+    slots[startSlotIdx].spanSlots = endIdx - startSlotIdx;
+    slots[startSlotIdx].durationMin = dur;
+    // Mark subsequent slots as continuation
+    for (let j = startSlotIdx + 1; j < endIdx; j++) {
+      slots[j].type = "task-cont";
+      slots[j].parentIdx = startSlotIdx;
+    }
+  };
+
   for (const task of scheduledTasks) {
-    const taskH = parseInt(task.scheduledTime.split(":")[0], 10);
-    // For today, hide tasks whose scheduled time hasn't been reached yet: show only at or before current hour
-    if (isToday && taskH > nowH) continue;
-    const slotIdx = slots.findIndex((s) => s.hour === taskH && s.type === "free");
-    if (slotIdx >= 0) {
-      slots[slotIdx] = {
-        ...slots[slotIdx],
-        type: "task",
-        task,
-        label: task.text,
-        priority: task.priority,
-        overdue: isTaskOverdue(task),
-        scheduled: true,
+    const [th, tm] = task.scheduledTime.split(":").map(Number);
+    const taskStartMin = toMin(th, tm || 0);
+    // For today: hide tasks whose scheduled time is still in the future
+    if (isToday && taskStartMin > toMin(nowH, nowM)) continue;
+    const slotIdx = Math.max(0, Math.floor((taskStartMin - startTotal) / STEP));
+    if (slotIdx < totalSlotCount && slots[slotIdx]?.type === "free") {
+      placeTaskInSlots(task, slotIdx);
+    }
+  }
+
+  // Fill remaining free slots with unscheduled tasks (duration-aware)
+  const pendingTasks = [...unscheduledTasks];
+  for (let i = 0; i < totalSlotCount && pendingTasks.length > 0; i++) {
+    if (slots[i].type !== "free") continue;
+    if (isToday) {
+      const idx = pendingTasks.findIndex((task) => {
+        if (!task.createdAt) return true;
+        const created = new Date(task.createdAt);
+        return toMin(created.getHours(), created.getMinutes()) <= slots[i].minOffset;
+      });
+      if (idx >= 0) {
+        const [task] = pendingTasks.splice(idx, 1);
+        placeTaskInSlots(task, i);
+      }
+    } else {
+      const task = pendingTasks.shift();
+      placeTaskInSlots(task, i);
+    }
+  }
+
+  // Insert break in the middle — duration-aware
+  if (breakMin > 0) {
+    const breakSlots = Math.max(1, Math.ceil(breakMin / STEP));
+    const midIdx = Math.floor(totalSlotCount / 2);
+    // Find best position around middle for break
+    let breakStart = midIdx;
+    for (let i = midIdx; i >= 0; i--) {
+      let fits = true;
+      for (let j = i; j < Math.min(i + breakSlots, totalSlotCount); j++) {
+        if (slots[j]?.type === "event") { fits = false; break; }
+      }
+      if (fits) { breakStart = i; break; }
+    }
+    // Insert break (overwrite free/task slots)
+    for (let j = breakStart; j < Math.min(breakStart + breakSlots, totalSlotCount); j++) {
+      const isFirst = j === breakStart;
+      slots[j] = {
+        ...slots[j],
+        type: "break",
+        label: isFirst ? `${breakMin}${t("common.min")} ${t("timeTracking.break")}` : "",
+        breakContinuation: !isFirst,
+        breakIdx: breakStart,
       };
     }
-  }
-
-  // Fill remaining free slots with unscheduled tasks
-  const pendingTasks = [...unscheduledTasks];
-  for (const slot of slots) {
-    if (slot.type === "free" && pendingTasks.length > 0) {
-      if (isToday) {
-        const idx = pendingTasks.findIndex((task) => {
-          if (!task.createdAt) return true;
-          const createdHour = new Date(task.createdAt).getHours();
-          return createdHour <= slot.hour;
-        });
-        if (idx >= 0) {
-          const [task] = pendingTasks.splice(idx, 1);
-          slot.type = "task";
-          slot.task = task;
-          slot.label = task.text;
-          slot.priority = task.priority;
-          slot.overdue = isTaskOverdue(task);
-        }
-      } else {
-        const task = pendingTasks.shift();
-        slot.type = "task";
-        slot.task = task;
-        slot.label = task.text;
-        slot.priority = task.priority;
-        slot.overdue = isTaskOverdue(task);
-      }
-    }
-  }
-
-  // Insert break in the middle
-  if (breakMin > 0 && slots.length > 2) {
-    const midIdx = Math.floor(slots.length / 2);
-    slots.splice(midIdx, 0, {
-      time: slots[midIdx]?.time,
-      hour: slots[midIdx]?.hour,
-      type: "break",
-      label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}`,
-    });
   }
 
   // --- Drag & drop handlers ---
@@ -221,37 +284,46 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
     setDragOverIdx(null);
     if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return; }
     const srcSlot = slots[dragIdx];
-    const tgtSlot = slots[targetIdx];
-    // Only allow dragging tasks/breaks to free or task slots
-    if (srcSlot?.type === "task" && srcSlot.task && tgtSlot) {
-      const newTime = `${String(tgtSlot.hour).padStart(2, "0")}:00`;
+    if (srcSlot?.type === "task" && srcSlot.task) {
+      const newTime = fmtTime(slots[targetIdx].minOffset);
       onUpdateScheduledTime(srcSlot.task.id, newTime);
     }
+    // Breaks can also be dragged (just visual reorder for now)
     setDragIdx(null);
   };
   const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
 
   const isDraggable = (slot) => !isPastDay && (slot.type === "task" || slot.type === "break");
 
+  // Filter out continuation slots for rendering (they are hidden)
+  const visibleSlots = slots.filter((s) => s.type !== "task-cont" && !s.breakContinuation);
+
+  const nowTotal = toMin(nowH, nowM);
+
   return (
-    <div className="space-y-1">
-      {slots.map((slot, i) => {
-        const isPast = isPastDay || (isToday && slot.hour !== undefined && slot.hour < nowH);
-        const isCurrent = isToday && slot.hour !== undefined && slot.hour === nowH;
+    <div className="space-y-0.5">
+      {visibleSlots.map((slot, vi) => {
+        const realIdx = slots.indexOf(slot);
+        const isPast = isPastDay || (isToday && slot.minOffset + STEP <= nowTotal);
+        const isCurrent = isToday && slot.minOffset <= nowTotal && nowTotal < slot.minOffset + STEP * (slot.spanSlots || 1);
         const isEditing = editingTaskId === slot.task?.id;
-        const dragging = dragIdx === i;
-        const dragOver = dragOverIdx === i && dragIdx !== i;
+        const dragging = dragIdx === realIdx;
+        const dragOver = dragOverIdx === realIdx && dragIdx !== realIdx;
+
+        // Calculate visual height based on span
+        const span = slot.spanSlots || 1;
+        const heightClass = span >= 4 ? "min-h-[4rem]" : span >= 2 ? "min-h-[2.5rem]" : "min-h-[1.75rem]";
 
         return (
           <div
-            key={i}
+            key={realIdx}
             draggable={isDraggable(slot) && !isEditing}
-            onDragStart={(e) => handleDragStart(e, i)}
-            onDragOver={(e) => handleDragOver(e, i)}
+            onDragStart={(e) => handleDragStart(e, realIdx)}
+            onDragOver={(e) => handleDragOver(e, realIdx)}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, i)}
+            onDrop={(e) => handleDrop(e, realIdx)}
             onDragEnd={handleDragEnd}
-            className={`flex items-center gap-3 group transition-all ${isPast ? "opacity-40" : ""} ${dragging ? "opacity-50 scale-[0.97]" : ""} ${dragOver ? "ring-2 ring-accent/40 rounded-lg" : ""}`}
+            className={`flex items-center gap-3 group transition-all ${heightClass} ${isPast ? "opacity-40" : ""} ${dragging ? "opacity-50 scale-[0.97]" : ""} ${dragOver ? "ring-2 ring-accent/40 rounded-lg" : ""}`}
           >
             {/* Drag handle */}
             {isDraggable(slot) && !isPast && (
@@ -268,7 +340,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
             </span>
 
             {/* Slot content */}
-            <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+            <div className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
               slot.type === "event"
                 ? "bg-accent/10 text-accent font-medium"
                 : slot.type === "task"
@@ -301,6 +373,9 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTask
               ) : (
                 <span className="flex-1 truncate">
                   {slot.label || t(`home.${slot.type === "free" ? "freeSlot" : "taskSlot"}`)}
+                  {slot.type === "task" && slot.durationMin && (
+                    <span className="ml-1.5 text-[10px] font-mono opacity-60">~{slot.durationMin}{t("common.min")}</span>
+                  )}
                 </span>
               )}
 
@@ -380,9 +455,17 @@ export default function HomePage() {
 
   const pendingTasks = state.tasks.filter((tk) => !tk.completed);
   const overdueTasks = pendingTasks.filter(isTaskOverdue);
-  const topTasks = isPast
+
+  // Filter tasks for the day view: exclude tasks whose scheduledDate is in the future
+  const dayTasks = isPast
     ? []
-    : [...pendingTasks]
+    : pendingTasks.filter((tk) => {
+        // If task has a scheduledDate and the view date is before that date, hide it
+        if (tk.scheduledDate && viewDate < tk.scheduledDate) return false;
+        return true;
+      });
+
+  const topTasks = [...dayTasks]
         .sort((a, b) => {
           const aOverdue = isTaskOverdue(a) ? 0 : 1;
           const bOverdue = isTaskOverdue(b) ? 0 : 1;

@@ -70,6 +70,9 @@
     "complete": "Complete",
     "scheduledTime": "Scheduled",
     "scheduledTimePlaceholder": "Time...",
+    "scheduledDate": "Scheduled Date",
+    "scheduledDatePlaceholder": "Starting from...",
+    "scheduledDateConflict": "⚠ Conflict: {task} collides with event at {time}",
     "category": "Category",
     "categories": {
       "work": "💼 Work",
@@ -82,7 +85,16 @@
       "creative": "🎨 Creative"
     },
     "subtaskMinutes": "min",
-    "noCategory": "None"
+    "noCategory": "None",
+    "manageCategories": "Manage categories",
+    "addCategory": "New category",
+    "editCategory": "Edit",
+    "deleteCategory": "Delete",
+    "categoryName": "Name",
+    "categoryEmoji": "Emoji",
+    "categoryTasks": "Tasks",
+    "addTaskExpand": "Create task ▸",
+    "addTaskCollapse": "▾ Collapse"
   },
   "focus": {
     "title": "Focus Block",
@@ -386,6 +398,7 @@
     "overdueSince": "Overdue by {days} day(s)",
     "dueToday": "Due today",
     "dueTomorrow": "Due tomorrow",
-    "viewAll": "View all tasks →"
+    "viewAll": "View all tasks →",
+    "scheduledConflict": "⚠ \"{task}\" conflicts with event at {time}"
   }
 }

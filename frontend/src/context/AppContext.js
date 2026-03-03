@@ -59,8 +59,20 @@ export const ACHIEVEMENTS = [
   { id: "level-50",       size: "large",  xp: 750 },
 ];
 
+export const DEFAULT_CATEGORIES = [
+  { id: "work",     name: "Arbeit",     emoji: "💼", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  { id: "personal", name: "Privat",     emoji: "👤", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  { id: "health",   name: "Gesundheit", emoji: "💪", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  { id: "finance",  name: "Finanzen",   emoji: "💰", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  { id: "learning", name: "Lernen",     emoji: "📚", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
+  { id: "home",     name: "Haushalt",   emoji: "🏠", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
+  { id: "errand",   name: "Besorgung",  emoji: "🏃", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300" },
+  { id: "creative", name: "Kreativ",    emoji: "🎨", color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
+];
+
 const initialState = {
   tasks: [],
+  categories: DEFAULT_CATEGORIES,
   xp: 0,
   level: 1,
   streak: 0,
@@ -260,6 +272,7 @@ function reducer(state, action) {
         createdAt: Date.now(),
         deadline: action.payload.deadline || null,
         scheduledTime: action.payload.scheduledTime || null,
+        scheduledDate: action.payload.scheduledDate || null,
         category: action.payload.category || null,
         mailRef: action.payload.mailRef || null,
         subtasks: action.payload.subtasks || [],
@@ -587,6 +600,33 @@ function reducer(state, action) {
         } : {}),
       };
     }
+
+    case "ADD_CATEGORY": {
+      const cat = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+        name: action.payload.name,
+        emoji: action.payload.emoji || "📁",
+        color: action.payload.color || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+      };
+      return { ...state, categories: [...(state.categories || []), cat] };
+    }
+
+    case "UPDATE_CATEGORY":
+      return {
+        ...state,
+        categories: (state.categories || []).map((c) =>
+          c.id === action.payload.id ? { ...c, ...action.payload } : c
+        ),
+      };
+
+    case "DELETE_CATEGORY":
+      return {
+        ...state,
+        categories: (state.categories || []).filter((c) => c.id !== action.payload),
+        tasks: state.tasks.map((t) =>
+          t.category === action.payload ? { ...t, category: null } : t
+        ),
+      };
 
     default:
       return state;

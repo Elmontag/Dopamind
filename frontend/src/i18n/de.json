@@ -51,6 +51,9 @@
     "complete": "Erledigen",
     "scheduledTime": "Geplant",
     "scheduledTimePlaceholder": "Uhrzeit...",
+    "scheduledDate": "Geplantes Datum",
+    "scheduledDatePlaceholder": "Ab wann...",
+    "scheduledDateConflict": "⚠ Terminkonflikt: {task} kollidiert mit Termin um {time}",
     "category": "Kategorie",
     "categories": {
       "work": "💼 Arbeit",
@@ -63,7 +66,16 @@
       "creative": "🎨 Kreativ"
     },
     "subtaskMinutes": "min",
-    "noCategory": "Ohne"
+    "noCategory": "Ohne",
+    "manageCategories": "Kategorien verwalten",
+    "addCategory": "Neue Kategorie",
+    "editCategory": "Bearbeiten",
+    "deleteCategory": "Löschen",
+    "categoryName": "Name",
+    "categoryEmoji": "Emoji",
+    "categoryTasks": "Aufgaben",
+    "addTaskExpand": "Aufgabe anlegen ▸",
+    "addTaskCollapse": "▾ Einklappen"
   },
   "focus": {
     "title": "Fokus-Block",
@@ -386,6 +398,7 @@
     "overdueSince": "Überfällig seit {days} Tag(en)",
     "dueToday": "Fällig heute",
     "dueTomorrow": "Fällig morgen",
-    "viewAll": "Alle Aufgaben anzeigen →"
+    "viewAll": "Alle Aufgaben anzeigen →",
+    "scheduledConflict": "⚠ \"{task}\" kollidiert mit Termin um {time}"
   }
 }

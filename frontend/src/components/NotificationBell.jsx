@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, AlertTriangle, Clock, X } from "lucide-react";
+import { Bell, AlertTriangle, Clock, X, CalendarDays } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import { useCalendar } from "../context/CalendarContext";
 import { useI18n } from "../i18n/I18nContext";
 import { Link } from "react-router-dom";
 
 export default function NotificationBell() {
   const { t } = useI18n();
   const { state } = useApp();
+  const { getEventsForDate } = useCalendar();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
     try {
@@ -62,6 +64,48 @@ export default function NotificationBell() {
     }
   }
 
+  // Check for scheduled date/time conflicts with calendar events
+  const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
+  for (const task of state.tasks) {
+    if (task.completed || !task.scheduledDate || !task.scheduledTime) continue;
+    const taskDate = task.scheduledDate;
+    const [th, tm] = task.scheduledTime.split(":").map(Number);
+    const taskStartMin = th * 60 + (tm || 0);
+    const taskEndMin = taskStartMin + (task.estimatedMinutes || 25);
+
+    const dayEvents = getEventsForDate(taskDate);
+    for (const ev of dayEvents) {
+      if (ev.allDay || !ev.start) continue;
+      let evStartMin, evEndMin;
+      if (isTimeOnly(ev.start)) {
+        const [eh, em] = ev.start.split(":").map(Number);
+        evStartMin = eh * 60 + (em || 0);
+        evEndMin = ev.end && isTimeOnly(ev.end) ? (() => { const [eeh, eem] = ev.end.split(":").map(Number); return eeh * 60 + (eem || 0); })() : evStartMin + 60;
+      } else {
+        const sd = new Date(ev.start);
+        if (isNaN(sd)) continue;
+        evStartMin = sd.getHours() * 60 + sd.getMinutes();
+        const ed = ev.end ? new Date(ev.end) : null;
+        evEndMin = ed && !isNaN(ed) ? ed.getHours() * 60 + ed.getMinutes() : evStartMin + 60;
+      }
+      // Check for overlap
+      if (taskStartMin < evEndMin && taskEndMin > evStartMin) {
+        notifications.push({
+          id: `conflict-${task.id}-${ev.id || ev.title}`,
+          type: "conflict",
+          taskId: task.id,
+          text: task.text,
+          detail: t("notifications.scheduledConflict")
+            .replace("{task}", task.text)
+            .replace("{time}", `${String(th).padStart(2, "0")}:${String(tm || 0).padStart(2, "0")}`),
+          priority: task.priority,
+          sortOrder: 0.5,
+        });
+        break; // One conflict notification per task is enough
+      }
+    }
+  }
+
   // Sort: overdue first, then urgent, then by priority
   notifications.sort((a, b) => {
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
@@ -114,14 +158,16 @@ export default function NotificationBell() {
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
                     n.type === "overdue"
                       ? "bg-danger/10 text-danger"
+                      : n.type === "conflict"
+                      ? "bg-accent/10 text-accent"
                       : "bg-warn/10 text-amber-600 dark:text-warn"
                   }`}>
-                    {n.type === "overdue" ? <AlertTriangle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                    {n.type === "overdue" ? <AlertTriangle className="w-3.5 h-3.5" /> : n.type === "conflict" ? <CalendarDays className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{n.text}</p>
                     <p className={`text-[11px] mt-0.5 ${
-                      n.type === "overdue" ? "text-danger" : "text-amber-600 dark:text-warn"
+                      n.type === "overdue" ? "text-danger" : n.type === "conflict" ? "text-accent" : "text-amber-600 dark:text-warn"
                     }`}>
                       {n.detail}
                     </p>
