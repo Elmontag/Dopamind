@@ -8,7 +8,8 @@
     "tasks": "Tasks",
     "calendar": "Calendar",
     "mail": "Mail",
-    "timeTracking": "Time Tracking",
+    "workTime": "Work Time",
+    "zeitmanagement": "Time Management",
     "settings": "Settings",
     "achievements": "Achievements"
   },
@@ -137,8 +138,14 @@
       "archive": "Archive"
     }
   },
+  "zeitmanagement": {
+    "title": "Time Management",
+    "focus": "Focus Blocks",
+    "timer": "Timer",
+    "hint": "Start a focus block to work with concentration and earn XP."
+  },
   "timeTracking": {
-    "title": "Time Tracking",
+    "title": "Work Time",
     "clockIn": "Clock In",
     "clockOut": "Clock Out",
     "currentSession": "Current Session",
@@ -223,7 +230,9 @@
     "achievementLarge": "🏆 MAJOR ACHIEVEMENT: {name} (+{xp} XP)",
     "streakBonus": "Streak Bonus! ×{multiplier} XP",
     "dailyBonus": "Daily Bonus! +{xp} XP",
-    "deadlineBonus": "On time! +15 XP Bonus"
+    "deadlineBonus": "On time! +15 XP Bonus",
+    "overduePenalty": "⚠ Overdue task: -{xp} XP ({daysOverdue} days late)",
+    "inactivityPenalty": "😴 Inactivity: -{xp} XP ({days} days inactive)"
   },
   "achievements": {
     "title": "Achievements",

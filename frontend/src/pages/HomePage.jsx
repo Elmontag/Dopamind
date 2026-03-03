@@ -4,10 +4,9 @@ import { useApp } from "../context/AppContext";
 import { useCalendar } from "../context/CalendarContext";
 import { useTimeTracking } from "../context/TimeTrackingContext";
 import { useSettings } from "../context/SettingsContext";
-import FocusTimer from "../components/FocusTimer";
 import {
-  CheckCircle, Calendar, Plus, Play,
-  LogIn, LogOut, Coffee, AlertCircle,
+  CheckCircle, Calendar, Plus,
+  LogIn, LogOut, Coffee, AlertCircle, Clock,
 } from "lucide-react";
 
 
@@ -50,7 +49,7 @@ function ClockWidget({ t }) {
       <div className="flex gap-2">
         {isOnBreak ? (
           <button onClick={() => dispatch({ type: "END_BREAK" })} className="btn-ghost text-sm flex items-center gap-1.5 flex-1 justify-center">
-            <Play className="w-3.5 h-3.5" /> {t("timeTracking.endBreak")}
+            <LogIn className="w-3.5 h-3.5" /> {t("timeTracking.endBreak")}
           </button>
         ) : (
           <button onClick={() => dispatch({ type: "START_BREAK" })} className="btn-ghost text-sm flex items-center gap-1.5 flex-1 justify-center">
@@ -88,17 +87,18 @@ function QuickAddTask({ t, onAdd }) {
   );
 }
 
-function DayPlan({ t, events, tasks, settings }) {
+function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, isTaskOverdue }) {
   const startH = parseInt(settings.workSchedule.start.split(":")[0], 10);
   const endH = parseInt(settings.workSchedule.end.split(":")[0], 10);
   const breakMin = settings.workSchedule.breakMinutes;
+  const now = new Date();
+  const nowH = now.getHours();
+  const nowMin = now.getMinutes();
 
-  // Build time slots
+  // Build hourly slots
   const slots = [];
   for (let h = startH; h < endH; h++) {
     const timeStr = `${String(h).padStart(2, "0")}:00`;
-
-    // Check if an event overlaps this hour
     const event = events.find((ev) => {
       if (ev.allDay) return false;
       const evStart = ev.start ? new Date(ev.start) : null;
@@ -108,58 +108,100 @@ function DayPlan({ t, events, tasks, settings }) {
       const evEndH = evEnd ? evEnd.getHours() : evStartH + 1;
       return h >= evStartH && h < evEndH;
     });
-
     if (event) {
-      slots.push({ time: timeStr, type: "event", label: event.title || event.summary });
+      slots.push({ time: timeStr, hour: h, type: "event", label: event.title || event.summary });
     } else {
-      slots.push({ time: timeStr, type: "free" });
+      slots.push({ time: timeStr, hour: h, type: "free" });
     }
   }
 
-  // Fill free slots with tasks
+  // Fill free slots with pending tasks
   const pendingTasks = [...tasks];
   for (const slot of slots) {
     if (slot.type === "free" && pendingTasks.length > 0) {
       const task = pendingTasks.shift();
       slot.type = "task";
+      slot.task = task;
       slot.label = task.text;
       slot.priority = task.priority;
+      slot.overdue = isTaskOverdue(task);
     }
   }
 
-  // Insert break roughly in the middle
+  // Insert break in the middle
   if (breakMin > 0 && slots.length > 2) {
     const midIdx = Math.floor(slots.length / 2);
-    slots.splice(midIdx, 0, { time: slots[midIdx]?.time, type: "break", label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}` });
+    slots.splice(midIdx, 0, {
+      time: slots[midIdx]?.time,
+      hour: slots[midIdx]?.hour,
+      type: "break",
+      label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}`,
+    });
   }
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-1">{t("home.dayPlan")}</h3>
-      <p className="text-[10px] text-muted-light dark:text-muted-dark mb-3">{t("home.dayPlanHint")}</p>
-      <div className="space-y-1.5">
-        {slots.map((slot, i) => (
-          <div key={i} className="flex items-center gap-3 text-sm">
-            <span className="w-12 text-[11px] font-mono text-muted-light dark:text-muted-dark flex-shrink-0">{slot.time}</span>
-            <div className={`flex-1 px-3 py-1.5 rounded-lg text-xs truncate ${
-              slot.type === "event" ? "bg-accent/10 text-accent font-medium" :
-              slot.type === "task" ? "bg-gray-100 dark:bg-white/5" :
-              slot.type === "break" ? "bg-warn/10 text-amber-700 dark:text-warn" :
-              "bg-gray-50 dark:bg-white/[0.02] text-muted-light dark:text-muted-dark"
+    <div className="space-y-1">
+      {slots.map((slot, i) => {
+        const isPast = slot.hour !== undefined && slot.hour < nowH;
+        const isCurrent = slot.hour !== undefined && slot.hour === nowH;
+
+        return (
+          <div
+            key={i}
+            className={`flex items-center gap-3 group transition-opacity ${isPast ? "opacity-40" : ""}`}
+          >
+            {/* Time column */}
+            <span className={`w-12 text-[11px] font-mono flex-shrink-0 ${isCurrent ? "text-accent font-bold" : "text-muted-light dark:text-muted-dark"}`}>
+              {slot.time}
+              {isCurrent && <span className="ml-0.5 text-accent">◀</span>}
+            </span>
+
+            {/* Slot content */}
+            <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+              slot.type === "event"
+                ? "bg-accent/10 text-accent font-medium"
+                : slot.type === "task"
+                ? slot.overdue
+                  ? "bg-danger/10 text-danger"
+                  : "bg-gray-100 dark:bg-white/5"
+                : slot.type === "break"
+                ? "bg-warn/10 text-amber-700 dark:text-warn"
+                : "bg-gray-50 dark:bg-white/[0.02] text-muted-light dark:text-muted-dark"
             }`}>
-              {slot.label || t(`home.${slot.type === "free" ? "freeSlot" : "taskSlot"}`)}
-              {slot.priority && (
-                <span className={`ml-2 inline-block w-1.5 h-1.5 rounded-full ${
+              {slot.type === "event" && <Calendar className="w-3 h-3 flex-shrink-0" />}
+              {slot.type === "task" && slot.overdue && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+              {slot.type === "break" && <Coffee className="w-3 h-3 flex-shrink-0" />}
+              {slot.type === "free" && <Clock className="w-3 h-3 flex-shrink-0 opacity-30" />}
+
+              <span className="flex-1 truncate">
+                {slot.label || t(`home.${slot.type === "free" ? "freeSlot" : "taskSlot"}`)}
+              </span>
+
+              {slot.type === "task" && slot.priority && (
+                <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                   slot.priority === "high" ? "bg-danger" : slot.priority === "medium" ? "bg-warn" : "bg-success"
                 }`} />
               )}
             </div>
+
+            {/* Inline task complete button */}
+            {slot.type === "task" && slot.task && !isPast && (
+              <button
+                onClick={() => onCompleteTask(slot.task.id)}
+                className="w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
+                title={t("tasks.complete")}
+              >
+                <CheckCircle className="w-3.5 h-3.5 text-accent" />
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
+
+const MAX_TIMELINE_TASKS = 8;
 
 export default function HomePage() {
   const { t } = useI18n();
@@ -171,7 +213,6 @@ export default function HomePage() {
   const todayEvents = getEventsForDate(today);
 
   const allDayEvents = todayEvents.filter((ev) => ev.allDay);
-  const timedEvents = todayEvents.filter((ev) => !ev.allDay);
 
   const isTaskOverdue = (task) => task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date();
 
@@ -185,7 +226,7 @@ export default function HomePage() {
       const p = { high: 0, medium: 1, low: 2 };
       return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
     })
-    .slice(0, 6);
+    .slice(0, MAX_TIMELINE_TASKS);
 
   const handleQuickAdd = (text) => {
     dispatch({ type: "ADD_TASK", payload: { text, priority: "medium", estimatedMinutes: 25 } });
@@ -226,86 +267,35 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Workflow Row 1: Time tracking + Focus */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <ClockWidget t={t} />
-        </div>
-        <div>
-          <FocusTimer />
-        </div>
-      </div>
+      {/* Clock widget */}
+      <ClockWidget t={t} />
 
-      {/* Workflow Row 2: Tasks + Calendar Events */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Tasks column */}
-        <div className="lg:col-span-2 glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("home.openTasks")}</h3>
-            {overdueTasks.length > 0 && (
-              <span className="badge bg-danger/10 text-danger text-[10px] flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}
-              </span>
-            )}
+      {/* Unified Day Timeline */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("home.dayPlan")}</h3>
+            <p className="text-[10px] text-muted-light dark:text-muted-dark mt-0.5">{t("home.dayPlanHint")}</p>
           </div>
-          <QuickAddTask t={t} onAdd={handleQuickAdd} />
-          {topTasks.length === 0 ? (
-            <p className="text-sm text-muted-light dark:text-muted-dark py-4 text-center">{t("home.noTasks")}</p>
-          ) : (
-            <div className="space-y-1 mt-3">
-              {topTasks.map((task) => {
-                const overdue = isTaskOverdue(task);
-                return (
-                  <div key={task.id} className="flex items-center gap-3 py-2 group">
-                    <button
-                      onClick={() => dispatch({ type: "COMPLETE_TASK", payload: task.id })}
-                      className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
-                    >
-                      <CheckCircle className="w-3 h-3 opacity-0 group-hover:opacity-50 text-accent" />
-                    </button>
-                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      task.priority === "high" ? "bg-danger" : task.priority === "medium" ? "bg-warn" : "bg-success"
-                    }`} />
-                    <span className={`text-sm flex-1 truncate ${overdue ? "text-danger font-medium" : ""}`}>{task.text}</span>
-                    {overdue && <AlertCircle className="w-3.5 h-3.5 text-danger flex-shrink-0" />}
-                    <span className="text-[10px] text-muted-light dark:text-muted-dark font-mono">~{task.estimatedMinutes}{t("common.min")}</span>
-                  </div>
-                );
-              })}
-            </div>
+          {overdueTasks.length > 0 && (
+            <span className="badge bg-danger/10 text-danger text-[10px] flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}
+            </span>
           )}
         </div>
 
-        {/* Calendar Events + Day Plan column */}
-        <div className="space-y-5">
-          {/* Today's Timed Events */}
-          <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-3">{t("home.upcoming")}</h3>
-            {timedEvents.length === 0 ? (
-              <p className="text-sm text-muted-light dark:text-muted-dark py-2 text-center">{t("home.noEvents")}</p>
-            ) : (
-              <div className="space-y-2">
-                {timedEvents
-                  .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
-                  .map((ev) => (
-                    <div key={ev.id} className="flex items-start gap-2">
-                      <div className="w-1 h-full min-h-[2rem] rounded-full bg-accent flex-shrink-0 mt-1" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{ev.title || ev.summary}</p>
-                        {ev.start && (
-                          <p className="text-[10px] text-muted-light dark:text-muted-dark font-mono">
-                            {ev.start} {ev.end && <> – {ev.end}</>}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          <DayPlan t={t} events={todayEvents} tasks={topTasks} settings={settings} />
+        <div className="mb-3">
+          <QuickAddTask t={t} onAdd={handleQuickAdd} />
         </div>
+
+        <UnifiedDayTimeline
+          t={t}
+          events={todayEvents}
+          tasks={topTasks}
+          settings={settings}
+          onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
+          isTaskOverdue={isTaskOverdue}
+        />
       </div>
     </div>
   );

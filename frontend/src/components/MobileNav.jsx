@@ -1,13 +1,13 @@
 import { NavLink } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
-import { Home, CheckSquare, Calendar, Mail, Clock } from "lucide-react";
+import { Home, CheckSquare, Calendar, Briefcase, Timer } from "lucide-react";
 
 const NAV_ITEMS = [
   { to: "/", icon: Home, key: "home" },
   { to: "/tasks", icon: CheckSquare, key: "tasks" },
   { to: "/calendar", icon: Calendar, key: "calendar" },
-  { to: "/mail", icon: Mail, key: "mail" },
-  { to: "/time", icon: Clock, key: "timeTracking" },
+  { to: "/time", icon: Briefcase, key: "workTime" },
+  { to: "/zeitmanagement", icon: Timer, key: "zeitmanagement" },
 ];
 
 export default function MobileNav() {

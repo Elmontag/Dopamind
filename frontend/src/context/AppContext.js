@@ -82,6 +82,7 @@ const initialState = {
   unlockedAchievements: [],
   deadlineHeroCount: 0,
   totalFocusMinutes: 0,
+  penalizedTaskIds: [],
 };
 
 function calcLevel(xp) {
@@ -97,6 +98,20 @@ function xpForNextLevel(level) {
 }
 
 const QUICK_STARTER_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+function calcOverduePenaltyXp(daysOverdue) {
+  if (daysOverdue >= 15) return 50;
+  if (daysOverdue >= 8) return 25;
+  if (daysOverdue >= 4) return 15;
+  return 5;
+}
+
+function getDaysOverdue(deadlineStr) {
+  const deadlineMs = new Date(deadlineStr + "T23:59:59").getTime();
+  const nowMs = Date.now();
+  if (nowMs <= deadlineMs) return 0;
+  return Math.floor((nowMs - deadlineMs) / 86400000);
+}
 
 function getStreakMultiplier(streak) {
   if (streak >= 100) return 2.0;
@@ -382,6 +397,7 @@ function reducer(state, action) {
       return {
         ...state,
         tasks: state.tasks.filter((t) => t.id !== action.payload),
+        penalizedTaskIds: (state.penalizedTaskIds || []).filter((id) => id !== action.payload),
       };
 
     case "ADD_FOCUS_MINUTES": {
@@ -466,6 +482,52 @@ function reducer(state, action) {
       const monthReset = state.lastMonthReset !== currentMonthKey;
       const yearReset = state.lastYearReset !== currentYearKey;
 
+      // --- Overdue-task XP penalties ---
+      const penalizedTaskIds = [...(state.penalizedTaskIds || [])];
+      const penaltyRewards = [];
+      let totalPenalty = 0;
+      let penaltyIdx = 0;
+
+      for (const task of state.tasks) {
+        if (task.completed || !task.deadline) continue;
+        const daysOverdue = getDaysOverdue(task.deadline);
+        if (daysOverdue <= 0) continue;
+        if (penalizedTaskIds.includes(task.id)) continue;
+        const penalty = calcOverduePenaltyXp(daysOverdue);
+        totalPenalty += penalty;
+        penalizedTaskIds.push(task.id);
+        penaltyRewards.push({
+          id: Date.now() + penaltyIdx * 1000,
+          type: "overdue-penalty",
+          messageKey: "rewards.overduePenalty",
+          xp: penalty,
+          daysOverdue,
+          timestamp: Date.now(),
+        });
+        penaltyIdx++;
+      }
+
+      // --- Inactivity XP penalty (streak broken, not first-ever use) ---
+      if (!streakContinues && state.lastActiveDate !== null) {
+        const inactivityDays = state.lastActiveDate
+          ? Math.max(1, Math.floor((new Date(today) - new Date(state.lastActiveDate)) / 86400000) - 1)
+          : 0;
+        const inactivityPenalty = Math.min(50, inactivityDays * 10);
+        if (inactivityPenalty > 0) {
+          totalPenalty += inactivityPenalty;
+          penaltyRewards.push({
+            id: Date.now() + penaltyIdx * 1000 + 500,
+            type: "inactivity-penalty",
+            messageKey: "rewards.inactivityPenalty",
+            xp: inactivityPenalty,
+            days: inactivityDays,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      const newXp = Math.max(0, state.xp - totalPenalty);
+
       return {
         ...state,
         completedToday: 0,
@@ -474,6 +536,10 @@ function reducer(state, action) {
         currentStreakDays: newStreak,
         longestStreakDays: Math.max(state.longestStreakDays || 0, newStreak),
         lastActiveDate: today,
+        xp: newXp,
+        level: calcLevel(newXp),
+        penalizedTaskIds,
+        rewards: [...state.rewards, ...penaltyRewards],
         ...(weekReset ? {
           completedThisWeek: 0,
           focusMinutesThisWeek: 0,
