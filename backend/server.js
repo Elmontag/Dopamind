@@ -6,7 +6,14 @@ const calendarRoutes = require("./routes/calendar");
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:3000" }));
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000,http://localhost")
+  .split(",").map((s) => s.trim());
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+}));
 app.use(express.json({ limit: "5mb" }));
 
 app.use("/api/mail", mailRoutes);

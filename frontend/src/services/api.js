@@ -26,7 +26,13 @@ export function getMailConfigHeader() {
 export function getCalDavConfigHeader() {
   const settings = getSettingsConfig();
   if (!settings.caldav?.url) return {};
-  return { "X-CalDAV-Config": safeBase64(JSON.stringify(settings.caldav)) };
+  const config = {
+    url: settings.caldav.url,
+    user: settings.caldav.user,
+    password: settings.caldav.password,
+    calendarUrl: settings.caldav.calendarUrl || "",
+  };
+  return { "X-CalDAV-Config": safeBase64(JSON.stringify(config)) };
 }
 
 export async function apiFetch(path, options = {}) {

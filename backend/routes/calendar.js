@@ -5,7 +5,7 @@ const path = require("path");
 const router = express.Router();
 const DATA_FILE = path.join(__dirname, "..", "data", "events.json");
 
-// --- Persistence layer (file-based, upgradeable to CalDAV) ---
+// --- Persistence layer (file-based fallback) ---
 
 function loadEvents() {
   try {
@@ -22,7 +22,7 @@ function saveEvents(events) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(events, null, 2));
 }
 
-// --- CalDAV helpers (used when caldav config is present) ---
+// --- CalDAV helpers ---
 
 function getCalDavConfig(req) {
   const cfg = req.headers["x-caldav-config"];
@@ -34,15 +34,27 @@ function getCalDavConfig(req) {
   }
 }
 
-async function caldavRequest(url, method, body, auth) {
-  const headers = {
-    "Content-Type": method === "PUT" ? "text/calendar; charset=utf-8" : "application/xml; charset=utf-8",
-    Authorization: "Basic " + Buffer.from(`${auth.user}:${auth.password}`).toString("base64"),
-    Depth: "1",
-  };
+/** The effective calendar URL — either the explicit calendarUrl or the base url */
+function getCalendarUrl(config) {
+  return (config.calendarUrl || config.url || "").replace(/\/$/, "");
+}
 
-  const res = await fetch(url, { method, headers, body });
-  return { status: res.status, text: await res.text() };
+async function caldavRequest(url, method, body, auth, depth) {
+  const headers = {
+    Authorization: "Basic " + Buffer.from(`${auth.user}:${auth.password}`).toString("base64"),
+    "Content-Type": method === "PUT"
+      ? "text/calendar; charset=utf-8"
+      : "application/xml; charset=utf-8",
+  };
+  if (depth !== undefined) headers["Depth"] = String(depth);
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body || undefined,
+    redirect: "follow",
+  });
+  return { status: res.status, text: await res.text(), headers: res.headers };
 }
 
 function toIcal(event) {
@@ -77,7 +89,15 @@ function toIcal(event) {
 
 // --- CalDAV fetch events ---
 async function fetchCalDavEvents(config, start, end) {
-  const calendarUrl = config.url.replace(/\/$/, "");
+  const calendarUrl = getCalendarUrl(config);
+  if (!calendarUrl) throw new Error("No calendar URL configured");
+
+  // Build REPORT body — empty comp-filter fetches all events
+  let timeRange = "";
+  if (start && end) {
+    timeRange = `<c:time-range start="${start.replace(/-/g, "")}T000000Z" end="${end.replace(/-/g, "")}T235959Z"/>`;
+  }
+
   const reportBody = `<?xml version="1.0" encoding="UTF-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:prop>
@@ -87,21 +107,28 @@ async function fetchCalDavEvents(config, start, end) {
   <c:filter>
     <c:comp-filter name="VCALENDAR">
       <c:comp-filter name="VEVENT">
-        ${start ? `<c:time-range start="${start.replace(/-/g, "")}T000000Z" end="${end.replace(/-/g, "")}T235959Z"/>` : ""}
+        ${timeRange}
       </c:comp-filter>
     </c:comp-filter>
   </c:filter>
 </c:calendar-query>`;
 
-  const res = await caldavRequest(calendarUrl, "REPORT", reportBody, config);
-  if (res.status >= 400) throw new Error(`CalDAV REPORT failed: ${res.status}`);
+  const res = await caldavRequest(calendarUrl, "REPORT", reportBody, config, 1);
+  if (res.status >= 400) {
+    console.error("CalDAV REPORT response:", res.status, res.text.slice(0, 500));
+    throw new Error(`CalDAV REPORT failed: ${res.status}`);
+  }
 
-  // Parse very basic iCal from multistatus response
   const events = [];
-  const calDataRegex = /<c(?:al)?:calendar-data[^>]*>([\s\S]*?)<\/c(?:al)?:calendar-data>/gi;
+  // Match calendar-data in various namespace prefixes (cal:, c:, C:, or no prefix)
+  const calDataRegex = /<(?:[A-Za-z]+:)?calendar-data[^>]*>([\s\S]*?)<\/(?:[A-Za-z]+:)?calendar-data>/gi;
   let match;
   while ((match = calDataRegex.exec(res.text)) !== null) {
-    const ical = match[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const ical = match[1]
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&#13;/g, "\r");
     const ev = parseIcalEvent(ical);
     if (ev) events.push(ev);
   }
@@ -110,9 +137,12 @@ async function fetchCalDavEvents(config, start, end) {
 
 function parseIcalEvent(ical) {
   const get = (key) => {
-    const re = new RegExp(`^${key}[;:](.*)$`, "m");
+    // Handle unfolded iCal lines (continuation lines start with space/tab)
+    const re = new RegExp(`^${key}[;:](.*(?:\\r?\\n[ \\t].*)*)`, "m");
     const m = ical.match(re);
-    return m ? m[1].trim() : null;
+    if (!m) return null;
+    // Unfold: remove CRLF + leading whitespace
+    return m[1].replace(/\r?\n[ \t]/g, "").trim();
   };
 
   const uid = get("UID");
@@ -121,35 +151,45 @@ function parseIcalEvent(ical) {
   const dtend = get("DTEND");
   const description = get("DESCRIPTION");
 
-  if (!uid || !summary) return null;
+  if (!uid) return null;
 
   let date, start, end, allDay = false;
 
-  if (dtstart && dtstart.length === 8) {
-    // VALUE=DATE format: 20260302
-    date = `${dtstart.slice(0, 4)}-${dtstart.slice(4, 6)}-${dtstart.slice(6, 8)}`;
-    allDay = true;
-  } else if (dtstart) {
-    const raw = dtstart.replace(/^.*:/, ""); // strip params
-    if (raw.length >= 15) {
-      date = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-      start = `${raw.slice(9, 11)}:${raw.slice(11, 13)}`;
-    } else if (raw.length === 8) {
-      date = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  if (dtstart) {
+    // Strip any iCal parameter prefix (e.g. VALUE=DATE: or TZID=...:)
+    // DTSTART;VALUE=DATE:20260303 → "VALUE=DATE:20260303"
+    const colonIdx = dtstart.indexOf(":");
+    const valuePart = colonIdx >= 0 ? dtstart.slice(colonIdx + 1) : dtstart;
+    const paramPart = colonIdx >= 0 ? dtstart.slice(0, colonIdx).toUpperCase() : "";
+
+    if (paramPart.includes("VALUE=DATE") || valuePart.length === 8) {
+      date = `${valuePart.slice(0, 4)}-${valuePart.slice(4, 6)}-${valuePart.slice(6, 8)}`;
       allDay = true;
+    } else {
+      // DateTime: 20260303T090000 or 20260303T090000Z
+      const dt = valuePart.replace(/Z$/, "");
+      if (dt.length >= 15) {
+        date = `${dt.slice(0, 4)}-${dt.slice(4, 6)}-${dt.slice(6, 8)}`;
+        start = `${dt.slice(9, 11)}:${dt.slice(11, 13)}`;
+      } else if (dt.length === 8) {
+        date = `${dt.slice(0, 4)}-${dt.slice(4, 6)}-${dt.slice(6, 8)}`;
+        allDay = true;
+      }
     }
   }
 
   if (dtend && !allDay) {
-    const raw = dtend.replace(/^.*:/, "");
-    if (raw.length >= 15) {
-      end = `${raw.slice(9, 11)}:${raw.slice(11, 13)}`;
+    const colonIdx = dtend.indexOf(":");
+    const valuePart = colonIdx >= 0 ? dtend.slice(colonIdx + 1) : dtend;
+    const dt = valuePart.replace(/Z$/, "");
+    if (dt.length >= 15) {
+      end = `${dt.slice(9, 11)}:${dt.slice(11, 13)}`;
     }
   }
 
   return {
     id: uid.replace(/@.*/, ""),
-    title: summary,
+    title: summary || "(no title)",
     description: description || "",
     date: date || new Date().toISOString().slice(0, 10),
     start: start || null,
@@ -158,14 +198,139 @@ function parseIcalEvent(ical) {
   };
 }
 
-// --- Routes ---
+// --- CalDAV calendar discovery ---
+async function discoverCalendars(config) {
+  const baseUrl = config.url.replace(/\/$/, "");
+
+  // Step 1: PROPFIND on the given URL to find calendar-home-set or direct calendars
+  const propfindBody = `<?xml version="1.0" encoding="UTF-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">
+  <d:prop>
+    <d:resourcetype/>
+    <d:displayname/>
+    <cs:getctag/>
+    <d:current-user-principal/>
+    <c:calendar-home-set/>
+  </d:prop>
+</d:propfind>`;
+
+  const res = await caldavRequest(baseUrl, "PROPFIND", propfindBody, config, 1);
+  if (res.status >= 400) throw new Error(`PROPFIND failed: ${res.status}`);
+
+  // Check if we got calendars directly (Depth:1 on a calendar-home-set)
+  let calendars = extractCalendars(res.text, baseUrl);
+  if (calendars.length > 0) return calendars;
+
+  // Try to find calendar-home-set URL
+  const homeSetMatch = res.text.match(/<(?:[A-Za-z]+:)?calendar-home-set[^>]*>\s*<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\//i);
+  if (homeSetMatch) {
+    const homeSetUrl = resolveUrl(baseUrl, homeSetMatch[1].trim());
+    const homeRes = await caldavRequest(homeSetUrl, "PROPFIND", propfindBody, config, 1);
+    if (homeRes.status < 400) {
+      calendars = extractCalendars(homeRes.text, homeSetUrl);
+      if (calendars.length > 0) return calendars;
+    }
+  }
+
+  // Try to find current-user-principal and go from there
+  const principalMatch = res.text.match(/<(?:[A-Za-z]+:)?current-user-principal[^>]*>\s*<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\//i);
+  if (principalMatch) {
+    const principalUrl = resolveUrl(baseUrl, principalMatch[1].trim());
+    const pRes = await caldavRequest(principalUrl, "PROPFIND", propfindBody, config, 0);
+    if (pRes.status < 400) {
+      const pHomeMatch = pRes.text.match(/<(?:[A-Za-z]+:)?calendar-home-set[^>]*>\s*<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\//i);
+      if (pHomeMatch) {
+        const homeUrl = resolveUrl(baseUrl, pHomeMatch[1].trim());
+        const hRes = await caldavRequest(homeUrl, "PROPFIND", propfindBody, config, 1);
+        if (hRes.status < 400) {
+          calendars = extractCalendars(hRes.text, homeUrl);
+        }
+      }
+    }
+  }
+
+  return calendars;
+}
+
+function resolveUrl(base, href) {
+  if (href.startsWith("http://") || href.startsWith("https://")) return href;
+  const url = new URL(base);
+  url.pathname = href;
+  return url.toString();
+}
+
+function extractCalendars(xml, baseUrl) {
+  const calendars = [];
+  // Split into <d:response> or <response> blocks
+  const responseRegex = /<(?:[A-Za-z]+:)?response[^>]*>([\s\S]*?)<\/(?:[A-Za-z]+:)?response>/gi;
+  let rMatch;
+  while ((rMatch = responseRegex.exec(xml)) !== null) {
+    const block = rMatch[1];
+
+    // Check if this is a calendar collection
+    const hasCalendar = /<(?:[A-Za-z]+:)?calendar\s*\/?\s*>/i.test(block);
+    const hasCollection = /<(?:[A-Za-z]+:)?collection\s*\/?\s*>/i.test(block);
+    if (!hasCalendar || !hasCollection) continue;
+
+    // Get href
+    const hrefMatch = block.match(/<(?:[A-Za-z]+:)?href[^>]*>([^<]+)<\//i);
+    if (!hrefMatch) continue;
+    const href = hrefMatch[1].trim();
+    const url = resolveUrl(baseUrl, href);
+
+    // Get displayname
+    const nameMatch = block.match(/<(?:[A-Za-z]+:)?displayname[^>]*>([^<]*)<\//i);
+    const name = nameMatch ? nameMatch[1].trim() : href.split("/").filter(Boolean).pop() || "Calendar";
+
+    // Get ctag if available
+    const ctagMatch = block.match(/<(?:[A-Za-z]+:)?getctag[^>]*>([^<]*)<\//i);
+
+    calendars.push({
+      url,
+      name,
+      ctag: ctagMatch ? ctagMatch[1] : null,
+    });
+  }
+  return calendars;
+}
+
+// --- Static routes BEFORE parameterized routes ---
+
+// POST /api/calendar/discover — discover available calendars
+router.post("/discover", async (req, res) => {
+  const caldavConfig = getCalDavConfig(req);
+  if (!caldavConfig?.url) return res.status(400).json({ error: "CalDAV URL not configured" });
+
+  try {
+    const calendars = await discoverCalendars(caldavConfig);
+    res.json(calendars);
+  } catch (err) {
+    console.error("CalDAV discover error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/calendar/test
+router.post("/test", async (req, res) => {
+  const caldavConfig = getCalDavConfig(req);
+  if (!caldavConfig?.url) return res.status(400).json({ error: "CalDAV not configured" });
+
+  try {
+    const result = await caldavRequest(caldavConfig.url, "PROPFIND", null, caldavConfig, 0);
+    if (result.status >= 400) throw new Error(`HTTP ${result.status}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/calendar?start=...&end=...
 router.get("/", async (req, res) => {
   const caldavConfig = getCalDavConfig(req);
   const { start, end } = req.query;
 
-  if (caldavConfig?.url) {
+  const calUrl = caldavConfig ? getCalendarUrl(caldavConfig) : null;
+  if (calUrl) {
     try {
       const events = await fetchCalDavEvents(caldavConfig, start, end);
       return res.json(events);
@@ -190,13 +355,13 @@ router.post("/", async (req, res) => {
     id: req.body.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
   };
 
-  if (caldavConfig?.url) {
+  const calUrl = caldavConfig ? getCalendarUrl(caldavConfig) : null;
+  if (calUrl) {
     try {
-      const calendarUrl = caldavConfig.url.replace(/\/$/, "");
       const ical = toIcal(event);
-      const putUrl = `${calendarUrl}/${event.id}.ics`;
+      const putUrl = `${calUrl}/${event.id}.ics`;
       const result = await caldavRequest(putUrl, "PUT", ical, caldavConfig);
-      if (result.status >= 400) throw new Error(`CalDAV PUT failed: ${result.status}`);
+      if (result.status >= 400) throw new Error(`CalDAV PUT failed: ${result.status} – ${result.text.slice(0, 200)}`);
       return res.status(201).json(event);
     } catch (err) {
       console.error("CalDAV create error:", err.message);
@@ -204,7 +369,6 @@ router.post("/", async (req, res) => {
     }
   }
 
-  // Fallback: local storage
   const events = loadEvents();
   events.push(event);
   saveEvents(events);
@@ -216,11 +380,11 @@ router.put("/:id", async (req, res) => {
   const caldavConfig = getCalDavConfig(req);
   const event = { ...req.body, id: req.params.id };
 
-  if (caldavConfig?.url) {
+  const calUrl = caldavConfig ? getCalendarUrl(caldavConfig) : null;
+  if (calUrl) {
     try {
-      const calendarUrl = caldavConfig.url.replace(/\/$/, "");
       const ical = toIcal(event);
-      const putUrl = `${calendarUrl}/${req.params.id}.ics`;
+      const putUrl = `${calUrl}/${req.params.id}.ics`;
       const result = await caldavRequest(putUrl, "PUT", ical, caldavConfig);
       if (result.status >= 400) throw new Error(`CalDAV PUT failed: ${result.status}`);
       return res.json(event);
@@ -241,10 +405,10 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const caldavConfig = getCalDavConfig(req);
 
-  if (caldavConfig?.url) {
+  const calUrl = caldavConfig ? getCalendarUrl(caldavConfig) : null;
+  if (calUrl) {
     try {
-      const calendarUrl = caldavConfig.url.replace(/\/$/, "");
-      const delUrl = `${calendarUrl}/${req.params.id}.ics`;
+      const delUrl = `${calUrl}/${req.params.id}.ics`;
       const result = await caldavRequest(delUrl, "DELETE", null, caldavConfig);
       if (result.status >= 400 && result.status !== 404) {
         throw new Error(`CalDAV DELETE failed: ${result.status}`);
@@ -259,20 +423,6 @@ router.delete("/:id", async (req, res) => {
   events = events.filter((e) => e.id !== req.params.id);
   saveEvents(events);
   res.json({ success: true });
-});
-
-// POST /api/calendar/test
-router.post("/test", async (req, res) => {
-  const caldavConfig = getCalDavConfig(req);
-  if (!caldavConfig?.url) return res.status(400).json({ error: "CalDAV not configured" });
-
-  try {
-    const result = await caldavRequest(caldavConfig.url, "PROPFIND", null, caldavConfig);
-    if (result.status >= 400) throw new Error(`HTTP ${result.status}`);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 module.exports = router;

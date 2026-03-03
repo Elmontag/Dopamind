@@ -6,7 +6,7 @@ const STORAGE_KEY = "dopamind-settings";
 const defaultSettings = {
   imap: { host: "", port: 993, user: "", password: "", tls: true },
   smtp: { host: "", port: 587, user: "", password: "", tls: true },
-  caldav: { url: "", user: "", password: "" },
+  caldav: { url: "", user: "", password: "", calendarUrl: "" },
   workSchedule: {
     start: "08:00",
     end: "17:00",

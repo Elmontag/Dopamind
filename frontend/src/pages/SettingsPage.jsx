@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSettings } from "../context/SettingsContext";
-import { Check, Sun, Moon, Monitor, Globe, Filter } from "lucide-react";
+import { discoverCalendars } from "../services/calendarService";
+import { Check, Sun, Moon, Monitor, Globe, Filter, Search, Loader2 } from "lucide-react";
 
 function Section({ title, children }) {
   return (
@@ -53,6 +54,107 @@ function Toggle({ checked, onChange, label }) {
       </div>
       <span className="text-sm">{label}</span>
     </label>
+  );
+}
+
+function CalDavSection({ t, settings, updateSettings }) {
+  const [calendars, setCalendars] = useState([]);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverError, setDiscoverError] = useState(null);
+
+  const handleDiscover = async () => {
+    setDiscovering(true);
+    setDiscoverError(null);
+    try {
+      const result = await discoverCalendars();
+      setCalendars(result);
+      if (result.length === 0) setDiscoverError(t("settings.caldavNoCalendars"));
+    } catch (err) {
+      setDiscoverError(err.message);
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const canDiscover = settings.caldav.url && settings.caldav.user && settings.caldav.password;
+
+  return (
+    <Section title={t("settings.caldav")}>
+      <Field label={t("settings.caldavUrl")}>
+        <Input
+          value={settings.caldav.url}
+          onChange={(v) => updateSettings("caldav", { url: v })}
+          placeholder={t("settings.caldavUrlHint")}
+        />
+      </Field>
+      <Field label={t("settings.caldavUser")}>
+        <Input
+          value={settings.caldav.user}
+          onChange={(v) => updateSettings("caldav", { user: v })}
+        />
+      </Field>
+      <Field label={t("settings.caldavPassword")}>
+        <Input
+          type="password"
+          value={settings.caldav.password}
+          onChange={(v) => updateSettings("caldav", { password: v })}
+        />
+      </Field>
+
+      {/* Discover + Select Calendar */}
+      {canDiscover && (
+        <>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleDiscover}
+              disabled={discovering}
+              className="btn-ghost text-sm flex items-center gap-2 px-4 py-2"
+            >
+              {discovering ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              {discovering ? t("settings.caldavDiscovering") : t("settings.caldavDiscover")}
+            </button>
+          </div>
+
+          {discoverError && (
+            <p className="text-xs text-danger">{discoverError}</p>
+          )}
+
+          {calendars.length > 0 && (
+            <Field label={t("settings.caldavCalendar")}>
+              <div className="space-y-1.5">
+                {calendars.map((cal) => {
+                  const isSelected = settings.caldav.calendarUrl === cal.url;
+                  return (
+                    <button
+                      key={cal.url}
+                      onClick={() => updateSettings("caldav", { calendarUrl: cal.url })}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-2 ${
+                        isSelected
+                          ? "bg-accent/10 text-accent ring-1 ring-accent/20"
+                          : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
+                      <span className="truncate">{cal.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+
+          {settings.caldav.calendarUrl && (
+            <p className="text-xs text-muted-light dark:text-muted-dark truncate">
+              {settings.caldav.calendarUrl}
+            </p>
+          )}
+        </>
+      )}
+    </Section>
   );
 }
 
@@ -283,28 +385,7 @@ export default function SettingsPage() {
       </Section>
 
       {/* CalDAV */}
-      <Section title={t("settings.caldav")}>
-        <Field label={t("settings.caldavUrl")}>
-          <Input
-            value={settings.caldav.url}
-            onChange={(v) => updateSettings("caldav", { url: v })}
-            placeholder="https://caldav.example.com/..."
-          />
-        </Field>
-        <Field label={t("settings.caldavUser")}>
-          <Input
-            value={settings.caldav.user}
-            onChange={(v) => updateSettings("caldav", { user: v })}
-          />
-        </Field>
-        <Field label={t("settings.caldavPassword")}>
-          <Input
-            type="password"
-            value={settings.caldav.password}
-            onChange={(v) => updateSettings("caldav", { password: v })}
-          />
-        </Field>
-      </Section>
+      <CalDavSection t={t} settings={settings} updateSettings={updateSettings} />
     </div>
   );
 }

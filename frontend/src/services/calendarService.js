@@ -30,3 +30,8 @@ export function deleteEvent(id) {
 export function testCalDav() {
   return apiFetch("/calendar/test", { method: "POST" });
 }
+
+export function discoverCalendars() {
+  return apiFetch("/calendar/discover", { method: "POST" });
+}
+
