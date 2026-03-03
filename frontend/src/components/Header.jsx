@@ -1,10 +1,17 @@
 import { useTheme } from "../context/ThemeContext";
+import { useApp, getLevelTitle } from "../context/AppContext";
+import { useSettings } from "../context/SettingsContext";
 import { useI18n } from "../i18n/I18nContext";
 import { Sun, Moon, Globe } from "lucide-react";
+import XpBar from "./XpBar";
 
 export default function Header() {
   const { dark, toggle } = useTheme();
+  const { state } = useApp();
   const { lang, switchLang, availableLanguages } = useI18n();
+  const { settings } = useSettings();
+  const levelTitle = getLevelTitle(state.level, lang);
+  const features = settings.features || {};
 
   return (
     <header className="sticky top-0 z-30 md:relative bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
@@ -42,6 +49,17 @@ export default function Header() {
           </button>
         </div>
       </div>
+
+      {/* Mobile: XP / Level (only on mobile, not on desktop where Sidebar shows it) */}
+      {features.gamificationEnabled !== false && (
+        <div className="md:hidden px-4 pb-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] text-muted-light dark:text-muted-dark">Lv. {state.level}</span>
+            <span className="text-[10px] text-muted-light dark:text-muted-dark">{levelTitle}</span>
+          </div>
+          <XpBar />
+        </div>
+      )}
     </header>
   );
 }
