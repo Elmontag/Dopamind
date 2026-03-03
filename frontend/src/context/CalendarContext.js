@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useCallback } from "react";
+import { createContext, useContext, useReducer, useCallback, useEffect } from "react";
 import * as calendarService from "../services/calendarService";
 
 const CalendarContext = createContext();
@@ -8,7 +8,8 @@ const initialState = {
   loading: false,
   error: null,
   selectedDate: new Date().toISOString().slice(0, 10),
-  view: "month", // "month" | "week" | "day"
+  view: "month",
+  fetched: false,
 };
 
 function reducer(state, action) {
@@ -18,7 +19,7 @@ function reducer(state, action) {
     case "SET_ERROR":
       return { ...state, loading: false, error: action.payload };
     case "SET_EVENTS":
-      return { ...state, events: action.payload, loading: false };
+      return { ...state, events: action.payload, loading: false, fetched: true };
     case "ADD_EVENT":
       return { ...state, events: [...state.events, action.payload] };
     case "UPDATE_EVENT":
@@ -29,10 +30,7 @@ function reducer(state, action) {
         ),
       };
     case "DELETE_EVENT":
-      return {
-        ...state,
-        events: state.events.filter((e) => e.id !== action.payload),
-      };
+      return { ...state, events: state.events.filter((e) => e.id !== action.payload) };
     case "SET_DATE":
       return { ...state, selectedDate: action.payload };
     case "SET_VIEW":
@@ -55,10 +53,16 @@ export function CalendarProvider({ children }) {
     }
   }, []);
 
+  // Auto-fetch on mount
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
   const addEvent = useCallback(async (event) => {
     try {
       const created = await calendarService.createEvent(event);
       dispatch({ type: "ADD_EVENT", payload: created });
+      return created;
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err.message });
     }
@@ -83,12 +87,7 @@ export function CalendarProvider({ children }) {
   }, []);
 
   const getEventsForDate = useCallback(
-    (date) => {
-      return state.events.filter((e) => {
-        const eventDate = e.date || e.start?.slice(0, 10);
-        return eventDate === date;
-      });
-    },
+    (date) => state.events.filter((e) => (e.date || e.start?.slice(0, 10)) === date),
     [state.events]
   );
 

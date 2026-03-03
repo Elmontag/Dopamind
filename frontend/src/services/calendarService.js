@@ -1,7 +1,12 @@
 import { apiFetch } from "./api";
 
 export function fetchEvents(start, end) {
-  return apiFetch(`/calendar?start=${start}&end=${end}`);
+  let url = "/calendar";
+  const params = [];
+  if (start) params.push(`start=${encodeURIComponent(start)}`);
+  if (end) params.push(`end=${encodeURIComponent(end)}`);
+  if (params.length) url += `?${params.join("&")}`;
+  return apiFetch(url);
 }
 
 export function createEvent(event) {
@@ -20,4 +25,8 @@ export function updateEvent(event) {
 
 export function deleteEvent(id) {
   return apiFetch(`/calendar/${id}`, { method: "DELETE" });
+}
+
+export function testCalDav() {
+  return apiFetch("/calendar/test", { method: "POST" });
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSettings } from "../context/SettingsContext";
-import { Check, Sun, Moon, Monitor, Globe } from "lucide-react";
+import { Check, Sun, Moon, Monitor, Globe, Filter } from "lucide-react";
 
 function Section({ title, children }) {
   return (
@@ -183,6 +183,30 @@ export default function SettingsPage() {
             })}
           </div>
         </Field>
+      </Section>
+
+      {/* Mail Filter */}
+      <Section title={t("settings.mailFilter")}>
+        <Toggle
+          checked={settings.mail.masterTagEnabled}
+          onChange={(v) => updateSettings("mail", { masterTagEnabled: v })}
+          label={t("settings.masterTagEnabled")}
+        />
+        <p className="text-xs text-muted-light dark:text-muted-dark -mt-2 ml-[52px]">
+          {t("settings.masterTagEnabledDesc")}
+        </p>
+        {settings.mail.masterTagEnabled && (
+          <Field label={t("settings.masterTag")}>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-accent flex-shrink-0" />
+              <Input
+                value={settings.mail.masterTag}
+                onChange={(v) => updateSettings("mail", { masterTag: v })}
+                placeholder="dopamind"
+              />
+            </div>
+          </Field>
+        )}
       </Section>
 
       {/* IMAP */}

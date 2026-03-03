@@ -15,12 +15,17 @@
     "greeting": "One step at a time.",
     "subtitle": "Pick a task, start a focus block, earn XP.",
     "quickStats": "Today",
-    "upcoming": "Upcoming Events",
+    "upcoming": "Today's Events",
     "noEvents": "No events today.",
     "recentMails": "New Mails",
     "noMails": "No new mails.",
-    "openTasks": "Open Tasks",
-    "noTasks": "No open tasks."
+    "openTasks": "Today's Tasks",
+    "noTasks": "No open tasks.",
+    "quickAdd": "Quick add...",
+    "dayPlan": "Day Plan",
+    "dayPlanHint": "Suggested time blocks based on events and tasks.",
+    "freeSlot": "Free",
+    "taskSlot": "Task"
   },
   "tasks": {
     "title": "Tasks",
@@ -180,7 +185,11 @@
     "gamification": "Gamification",
     "xpEnabled": "XP System enabled",
     "soundEnabled": "Sound Effects",
-    "weekdaysShort": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    "weekdaysShort": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "mailFilter": "Mail Filter",
+    "masterTagEnabled": "Enable key tag for mails",
+    "masterTagEnabledDesc": "Only show mails with this tag in the overview. This allows tagging mails for Dopamind from other mail clients.",
+    "masterTag": "Key Tag"
   },
   "rewards": {
     "levelUp": "Level {level} reached!",

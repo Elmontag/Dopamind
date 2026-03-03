@@ -1,23 +1,44 @@
 const API_BASE = process.env.REACT_APP_API_URL || "/api";
 
-export function getMailConfigHeader() {
+function safeBase64(str) {
   try {
-    const settings = JSON.parse(localStorage.getItem("dopamind-settings") || "{}");
-    if (!settings.imap?.host) return {};
-    const config = { ...settings.imap, smtp: settings.smtp };
-    return { "X-Mail-Config": btoa(JSON.stringify(config)) };
+    return btoa(unescape(encodeURIComponent(str)));
+  } catch {
+    return btoa(str);
+  }
+}
+
+function getSettingsConfig() {
+  try {
+    return JSON.parse(localStorage.getItem("dopamind-settings") || "{}");
   } catch {
     return {};
   }
 }
 
+export function getMailConfigHeader() {
+  const settings = getSettingsConfig();
+  if (!settings.imap?.host) return {};
+  const config = { ...settings.imap, smtp: settings.smtp };
+  return { "X-Mail-Config": safeBase64(JSON.stringify(config)) };
+}
+
+export function getCalDavConfigHeader() {
+  const settings = getSettingsConfig();
+  if (!settings.caldav?.url) return {};
+  return { "X-CalDAV-Config": safeBase64(JSON.stringify(settings.caldav)) };
+}
+
 export async function apiFetch(path, options = {}) {
-  const mailHeaders = path.startsWith("/mail") ? getMailConfigHeader() : {};
+  const extraHeaders = {};
+  if (path.startsWith("/mail")) Object.assign(extraHeaders, getMailConfigHeader());
+  if (path.startsWith("/calendar")) Object.assign(extraHeaders, getCalDavConfigHeader());
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...mailHeaders,
+      ...extraHeaders,
       ...options.headers,
     },
   });

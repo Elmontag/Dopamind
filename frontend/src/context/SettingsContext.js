@@ -11,17 +11,30 @@ const defaultSettings = {
     start: "08:00",
     end: "17:00",
     breakMinutes: 60,
-    workDays: [1, 2, 3, 4, 5], // Mon-Fri
+    workDays: [1, 2, 3, 4, 5],
   },
   gamification: { xpEnabled: true, soundEnabled: false },
   notifications: { enabled: true, focusReminder: true },
+  mail: { masterTagEnabled: false, masterTag: "dopamind" },
 };
+
+function deepMerge(target, source) {
+  const result = { ...target };
+  for (const key of Object.keys(source)) {
+    if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
+      result[key] = deepMerge(target[key] || {}, source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return { ...defaultSettings, ...JSON.parse(saved) };
+      if (saved) return deepMerge(defaultSettings, JSON.parse(saved));
     } catch {}
     return defaultSettings;
   });

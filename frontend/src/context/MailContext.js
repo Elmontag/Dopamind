@@ -9,7 +9,7 @@ const initialState = {
   folder: "INBOX",
   loading: false,
   error: null,
-  composing: null, // null | { to, cc, subject, body, replyTo? }
+  composing: null,
 };
 
 function reducer(state, action) {
@@ -52,11 +52,11 @@ function reducer(state, action) {
 export function MailProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const fetchMails = useCallback(async (folder = "INBOX") => {
+  const fetchMails = useCallback(async (folder = "INBOX", masterTag = null) => {
     dispatch({ type: "SET_LOADING", payload: true });
     dispatch({ type: "SET_FOLDER", payload: folder });
     try {
-      const mails = await mailService.fetchMails(folder);
+      const mails = await mailService.fetchMails(folder, masterTag);
       dispatch({ type: "SET_MAILS", payload: mails });
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err.message });
@@ -64,8 +64,19 @@ export function MailProvider({ children }) {
   }, []);
 
   const selectMail = useCallback(async (mail) => {
-    dispatch({ type: "SELECT_MAIL", payload: mail });
-    if (mail && !mail.seen) {
+    if (!mail) {
+      dispatch({ type: "SELECT_MAIL", payload: null });
+      return;
+    }
+    // Fetch full body for detail view
+    let fullMail = mail;
+    try {
+      fullMail = await mailService.fetchMailDetail(mail.uid);
+      fullMail.tags = mail.tags; // preserve tags from list
+      fullMail.seen = true;
+    } catch {}
+    dispatch({ type: "SELECT_MAIL", payload: fullMail });
+    if (!mail.seen) {
       try {
         await mailService.markSeen(mail.uid);
         dispatch({ type: "UPDATE_MAIL", payload: { uid: mail.uid, seen: true } });
@@ -94,11 +105,15 @@ export function MailProvider({ children }) {
   const tagMail = useCallback(async (uid, tag) => {
     try {
       await mailService.tagMail(uid, tag);
-      dispatch({ type: "UPDATE_MAIL", payload: { uid, tags: [tag] } });
+      // Append tag to existing tags
+      const mail = state.mails.find((m) => m.uid === uid);
+      const currentTags = mail?.tags || [];
+      const newTags = currentTags.includes(tag) ? currentTags : [...currentTags, tag];
+      dispatch({ type: "UPDATE_MAIL", payload: { uid, tags: newTags } });
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err.message });
     }
-  }, []);
+  }, [state.mails]);
 
   const sendMail = useCallback(async (mailData) => {
     try {
@@ -106,6 +121,7 @@ export function MailProvider({ children }) {
       dispatch({ type: "SET_COMPOSING", payload: null });
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err.message });
+      throw err;
     }
   }, []);
 
@@ -119,7 +135,7 @@ export function MailProvider({ children }) {
       payload: {
         to: mail.from,
         cc: "",
-        subject: `Re: ${mail.subject.replace(/^Re:\s*/i, "")}`,
+        subject: `Re: ${(mail.subject || "").replace(/^Re:\s*/i, "")}`,
         body: `\n\n--- ${mail.from} ---\n${mail.body || mail.preview || ""}`,
         replyTo: mail.uid,
       },
@@ -128,18 +144,7 @@ export function MailProvider({ children }) {
 
   return (
     <MailContext.Provider
-      value={{
-        state,
-        dispatch,
-        fetchMails,
-        selectMail,
-        deleteMail,
-        archiveMail,
-        tagMail,
-        sendMail,
-        startCompose,
-        startReply,
-      }}
+      value={{ state, dispatch, fetchMails, selectMail, deleteMail, archiveMail, tagMail, sendMail, startCompose, startReply }}
     >
       {children}
     </MailContext.Provider>

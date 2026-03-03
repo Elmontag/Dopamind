@@ -5,102 +5,181 @@ const { simpleParser } = require("mailparser");
 
 const router = express.Router();
 
-// Create IMAP client from request headers (credentials per-request)
-function createImapClient(config) {
-  return new ImapFlow({
-    host: config.host,
-    port: config.port || 993,
-    secure: config.tls !== false,
-    auth: { user: config.user, pass: config.password },
-    logger: false,
-  });
-}
-
 function getMailConfig(req) {
   const cfg = req.headers["x-mail-config"];
   if (!cfg) return null;
-  try { return JSON.parse(Buffer.from(cfg, "base64").toString()); }
-  catch { return null; }
+  try {
+    return JSON.parse(Buffer.from(cfg, "base64").toString());
+  } catch {
+    return null;
+  }
 }
 
-// GET /api/mail?folder=INBOX
-router.get("/", async (req, res) => {
+function createImapClient(config) {
+  return new ImapFlow({
+    host: config.host,
+    port: Number(config.port) || 993,
+    secure: config.tls !== false,
+    auth: { user: config.user, pass: config.password },
+    logger: false,
+    tls: { rejectUnauthorized: false },
+  });
+}
+
+function extractTags(flags) {
+  if (!flags) return [];
+  const tags = [];
+  for (const flag of flags) {
+    if (typeof flag === "string" && flag.startsWith("$dopamind_")) {
+      tags.push(flag.replace("$dopamind_", ""));
+    }
+  }
+  return tags;
+}
+
+async function withImap(config, folder, fn) {
+  const client = createImapClient(config);
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock(folder);
+    try {
+      return await fn(client);
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+// --- Static routes BEFORE parameterized routes ---
+
+// POST /api/mail/send
+router.post("/send", async (req, res) => {
+  const config = getMailConfig(req);
+  if (!config?.smtp) return res.status(400).json({ error: "SMTP not configured" });
+
+  const { to, cc, subject, body } = req.body;
+  if (!to || !subject) return res.status(400).json({ error: "Missing to/subject" });
+
+  try {
+    const smtp = config.smtp;
+    const port = Number(smtp.port) || 587;
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port,
+      secure: port === 465,
+      auth: { user: smtp.user || config.user, pass: smtp.password || config.password },
+      tls: { rejectUnauthorized: false },
+    });
+
+    await transporter.sendMail({
+      from: smtp.user || config.user,
+      to,
+      cc: cc || undefined,
+      subject,
+      text: body,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("SMTP error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/mail/test
+router.post("/test", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
 
   const client = createImapClient(config);
   try {
     await client.connect();
-    const folder = req.query.folder || "INBOX";
-    const lock = await client.getMailboxLock(folder);
+    await client.logout();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    try {
-      const messages = [];
-      // Fetch last 50 messages
-      const totalMessages = client.mailbox.exists;
-      const startSeq = Math.max(1, totalMessages - 49);
+// GET /api/mail?folder=INBOX&tag=...
+router.get("/", async (req, res) => {
+  const config = getMailConfig(req);
+  if (!config) return res.status(400).json({ error: "Mail not configured" });
 
+  const folder = req.query.folder || "INBOX";
+  const filterTag = req.query.tag;
+
+  try {
+    const messages = await withImap(config, folder, async (client) => {
+      const result = [];
+      const total = client.mailbox.exists;
+      if (total === 0) return result;
+
+      const startSeq = Math.max(1, total - 49);
       for await (const msg of client.fetch(`${startSeq}:*`, {
         uid: true,
         envelope: true,
         flags: true,
         bodyStructure: true,
-        source: { maxLength: 2048 },
+        source: { maxLength: 4096 },
       })) {
-        const parsed = msg.source ? await simpleParser(msg.source) : null;
-        messages.push({
+        const tags = extractTags(msg.flags);
+        if (filterTag && !tags.includes(filterTag)) continue;
+
+        let preview = "";
+        try {
+          if (msg.source) {
+            const parsed = await simpleParser(msg.source);
+            preview = (parsed.text || "").slice(0, 200).replace(/\n+/g, " ");
+          }
+        } catch {}
+
+        result.push({
           uid: msg.uid,
-          subject: msg.envelope.subject || "(no subject)",
-          from: msg.envelope.from?.[0]?.address || "unknown",
-          fromName: msg.envelope.from?.[0]?.name || "",
-          date: msg.envelope.date?.toISOString(),
-          seen: msg.flags.has("\\Seen"),
-          flagged: msg.flags.has("\\Flagged"),
-          preview: parsed?.text?.slice(0, 200) || "",
-          tags: [],
+          subject: msg.envelope?.subject || "(no subject)",
+          from: msg.envelope?.from?.[0]?.address || "unknown",
+          fromName: msg.envelope?.from?.[0]?.name || "",
+          date: msg.envelope?.date?.toISOString() || null,
+          seen: msg.flags?.has?.("\\Seen") || false,
+          flagged: msg.flags?.has?.("\\Flagged") || false,
+          preview,
+          tags,
         });
       }
-
-      res.json(messages.reverse());
-    } finally {
-      lock.release();
-    }
+      return result.reverse();
+    });
+    res.json(messages);
   } catch (err) {
+    console.error("IMAP fetch error:", err.message);
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
-// GET /api/mail/:uid - full message
+// GET /api/mail/:uid
 router.get("/:uid", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
 
-  const client = createImapClient(config);
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
+    const mail = await withImap(config, req.query.folder || "INBOX", async (client) => {
       const msg = await client.fetchOne(req.params.uid, { source: true }, { uid: true });
+      if (!msg?.source) throw new Error("Message not found");
       const parsed = await simpleParser(msg.source);
-      res.json({
+      return {
         uid: Number(req.params.uid),
-        subject: parsed.subject,
+        subject: parsed.subject || "",
         from: parsed.from?.text || "",
         to: parsed.to?.text || "",
         cc: parsed.cc?.text || "",
-        date: parsed.date?.toISOString(),
+        date: parsed.date?.toISOString() || null,
         body: parsed.text || "",
         html: parsed.html || "",
-      });
-    } finally {
-      lock.release();
-    }
+      };
+    });
+    res.json(mail);
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
@@ -109,69 +188,51 @@ router.put("/:uid/seen", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
 
-  const client = createImapClient(config);
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
+    await withImap(config, "INBOX", async (client) => {
       await client.messageFlagsAdd(req.params.uid, ["\\Seen"], { uid: true });
-      res.json({ success: true });
-    } finally {
-      lock.release();
-    }
+    });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
-// DELETE /api/mail/:uid - permanent delete
+// DELETE /api/mail/:uid
 router.delete("/:uid", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
 
-  const client = createImapClient(config);
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
-      await client.messageFlagsAdd(req.params.uid, ["\\Deleted"], { uid: true });
+    await withImap(config, "INBOX", async (client) => {
       await client.messageDelete(req.params.uid, { uid: true });
-      res.json({ success: true });
-    } finally {
-      lock.release();
-    }
+    });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
-// PUT /api/mail/:uid/archive - move to Archive folder
+// PUT /api/mail/:uid/archive
 router.put("/:uid/archive", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
 
-  const client = createImapClient(config);
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
-      await client.messageMove(req.params.uid, "Archive", { uid: true });
-      res.json({ success: true });
-    } finally {
-      lock.release();
-    }
+    await withImap(config, "INBOX", async (client) => {
+      try {
+        await client.messageMove(req.params.uid, "Archive", { uid: true });
+      } catch {
+        await client.messageMove(req.params.uid, "INBOX.Archive", { uid: true });
+      }
+    });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
-// PUT /api/mail/:uid/tag - add IMAP keyword as tag
+// PUT /api/mail/:uid/tag
 router.put("/:uid/tag", async (req, res) => {
   const config = getMailConfig(req);
   if (!config) return res.status(400).json({ error: "Mail not configured" });
@@ -179,46 +240,28 @@ router.put("/:uid/tag", async (req, res) => {
   const { tag } = req.body;
   if (!tag) return res.status(400).json({ error: "Tag required" });
 
-  const client = createImapClient(config);
   try {
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
-      // Use IMAP keywords for tags
+    await withImap(config, "INBOX", async (client) => {
       await client.messageFlagsAdd(req.params.uid, [`$dopamind_${tag}`], { uid: true });
-      res.json({ success: true });
-    } finally {
-      lock.release();
-    }
+    });
+    res.json({ success: true, tag });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  } finally {
-    await client.logout().catch(() => {});
   }
 });
 
-// POST /api/mail/send - send via SMTP
-router.post("/send", async (req, res) => {
+// PUT /api/mail/:uid/untag
+router.put("/:uid/untag", async (req, res) => {
   const config = getMailConfig(req);
-  if (!config?.smtp) return res.status(400).json({ error: "SMTP not configured" });
+  if (!config) return res.status(400).json({ error: "Mail not configured" });
 
-  const { to, cc, subject, body } = req.body;
+  const { tag } = req.body;
+  if (!tag) return res.status(400).json({ error: "Tag required" });
+
   try {
-    const transporter = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port || 587,
-      secure: config.smtp.tls,
-      auth: { user: config.smtp.user, pass: config.smtp.password },
+    await withImap(config, "INBOX", async (client) => {
+      await client.messageFlagsRemove(req.params.uid, [`$dopamind_${tag}`], { uid: true });
     });
-
-    await transporter.sendMail({
-      from: config.smtp.user,
-      to,
-      cc: cc || undefined,
-      subject,
-      text: body,
-    });
-
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
