@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const { getDb } = require("./db/database");
+const { initDb } = require("./db/database");
 const { authenticate } = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
@@ -52,9 +52,6 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/", generalLimiter);
 
-// Initialize database on startup
-getDb();
-
 // Public routes
 app.use("/api/auth", authRoutes);
 
@@ -72,6 +69,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Dopamind API running on port ${PORT}`);
-});
+// Initialize database and start server
+async function start() {
+  try {
+    await initDb();
+    console.log("PostgreSQL connected and schema initialized.");
+  } catch (err) {
+    console.error("Failed to initialize database:", err.message);
+    process.exit(1);
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Dopamind API running on port ${PORT}`);
+  });
+}
+
+start();

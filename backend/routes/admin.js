@@ -1,6 +1,6 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
-const { getDb, addAuditLog } = require("../db/database");
+const { getPool, addAuditLog } = require("../db/database");
 const { authenticate, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -16,9 +16,9 @@ const validate = (req, res, next) => {
 };
 
 // GET /api/admin/users
-router.get("/users", (req, res) => {
+router.get("/users", async (req, res) => {
   try {
-    const db = getDb();
+    const pool = getPool();
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
@@ -27,21 +27,24 @@ router.get("/users", (req, res) => {
     let query = "SELECT id, email, name, role, email_verified, active, created_at, last_login FROM users";
     let countQuery = "SELECT COUNT(*) as total FROM users";
     const params = [];
+    let paramIdx = 1;
 
     if (search) {
-      const clause = " WHERE email LIKE ? OR name LIKE ?";
+      const clause = ` WHERE LOWER(email) LIKE LOWER($${paramIdx}) OR LOWER(name) LIKE LOWER($${paramIdx + 1})`;
       query += clause;
       countQuery += clause;
       params.push(`%${search}%`, `%${search}%`);
+      paramIdx += 2;
     }
 
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+    query += ` ORDER BY created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
 
-    const total = db.prepare(countQuery).get(...params).total;
-    const users = db.prepare(query).all(...params, limit, offset);
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total);
+    const usersResult = await pool.query(query, [...params, limit, offset]);
 
     res.json({
-      users: users.map((u) => ({
+      users: usersResult.rows.map((u) => ({
         id: u.id,
         email: u.email,
         name: u.name,
@@ -60,12 +63,14 @@ router.get("/users", (req, res) => {
 });
 
 // GET /api/admin/users/:id
-router.get("/users/:id", (req, res) => {
+router.get("/users/:id", async (req, res) => {
   try {
-    const db = getDb();
-    const user = db
-      .prepare("SELECT id, email, name, role, email_verified, active, created_at, updated_at, last_login FROM users WHERE id = ?")
-      .get(req.params.id);
+    const pool = getPool();
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, email_verified, active, created_at, updated_at, last_login FROM users WHERE id = $1",
+      [req.params.id]
+    );
+    const user = rows[0];
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -95,48 +100,62 @@ router.put(
     body("name").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Name must be 1-100 characters"),
   ],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
+      const pool = getPool();
       const { role, active, name } = req.body;
       const targetId = req.params.id;
 
-      const target = db.prepare("SELECT id, email, role FROM users WHERE id = ?").get(targetId);
+      const { rows: targetRows } = await pool.query(
+        "SELECT id, email, role FROM users WHERE id = $1",
+        [targetId]
+      );
+      const target = targetRows[0];
       if (!target) return res.status(404).json({ error: "User not found" });
 
       // Prevent removing the last admin
       if (target.role === "admin" && role === "user") {
-        const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = 1").get().count;
-        if (adminCount <= 1) {
+        const { rows: adminRows } = await pool.query(
+          "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = TRUE"
+        );
+        if (parseInt(adminRows[0].count) <= 1) {
           return res.status(400).json({ error: "Cannot remove the last admin" });
         }
       }
 
       // Prevent disabling the last admin
       if (target.role === "admin" && active === false) {
-        const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = 1").get().count;
-        if (adminCount <= 1) {
+        const { rows: adminRows } = await pool.query(
+          "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = TRUE"
+        );
+        if (parseInt(adminRows[0].count) <= 1) {
           return res.status(400).json({ error: "Cannot disable the last admin" });
         }
       }
 
       const updates = [];
       const values = [];
-      if (role !== undefined) { updates.push("role = ?"); values.push(role); }
-      if (active !== undefined) { updates.push("active = ?"); values.push(active ? 1 : 0); }
-      if (name !== undefined) { updates.push("name = ?"); values.push(name); }
+      let paramIdx = 1;
+      if (role !== undefined) { updates.push(`role = $${paramIdx++}`); values.push(role); }
+      if (active !== undefined) { updates.push(`active = $${paramIdx++}`); values.push(active); }
+      if (name !== undefined) { updates.push(`name = $${paramIdx++}`); values.push(name); }
 
       if (updates.length > 0) {
-        updates.push("updated_at = datetime('now')");
+        updates.push("updated_at = NOW()");
         values.push(targetId);
-        db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+        await pool.query(
+          `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIdx}`,
+          values
+        );
       }
 
-      addAuditLog(req.user.id, "admin_update_user", `Updated user ${target.email}: ${JSON.stringify(req.body)}`, req.ip);
+      await addAuditLog(req.user.id, "admin_update_user", `Updated user ${target.email}: ${JSON.stringify(req.body)}`, req.ip);
 
-      const updated = db
-        .prepare("SELECT id, email, name, role, email_verified, active, created_at, last_login FROM users WHERE id = ?")
-        .get(targetId);
+      const { rows: updatedRows } = await pool.query(
+        "SELECT id, email, name, role, email_verified, active, created_at, last_login FROM users WHERE id = $1",
+        [targetId]
+      );
+      const updated = updatedRows[0];
 
       res.json({
         id: updated.id,
@@ -156,28 +175,34 @@ router.put(
 );
 
 // DELETE /api/admin/users/:id
-router.delete("/users/:id", (req, res) => {
+router.delete("/users/:id", async (req, res) => {
   try {
-    const db = getDb();
+    const pool = getPool();
     const targetId = req.params.id;
 
     if (targetId === req.user.id) {
       return res.status(400).json({ error: "Cannot delete your own account" });
     }
 
-    const target = db.prepare("SELECT id, email, role FROM users WHERE id = ?").get(targetId);
+    const { rows: targetRows } = await pool.query(
+      "SELECT id, email, role FROM users WHERE id = $1",
+      [targetId]
+    );
+    const target = targetRows[0];
     if (!target) return res.status(404).json({ error: "User not found" });
 
     if (target.role === "admin") {
-      const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = 1").get().count;
-      if (adminCount <= 1) {
+      const { rows: adminRows } = await pool.query(
+        "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = TRUE"
+      );
+      if (parseInt(adminRows[0].count) <= 1) {
         return res.status(400).json({ error: "Cannot delete the last admin" });
       }
     }
 
-    db.prepare("DELETE FROM users WHERE id = ?").run(targetId);
+    await pool.query("DELETE FROM users WHERE id = $1", [targetId]);
 
-    addAuditLog(req.user.id, "admin_delete_user", `Deleted user ${target.email}`, req.ip);
+    await addAuditLog(req.user.id, "admin_delete_user", `Deleted user ${target.email}`, req.ip);
 
     res.json({ message: "User deleted" });
   } catch (err) {
@@ -187,21 +212,21 @@ router.delete("/users/:id", (req, res) => {
 });
 
 // GET /api/admin/audit-log
-router.get("/audit-log", (req, res) => {
+router.get("/audit-log", async (req, res) => {
   try {
-    const db = getDb();
+    const pool = getPool();
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const offset = (page - 1) * limit;
 
-    const total = db.prepare("SELECT COUNT(*) as total FROM audit_log").get().total;
-    const logs = db
-      .prepare(
-        `SELECT a.id, a.user_id, a.action, a.detail, a.ip, a.created_at, u.email as user_email
-         FROM audit_log a LEFT JOIN users u ON a.user_id = u.id
-         ORDER BY a.created_at DESC LIMIT ? OFFSET ?`
-      )
-      .all(limit, offset);
+    const countResult = await pool.query("SELECT COUNT(*) as total FROM audit_log");
+    const total = parseInt(countResult.rows[0].total);
+    const { rows: logs } = await pool.query(
+      `SELECT a.id, a.user_id, a.action, a.detail, a.ip, a.created_at, u.email as user_email
+       FROM audit_log a LEFT JOIN users u ON a.user_id = u.id
+       ORDER BY a.created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
 
     res.json({
       logs,

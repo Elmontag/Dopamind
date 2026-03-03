@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 const { body, validationResult } = require("express-validator");
-const { getDb, addAuditLog } = require("../db/database");
+const { getPool, addAuditLog } = require("../db/database");
 const { signToken, authenticate } = require("../middleware/auth");
 
 const router = express.Router();
@@ -32,13 +32,15 @@ router.post(
       .matches(/\d/).withMessage("Password must contain a number"),
   ],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
+      const pool = getPool();
       const { email, name, password } = req.body;
 
-      const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-      if (existing) {
+      const { rows: existing } = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [email]
+      );
+      if (existing.length > 0) {
         return res.status(409).json({ error: "Email already registered" });
       }
 
@@ -46,12 +48,13 @@ router.post(
       const id = uuidv4();
       const verificationToken = crypto.randomBytes(32).toString("hex");
 
-      db.prepare(
+      await pool.query(
         `INSERT INTO users (id, email, name, password_hash, verification_token)
-         VALUES (?, ?, ?, ?, ?)`
-      ).run(id, email, name, hash, verificationToken);
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, email, name, hash, verificationToken]
+      );
 
-      addAuditLog(id, "register", `User registered: ${email}`, req.ip);
+      await addAuditLog(id, "register", `User registered: ${email}`, req.ip);
 
       const token = signToken({ id, email, role: "user" });
 
@@ -75,17 +78,19 @@ router.post(
     body("password").notEmpty().withMessage("Password required"),
   ],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
+      const pool = getPool();
       const { email, password } = req.body;
 
-      const user = db
-        .prepare("SELECT id, email, name, password_hash, role, email_verified, active FROM users WHERE email = ?")
-        .get(email);
+      const { rows } = await pool.query(
+        "SELECT id, email, name, password_hash, role, email_verified, active FROM users WHERE LOWER(email) = LOWER($1)",
+        [email]
+      );
+      const user = rows[0];
 
       if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-        addAuditLog(null, "login_failed", `Failed login attempt: ${email}`, req.ip);
+        await addAuditLog(null, "login_failed", `Failed login attempt: ${email}`, req.ip);
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
@@ -93,9 +98,12 @@ router.post(
         return res.status(403).json({ error: "Account is disabled" });
       }
 
-      db.prepare("UPDATE users SET last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(user.id);
+      await pool.query(
+        "UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1",
+        [user.id]
+      );
 
-      addAuditLog(user.id, "login", `User logged in: ${email}`, req.ip);
+      await addAuditLog(user.id, "login", `User logged in: ${email}`, req.ip);
 
       const token = signToken(user);
 
@@ -117,12 +125,14 @@ router.post(
 );
 
 // GET /api/auth/me
-router.get("/me", authenticate, (req, res) => {
+router.get("/me", authenticate, async (req, res) => {
   try {
-    const db = getDb();
-    const user = db
-      .prepare("SELECT id, email, name, role, email_verified, created_at, last_login FROM users WHERE id = ?")
-      .get(req.user.id);
+    const pool = getPool();
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, email_verified, created_at, last_login FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    const user = rows[0];
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -147,18 +157,23 @@ router.put(
   authenticate,
   [body("name").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Name must be 1-100 characters")],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
+      const pool = getPool();
       const { name } = req.body;
 
       if (name) {
-        db.prepare("UPDATE users SET name = ?, updated_at = datetime('now') WHERE id = ?").run(name, req.user.id);
+        await pool.query(
+          "UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2",
+          [name, req.user.id]
+        );
       }
 
-      const user = db
-        .prepare("SELECT id, email, name, role, email_verified FROM users WHERE id = ?")
-        .get(req.user.id);
+      const { rows } = await pool.query(
+        "SELECT id, email, name, role, email_verified FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      const user = rows[0];
 
       res.json({
         id: user.id,
@@ -188,20 +203,26 @@ router.post(
       .matches(/\d/).withMessage("Password must contain a number"),
   ],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
+      const pool = getPool();
       const { currentPassword, newPassword } = req.body;
 
-      const user = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(req.user.id);
-      if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+      const { rows } = await pool.query(
+        "SELECT password_hash FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      if (!bcrypt.compareSync(currentPassword, rows[0].password_hash)) {
         return res.status(400).json({ error: "Current password is incorrect" });
       }
 
       const hash = bcrypt.hashSync(newPassword, 12);
-      db.prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?").run(hash, req.user.id);
+      await pool.query(
+        "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+        [hash, req.user.id]
+      );
 
-      addAuditLog(req.user.id, "password_change", "Password changed", req.ip);
+      await addAuditLog(req.user.id, "password_change", "Password changed", req.ip);
 
       res.json({ message: "Password changed successfully" });
     } catch (err) {
@@ -217,10 +238,14 @@ router.delete(
   authenticate,
   [body("password").notEmpty().withMessage("Password required for account deletion")],
   validate,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const db = getDb();
-      const user = db.prepare("SELECT id, email, password_hash, role FROM users WHERE id = ?").get(req.user.id);
+      const pool = getPool();
+      const { rows } = await pool.query(
+        "SELECT id, email, password_hash, role FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      const user = rows[0];
 
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -229,17 +254,19 @@ router.delete(
       }
 
       if (user.role === "admin") {
-        const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = 1").get().count;
-        if (adminCount <= 1) {
+        const { rows: admins } = await pool.query(
+          "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND active = TRUE"
+        );
+        if (parseInt(admins[0].count) <= 1) {
           return res.status(400).json({ error: "Cannot delete the last admin account" });
         }
       }
 
       // Delete user data and account (cascade handles user_data)
-      db.prepare("DELETE FROM user_data WHERE user_id = ?").run(user.id);
-      db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+      await pool.query("DELETE FROM user_data WHERE user_id = $1", [user.id]);
+      await pool.query("DELETE FROM users WHERE id = $1", [user.id]);
 
-      addAuditLog(null, "account_deleted", `User deleted own account: ${user.email}`, req.ip);
+      await addAuditLog(null, "account_deleted", `User deleted own account: ${user.email}`, req.ip);
 
       res.json({ message: "Account deleted successfully" });
     } catch (err) {
@@ -250,21 +277,25 @@ router.delete(
 );
 
 // POST /api/auth/verify-email
-router.post("/verify-email", (req, res) => {
+router.post("/verify-email", async (req, res) => {
   try {
-    const db = getDb();
+    const pool = getPool();
     const { token } = req.body;
 
     if (!token) return res.status(400).json({ error: "Verification token required" });
 
-    const user = db.prepare("SELECT id FROM users WHERE verification_token = ?").get(token);
-    if (!user) return res.status(400).json({ error: "Invalid verification token" });
+    const { rows } = await pool.query(
+      "SELECT id FROM users WHERE verification_token = $1",
+      [token]
+    );
+    if (rows.length === 0) return res.status(400).json({ error: "Invalid verification token" });
 
-    db.prepare(
-      "UPDATE users SET email_verified = 1, verification_token = NULL, updated_at = datetime('now') WHERE id = ?"
-    ).run(user.id);
+    await pool.query(
+      "UPDATE users SET email_verified = TRUE, verification_token = NULL, updated_at = NOW() WHERE id = $1",
+      [rows[0].id]
+    );
 
-    addAuditLog(user.id, "email_verified", "Email verified", req.ip);
+    await addAuditLog(rows[0].id, "email_verified", "Email verified", req.ip);
 
     res.json({ message: "Email verified successfully" });
   } catch (err) {

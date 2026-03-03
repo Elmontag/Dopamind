@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { getDb } = require("../db/database");
+const { getPool } = require("../db/database");
 
 const JWT_SECRET = process.env.JWT_SECRET || require("crypto").randomBytes(32).toString("hex");
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
@@ -16,7 +16,7 @@ function signToken(user) {
   );
 }
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Authentication required" });
@@ -24,8 +24,12 @@ function authenticate(req, res, next) {
   try {
     const token = header.slice(7);
     const payload = jwt.verify(token, JWT_SECRET);
-    const db = getDb();
-    const user = db.prepare("SELECT id, email, name, role, active FROM users WHERE id = ?").get(payload.sub);
+    const pool = getPool();
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, active FROM users WHERE id = $1",
+      [payload.sub]
+    );
+    const user = rows[0];
     if (!user || !user.active) {
       return res.status(401).json({ error: "Account disabled or not found" });
     }

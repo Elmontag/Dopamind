@@ -1,6 +1,18 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dopamind
+      POSTGRES_PASSWORD: dopamind_dev
+      POSTGRES_DB: dopamind
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   frontend:
     build:
       context: ./frontend
@@ -30,6 +42,9 @@ services:
       - PORT=4000
       - CORS_ORIGIN=http://localhost:3000,http://localhost
       - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - DATABASE_URL=postgresql://dopamind:dopamind_dev@postgres:5432/dopamind
+    depends_on:
+      - postgres
 
   nginx:
     image: nginx:alpine
@@ -40,3 +55,6 @@ services:
     depends_on:
       - frontend
       - backend
+
+volumes:
+  pgdata:
