@@ -920,62 +920,247 @@ function shiftDateBy(dateStr, delta) {
   return new Date(Date.UTC(y, m - 1, dd + delta)).toISOString().slice(0, 10);
 }
 
-function WeekPlanView({ t, tasks, getEventsForDate, weekStart, onSelectDay, todayStr }) {
+// --- Week Timeline View: Google-Calendar style with time axis and drag & drop ---
+const WEEK_PX_PER_MIN = 1.2; // pixels per minute in the week timeline
+const WEEK_HOUR_HEIGHT = WEEK_PX_PER_MIN * 60;
+const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function WeekPlanView({ t, tasks, getEventsForDate, weekStart, onSelectDay, todayStr, settings, onMoveTask }) {
   const days = Array.from({ length: 7 }, (_, i) => shiftDateBy(weekStart, i));
-  const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+  const workStartH = parseInt((settings.workSchedule?.start || "08:00").split(":")[0], 10);
+  const workStartM = parseInt((settings.workSchedule?.start || "08:00").split(":")[1] || "0", 10);
+  const workEndH = parseInt((settings.workSchedule?.end || "17:00").split(":")[0], 10);
+  const workEndM = parseInt((settings.workSchedule?.end || "17:00").split(":")[1] || "0", 10);
+  const workStart = workStartH * 60 + workStartM;
+  const workEnd = workEndH * 60 + workEndM;
+
+  // Show 1 hour before/after work + ensure now is visible
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const nowTotal = currentTime.getHours() * 60 + currentTime.getMinutes();
+  const today = currentTime.toISOString().slice(0, 10);
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const nowPaddedStart = nowTotal - 60;
+  const nowPaddedEnd = nowTotal + 60;
+  const visStart = Math.max(0, Math.min(workStart - 60, days.includes(today) ? nowPaddedStart : workStart - 60));
+  const visEnd = Math.min(24 * 60, Math.max(workEnd + 60, days.includes(today) ? nowPaddedEnd : workEnd + 60));
+  const totalMin = visEnd - visStart;
+  const containerHeight = totalMin * WEEK_PX_PER_MIN;
+
+  // Hour labels
+  const hourLabels = [];
+  for (let h = Math.floor(visStart / 60); h <= Math.ceil(visEnd / 60); h++) {
+    const minFromTop = h * 60 - visStart;
+    if (minFromTop < 0 || minFromTop > totalMin) continue;
+    hourLabels.push({ h, top: minFromTop * WEEK_PX_PER_MIN });
+  }
+
+  // Drag state
+  const [dragTaskId, setDragTaskId] = useState(null);
+  const [dragOverDate, setDragOverDate] = useState(null);
+
+  const handleDragStart = (e, taskId) => {
+    setDragTaskId(taskId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", taskId);
+  };
+  const handleDragEnd = () => { setDragTaskId(null); setDragOverDate(null); };
+  const handleDrop = (e, date) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain") || dragTaskId;
+    if (id && date) onMoveTask(id, date);
+    setDragTaskId(null);
+    setDragOverDate(null);
+  };
+
+  const getTasksForDate = (date) => {
+    return tasks.filter((tk) => {
+      if (tk.completed) {
+        if (!tk.completedAt) return false;
+        const d = new Date(tk.completedAt);
+        const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        return cd === date;
+      }
+      if (date > todayStr) return tk.scheduledDate === date;
+      if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
+      return false;
+    });
+  };
+
+  const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
+
+  const getEventBlocks = (date) => {
+    const evs = getEventsForDate(date).filter((ev) => !ev.allDay && ev.start);
+    return evs.map((ev) => {
+      let startMin, endMin;
+      if (isTimeOnly(ev.start)) {
+        const [h, m] = ev.start.split(":").map(Number);
+        startMin = h * 60 + m;
+        if (ev.end && isTimeOnly(ev.end)) {
+          const [eh, em] = ev.end.split(":").map(Number);
+          endMin = eh * 60 + em;
+        } else { endMin = startMin + 60; }
+      } else {
+        const sd = new Date(ev.start);
+        if (isNaN(sd)) return null;
+        startMin = sd.getHours() * 60 + sd.getMinutes();
+        const ed = ev.end ? new Date(ev.end) : null;
+        endMin = ed && !isNaN(ed) ? ed.getHours() * 60 + ed.getMinutes() : startMin + 60;
+      }
+      const dur = Math.max(30, endMin - startMin);
+      return { id: ev.id || ev.title, label: ev.title || ev.summary, startMin, dur };
+    }).filter(Boolean);
+  };
+
+  const getTaskBlocks = (date, dayTasks) => {
+    return dayTasks.map((tk) => {
+      let startMin = workStart;
+      if (tk.scheduledTime) {
+        const [h, m] = tk.scheduledTime.split(":").map(Number);
+        startMin = h * 60 + (m || 0);
+      }
+      const dur = Math.max(25, tk.estimatedMinutes || 25);
+      return { id: tk.id, label: tk.text, startMin, dur, priority: tk.priority, completed: tk.completed, task: tk };
+    });
+  };
 
   return (
-    <div className="grid grid-cols-7 gap-1">
-      {days.map((date, idx) => {
-        const isToday = date === todayStr;
-        const isPast = date < todayStr;
-        const dayTasks = tasks.filter((tk) => {
-          if (tk.completed) {
-            if (!tk.completedAt) return false;
-            const d = new Date(tk.completedAt);
-            const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-            return cd === date;
-          }
-          if (date > todayStr) return tk.scheduledDate === date;
-          if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
-          return false;
-        });
-        const events = getEventsForDate(date).filter((ev) => !ev.allDay);
-        const completedCount = dayTasks.filter((t) => t.completed).length;
-        const pendingCount = dayTasks.filter((t) => !t.completed).length;
-
-        return (
-          <button
-            key={date}
-            onClick={() => onSelectDay(date)}
-            className={`flex flex-col items-center p-1.5 rounded-xl border transition-all text-left min-h-[80px] ${
-              isToday
-                ? "border-accent/50 bg-accent/5"
-                : isPast
-                ? "border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/2"
-                : "border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5"
-            }`}
-          >
-            <span className={`text-[9px] font-medium uppercase ${isToday ? "text-accent" : "text-muted-light dark:text-muted-dark"}`}>
-              {dayNames[idx]}
-            </span>
-            <span className={`text-base font-bold mt-0.5 ${isToday ? "text-accent" : isPast ? "text-gray-400 dark:text-gray-600" : ""}`}>
-              {date.slice(8)}
-            </span>
-            <div className="mt-1 w-full space-y-0.5">
-              {events.slice(0, 2).map((ev) => (
-                <div key={ev.id} className="w-full h-1 rounded-full bg-accent/40" title={ev.title || ev.summary} />
-              ))}
-              {pendingCount > 0 && (
-                <div className="text-[9px] text-muted-light dark:text-muted-dark text-center">{pendingCount} {t("stats.open")}</div>
-              )}
-              {completedCount > 0 && (
-                <div className="text-[9px] text-success text-center">✓{completedCount}</div>
-              )}
+    <div className="overflow-x-auto">
+      <div className="flex min-w-0" style={{ minWidth: "600px" }}>
+        {/* Time axis */}
+        <div className="relative shrink-0 w-10 mr-1" style={{ height: containerHeight }}>
+          {hourLabels.map(({ h, top }) => (
+            <div
+              key={h}
+              className="absolute right-0 text-[9px] text-muted-light dark:text-muted-dark leading-none"
+              style={{ top, transform: "translateY(-50%)" }}
+            >
+              {String(h).padStart(2, "0")}
             </div>
-          </button>
-        );
-      })}
+          ))}
+        </div>
+
+        {/* Day columns */}
+        {days.map((date, idx) => {
+          const isToday = date === today;
+          const isPast = date < todayStr;
+          const dayTasks = getTasksForDate(date);
+          const eventBlocks = getEventBlocks(date);
+          const taskBlocks = getTaskBlocks(date, dayTasks.filter((t) => !t.completed));
+          const isDragOver = dragOverDate === date;
+
+          return (
+            <div key={date} className="flex-1 flex flex-col min-w-0">
+              {/* Day header */}
+              <button
+                onClick={() => onSelectDay(date)}
+                className={`text-center py-1 mb-1 rounded-lg text-xs font-medium transition-colors ${
+                  isToday
+                    ? "bg-accent/10 text-accent"
+                    : isPast
+                    ? "text-gray-400 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                }`}
+              >
+                <span className="text-[9px] uppercase block">{DAY_NAMES[idx]}</span>
+                <span className={`text-sm font-bold ${isToday ? "text-accent" : ""}`}>{date.slice(8)}</span>
+              </button>
+
+              {/* Time column */}
+              <div
+                className={`relative flex-1 border-l border-gray-100 dark:border-white/5 transition-colors ${
+                  isDragOver ? "bg-accent/5 border-accent/30" : ""
+                }`}
+                style={{ height: containerHeight }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverDate(date); e.dataTransfer.dropEffect = "move"; }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverDate(null); }}
+                onDrop={(e) => handleDrop(e, date)}
+              >
+                {/* Hour grid lines */}
+                {hourLabels.map(({ h, top }) => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-t border-gray-100 dark:border-white/[0.04]"
+                    style={{ top }}
+                  />
+                ))}
+
+                {/* Work hours highlight */}
+                <div
+                  className="absolute left-0 right-0 bg-gray-50/50 dark:bg-white/[0.015]"
+                  style={{
+                    top: (workStart - visStart) * WEEK_PX_PER_MIN,
+                    height: (workEnd - workStart) * WEEK_PX_PER_MIN,
+                  }}
+                />
+
+                {/* Current time line */}
+                {isToday && nowTotal >= visStart && nowTotal <= visEnd && (
+                  <div
+                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                    style={{ top: (nowTotal - visStart) * WEEK_PX_PER_MIN }}
+                  >
+                    <div className="h-0.5 bg-accent/70 w-full relative">
+                      <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-accent" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Calendar event blocks */}
+                {eventBlocks.map((ev) => {
+                  const top = (ev.startMin - visStart) * WEEK_PX_PER_MIN;
+                  const height = Math.max(18, ev.dur * WEEK_PX_PER_MIN);
+                  if (top + height < 0 || top > containerHeight) return null;
+                  return (
+                    <div
+                      key={`ev-${ev.id}`}
+                      className="absolute left-0.5 right-0.5 rounded overflow-hidden bg-accent/20 border border-accent/30 z-10"
+                      style={{ top: Math.max(0, top), height }}
+                      title={ev.label}
+                    >
+                      <p className="text-[8px] font-medium text-accent px-1 leading-tight truncate">{ev.label}</p>
+                    </div>
+                  );
+                })}
+
+                {/* Task blocks */}
+                {taskBlocks.map((tb) => {
+                  const top = (tb.startMin - visStart) * WEEK_PX_PER_MIN;
+                  const height = Math.max(18, tb.dur * WEEK_PX_PER_MIN);
+                  if (top + height < 0 || top > containerHeight) return null;
+                  const isDragging = dragTaskId === tb.id;
+                  const priorityColor =
+                    tb.priority === "high" ? "bg-danger/15 border-danger/30 text-danger" :
+                    tb.priority === "medium" ? "bg-amber-50 dark:bg-amber-900/15 border-amber-200 dark:border-amber-500/25 text-amber-800 dark:text-amber-300" :
+                    "bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300";
+                  return (
+                    <div
+                      key={`task-${tb.id}`}
+                      draggable={!isPast}
+                      onDragStart={(e) => handleDragStart(e, tb.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`absolute left-0.5 right-0.5 rounded border overflow-hidden cursor-grab active:cursor-grabbing z-10 transition-opacity ${priorityColor} ${isDragging ? "opacity-40" : "opacity-100"}`}
+                      style={{ top: Math.max(0, top), height }}
+                      title={tb.label}
+                    >
+                      <p className="text-[8px] font-medium px-1 leading-tight truncate">{tb.label}</p>
+                    </div>
+                  );
+                })}
+
+                {/* Drop hint */}
+                {isDragOver && (
+                  <div className="absolute inset-0 rounded border-2 border-dashed border-accent/40 pointer-events-none z-30" />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1458,6 +1643,8 @@ export default function HomePage() {
             weekStart={weekStart}
             onSelectDay={(date) => { setViewDate(date); setPlanView("day"); }}
             todayStr={todayStr}
+            settings={settings}
+            onMoveTask={(taskId, newDate) => dispatch({ type: "UPDATE_TASK", payload: { id: taskId, scheduledDate: newDate } })}
           />
         )}
 
