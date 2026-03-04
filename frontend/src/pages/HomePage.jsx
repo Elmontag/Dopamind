@@ -942,106 +942,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
   }, []);
 
   const days = Array.from({ length: 7 }, (_, i) => shiftDateBy(weekStart, i));
-
-  const workStartH = parseInt((settings.workSchedule?.start || "08:00").split(":")[0], 10);
-  const workStartM = parseInt((settings.workSchedule?.start || "08:00").split(":")[1] || "0", 10);
-  const workEndH = parseInt((settings.workSchedule?.end || "17:00").split(":")[0], 10);
-  const workEndM = parseInt((settings.workSchedule?.end || "17:00").split(":")[1] || "0", 10);
-  const workStart = workStartH * 60 + workStartM;
-  const workEnd = workEndH * 60 + workEndM;
-
-  // Show 1 hour before/after work + ensure now is visible
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const nowTotal = currentTime.getHours() * 60 + currentTime.getMinutes();
-  const today = currentTime.toISOString().slice(0, 10);
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const nowPaddedStart = nowTotal - 60;
-  const nowPaddedEnd = nowTotal + 60;
-  const visStart = Math.max(0, Math.min(workStart - 60, days.includes(today) ? nowPaddedStart : workStart - 60));
-  const visEnd = Math.min(24 * 60, Math.max(workEnd + 60, days.includes(today) ? nowPaddedEnd : workEnd + 60));
-  const totalMin = visEnd - visStart;
-  const containerHeight = totalMin * WEEK_PX_PER_MIN;
-
-  // Hour labels
-  const hourLabels = [];
-  for (let h = Math.floor(visStart / 60); h <= Math.ceil(visEnd / 60); h++) {
-    const minFromTop = h * 60 - visStart;
-    if (minFromTop < 0 || minFromTop > totalMin) continue;
-    hourLabels.push({ h, top: minFromTop * WEEK_PX_PER_MIN });
-  }
-
-  // Drag state
-  const [dragTaskId, setDragTaskId] = useState(null);
-  const [dragOverDate, setDragOverDate] = useState(null);
-
-  const handleDragStart = (e, taskId) => {
-    setDragTaskId(taskId);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", taskId);
-  };
-  const handleDragEnd = () => { setDragTaskId(null); setDragOverDate(null); };
-  const handleDrop = (e, date) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain") || dragTaskId;
-    if (id && date) onMoveTask(id, date);
-    setDragTaskId(null);
-    setDragOverDate(null);
-  };
-
-  const getTasksForDate = (date) => {
-    return tasks.filter((tk) => {
-      if (tk.completed) {
-        if (!tk.completedAt) return false;
-        const d = new Date(tk.completedAt);
-        const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-        return cd === date;
-      }
-      if (date > todayStr) return tk.scheduledDate === date;
-      if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
-      return false;
-    });
-  };
-
-  const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
-
-  const getEventBlocks = (date) => {
-    const evs = getEventsForDate(date).filter((ev) => !ev.allDay && ev.start);
-    return evs.map((ev) => {
-      let startMin, endMin;
-      if (isTimeOnly(ev.start)) {
-        const [h, m] = ev.start.split(":").map(Number);
-        startMin = h * 60 + m;
-        if (ev.end && isTimeOnly(ev.end)) {
-          const [eh, em] = ev.end.split(":").map(Number);
-          endMin = eh * 60 + em;
-        } else { endMin = startMin + 60; }
-      } else {
-        const sd = new Date(ev.start);
-        if (isNaN(sd)) return null;
-        startMin = sd.getHours() * 60 + sd.getMinutes();
-        const ed = ev.end ? new Date(ev.end) : null;
-        endMin = ed && !isNaN(ed) ? ed.getHours() * 60 + ed.getMinutes() : startMin + 60;
-      }
-      const dur = Math.max(30, endMin - startMin);
-      return { id: ev.id || ev.title, label: ev.title || ev.summary, startMin, dur };
-    }).filter(Boolean);
-  };
-
-  const getTaskBlocks = (date, dayTasks) => {
-    return dayTasks.map((tk) => {
-      let startMin = workStart;
-      if (tk.scheduledTime) {
-        const [h, m] = tk.scheduledTime.split(":").map(Number);
-        startMin = h * 60 + (m || 0);
-      }
-      const dur = Math.max(25, tk.estimatedMinutes || 25);
-      return { id: tk.id, label: tk.text, startMin, dur, priority: tk.priority, completed: tk.completed, task: tk };
-    });
-  };
+  const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
   const fmtTime = (totalMin) => {
     const h = Math.floor(totalMin / 60);
@@ -1263,6 +1164,8 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     </div>
   );
 }
+
+
 
 function MonthPlanView({ t, tasks, getEventsForDate, monthStart, onSelectDay, todayStr }) {
   const [y, m] = monthStart.split("-").map(Number);
