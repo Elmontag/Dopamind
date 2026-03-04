@@ -89,7 +89,7 @@ function QuickAddTask({ t, onAdd }) {
   );
 }
 
-function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onToggleSubtask, isTaskOverdue, onEditTask, onEditSubtask, onUpdateScheduledTime, onUpdateSubtaskScheduledTime, onRescheduleNextDay, isToday, isPastDay, gridInterval, viewDate, removedBreaks, onToggleBreakRemoved, breakTimeOverrides, onUpdateBreakTime, timeTrackingBreaks, onStartTask, countdownStartEnabled, showFullDay, hideParentWithSubtasks, onPushDownTask }) {
+function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onToggleSubtask, isTaskOverdue, onEditTask, onEditSubtask, onUpdateScheduledTime, onUpdateSubtaskScheduledTime, onRescheduleNextDay, isToday, isPastDay, gridInterval, viewDate, removedBreaks, onToggleBreakRemoved, breakTimeOverrides, onUpdateBreakTime, timeTrackingBreaks, onStartTask, countdownStartEnabled, showFullDay, hideParentWithSubtasks, onPushDownTask, energyLevel }) {
   const workStartH = parseInt(settings.workSchedule.start.split(":")[0], 10);
   const workStartM = parseInt(settings.workSchedule.start.split(":")[1] || "0", 10);
   const workEndH = parseInt(settings.workSchedule.end.split(":")[0], 10);
@@ -166,6 +166,15 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
+  // Energy cost indicator: priority maps to energy requirement
+  const PRIORITY_ENERGY = { high: "high", medium: "normal", low: "low" };
+  const ENERGY_EMOJI = { high: "⚡", normal: "🔵", low: "🔋" };
+  const getEnergyMatch = (priority) => {
+    const cost = PRIORITY_ENERGY[priority] || "normal";
+    if (!energyLevel) return { emoji: ENERGY_EMOJI[cost], matched: false };
+    const matched = cost === energyLevel;
+    return { emoji: ENERGY_EMOJI[cost], matched };
   };
   const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
   const nowTotal = toMin(nowH, nowM);
@@ -244,7 +253,10 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   };
 
   const placeTask = (task, desiredStart) => {
-    const subtasks = (task.subtasks || []).filter((s) => !s.completed);
+    // Only include subtasks that are scheduled for viewDate (or have no explicit scheduledDate)
+    const subtasks = (task.subtasks || []).filter(
+      (s) => !s.completed && (!s.scheduledDate || s.scheduledDate === viewDate)
+    );
     if (subtasks.length > 0) {
       let cursor = desiredStart;
       if (!hideParentWithSubtasks) {
@@ -323,30 +335,28 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     else if (totalFreeMin <= Math.max(m1, m2)) warningLevel = "moderate";
   }
 
-  // --- Build grid rows ---
+  // --- Build grid rows (full 24h so they cover any visEnd) ---
   const gridSlots = [];
-  for (let min = DAY_START; min < DAY_END; min += STEP) {
+  for (let min = 0; min < 24 * 60; min += STEP) {
     gridSlots.push(min);
   }
 
-  // Compute visible range: clip to span from 1 hour before earliest entry to 1 hour after latest entry (or work hours)
-  let visStart = showFullDay ? DAY_START : workStart;
-  let visEnd = showFullDay ? DAY_END : workEnd;
-  if (!showFullDay && entries.length > 0) {
+  // Compute visible range: always extend to cover all entries and now-line
+  let visStart = showFullDay ? 0 : workStart;
+  let visEnd = showFullDay ? 24 * 60 : workEnd;
+  if (entries.length > 0) {
     const earliest = Math.min(...entries.map((e) => e.startMin));
     const latest = Math.max(...entries.map((e) => e.startMin + e.durationMin));
     visStart = Math.min(visStart, earliest);
     visEnd = Math.max(visEnd, latest);
   }
-  if (!showFullDay && isToday) {
+  if (isToday) {
     visStart = Math.min(visStart, nowTotal);
     visEnd = Math.max(visEnd, nowTotal + 60);
   }
-  // Snap to STEP boundaries and add padding (only for work-hours mode)
-  if (!showFullDay) {
-    visStart = Math.max(DAY_START, Math.floor(visStart / STEP) * STEP - STEP);
-    visEnd = Math.min(DAY_END, Math.ceil(visEnd / STEP) * STEP + STEP);
-  }
+  // Snap to STEP boundaries and add one-slot padding; clamp to 0–24h
+  visStart = Math.max(0, Math.floor(visStart / STEP) * STEP - STEP);
+  visEnd = Math.min(24 * 60, Math.ceil(visEnd / STEP) * STEP + STEP);
   const visGridSlots = gridSlots.filter((s) => s >= visStart && s < visEnd);
 
   // --- Drag handlers (minute-precise D&D with time indicator) ---
@@ -604,7 +614,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
           const rect = e.currentTarget.getBoundingClientRect();
           const relY = e.clientY - rect.top;
           const minuteFromTop = visStart + relY / PX_PER_MIN;
-          const clampedMin = Math.max(DAY_START, Math.min(DAY_END - 1, Math.round(minuteFromTop)));
+          const clampedMin = Math.max(visStart, Math.min(visEnd - 1, Math.round(minuteFromTop)));
           setDragTimeMin(clampedMin);
           setDragOverSlot(Math.floor(clampedMin / STEP) * STEP);
         }}
@@ -618,7 +628,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
           if (!srcEntry) { setDragKey(null); return; }
           const rect = e.currentTarget.getBoundingClientRect();
           const relY = e.clientY - rect.top;
-          const targetMin = Math.max(DAY_START, Math.min(DAY_END - 1, Math.round(visStart + relY / PX_PER_MIN)));
+          const targetMin = Math.max(visStart, Math.min(visEnd - 1, Math.round(visStart + relY / PX_PER_MIN)));
           const newTime = fmtTime(targetMin);
           if (srcEntry.type === "break") {
             if (onUpdateBreakTime) onUpdateBreakTime(viewDate, newTime);
@@ -791,6 +801,16 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                 {/* Priority dot */}
                 {(isTask || isSubtask) && entry.priority && !isEditing && (
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1 ${entry.priority === "high" ? "bg-danger" : entry.priority === "medium" ? "bg-warn" : "bg-success"}`} />
+                )}
+
+                {/* Energy resource indicator */}
+                {(isTask || isSubtask) && entry.priority && !isEditing && energyLevel && (
+                  <span
+                    className={`text-[9px] flex-shrink-0 mt-0.5 transition-opacity ${getEnergyMatch(entry.priority).matched ? "opacity-100" : "opacity-30"}`}
+                    title={`${t("home.energyCost")}: ${t(`home.energy.${PRIORITY_ENERGY[entry.priority] || "normal"}`)}`}
+                  >
+                    {getEnergyMatch(entry.priority).emoji}
+                  </span>
                 )}
 
                 {/* Reschedule to next day button */}
@@ -1535,22 +1555,42 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Energy Check-in (Feature 6) */}
-      {isToday && settings.gamification?.energyCheckinEnabled && state.energyCheckDate !== todayStr && (
-        <div className="glass-card p-4">
-          <p className="text-sm font-medium mb-3">⚡ {t("home.energyCheckin")}</p>
-          <div className="flex gap-2">
-            {["low", "normal", "high"].map((level) => (
-              <button
-                key={level}
-                onClick={() => dispatch({ type: "SET_ENERGY_LEVEL", payload: level })}
-                className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-gray-50 dark:bg-white/5 hover:bg-accent/10 hover:text-accent border border-gray-200 dark:border-white/10"
-              >
-                {t(`home.energy.${level}`)}
-              </button>
-            ))}
+      {/* Energy Check-in (Feature 6): shown once daily; also show compact changer when already set */}
+      {isToday && settings.gamification?.energyCheckinEnabled && (
+        state.energyCheckDate !== todayStr ? (
+          <div className="glass-card p-4">
+            <p className="text-sm font-medium mb-3">⚡ {t("home.energyCheckin")}</p>
+            <div className="flex gap-2">
+              {["low", "normal", "high"].map((level) => (
+                <button
+                  key={level}
+                  onClick={() => dispatch({ type: "SET_ENERGY_LEVEL", payload: level })}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-gray-50 dark:bg-white/5 hover:bg-accent/10 hover:text-accent border border-gray-200 dark:border-white/10"
+                >
+                  {t(`home.energy.${level}`)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : state.energyLevel && (
+          <div className="glass-card px-4 py-2 flex items-center gap-3">
+            <span className="text-sm font-medium flex-1 flex items-center gap-1.5">
+              {state.energyLevel === "high" ? "⚡" : state.energyLevel === "low" ? "🔋" : "🔵"}
+              {t(`home.energy.${state.energyLevel}`)}
+            </span>
+            <div className="flex gap-1">
+              {["low", "normal", "high"].filter((l) => l !== state.energyLevel).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => dispatch({ type: "SET_ENERGY_LEVEL", payload: level })}
+                  className="px-2 py-1 rounded-lg text-[11px] font-medium transition-all bg-gray-50 dark:bg-white/5 hover:bg-accent/10 hover:text-accent border border-gray-200 dark:border-white/10"
+                >
+                  {t(`home.energy.${level}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
       {/* Daily Challenge (Feature 7) */}
@@ -1789,6 +1829,7 @@ export default function HomePage() {
               onStartTask={(task) => setCountdownTask(task)}
               showFullDay={timelineShowFullDay}
               hideParentWithSubtasks={settings.timeline?.hideParentWithSubtasks === true}
+              energyLevel={state.energyLevel}
             />
           </>
         )}

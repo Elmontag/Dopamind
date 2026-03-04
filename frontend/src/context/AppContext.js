@@ -674,9 +674,12 @@ function reducer(state, action) {
 
     case "SET_ENERGY_LEVEL": {
       const today = getTodayStr();
+      // Append every change with a timestamp so all changes flow into the Brain Report.
+      // Retain entries from the last 90 days to prevent unbounded growth.
+      const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const newEnergyLog = [
-        ...(state.energyLog || []).filter((e) => e.date !== today),
-        { date: today, level: action.payload },
+        ...(state.energyLog || []).filter((e) => e.date >= cutoff),
+        { date: today, level: action.payload, changedAt: new Date().toISOString() },
       ];
       return { ...state, energyLevel: action.payload, energyCheckDate: today, energyLog: newEnergyLog };
     }
