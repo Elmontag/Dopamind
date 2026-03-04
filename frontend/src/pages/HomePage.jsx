@@ -906,6 +906,150 @@ const CATEGORY_CONFIG = {
 
 const MAX_TIMELINE_TASKS = 8;
 
+// Helper: get ISO week's Monday
+function getWeekMonday(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function shiftDateBy(dateStr, delta) {
+  const [y, m, dd] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, dd + delta)).toISOString().slice(0, 10);
+}
+
+function WeekPlanView({ t, tasks, getEventsForDate, weekStart, onSelectDay, todayStr }) {
+  const days = Array.from({ length: 7 }, (_, i) => shiftDateBy(weekStart, i));
+  const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+  return (
+    <div className="grid grid-cols-7 gap-1">
+      {days.map((date, idx) => {
+        const isToday = date === todayStr;
+        const isPast = date < todayStr;
+        const dayTasks = tasks.filter((tk) => {
+          if (tk.completed) {
+            if (!tk.completedAt) return false;
+            const d = new Date(tk.completedAt);
+            const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+            return cd === date;
+          }
+          if (date > todayStr) return tk.scheduledDate === date;
+          if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
+          return false;
+        });
+        const events = getEventsForDate(date).filter((ev) => !ev.allDay);
+        const completedCount = dayTasks.filter((t) => t.completed).length;
+        const pendingCount = dayTasks.filter((t) => !t.completed).length;
+
+        return (
+          <button
+            key={date}
+            onClick={() => onSelectDay(date)}
+            className={`flex flex-col items-center p-1.5 rounded-xl border transition-all text-left min-h-[80px] ${
+              isToday
+                ? "border-accent/50 bg-accent/5"
+                : isPast
+                ? "border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/2"
+                : "border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5"
+            }`}
+          >
+            <span className={`text-[9px] font-medium uppercase ${isToday ? "text-accent" : "text-muted-light dark:text-muted-dark"}`}>
+              {dayNames[idx]}
+            </span>
+            <span className={`text-base font-bold mt-0.5 ${isToday ? "text-accent" : isPast ? "text-gray-400 dark:text-gray-600" : ""}`}>
+              {date.slice(8)}
+            </span>
+            <div className="mt-1 w-full space-y-0.5">
+              {events.slice(0, 2).map((ev) => (
+                <div key={ev.id} className="w-full h-1 rounded-full bg-accent/40" title={ev.title || ev.summary} />
+              ))}
+              {pendingCount > 0 && (
+                <div className="text-[9px] text-muted-light dark:text-muted-dark text-center">{pendingCount} {t("stats.open")}</div>
+              )}
+              {completedCount > 0 && (
+                <div className="text-[9px] text-success text-center">✓{completedCount}</div>
+              )}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MonthPlanView({ t, tasks, getEventsForDate, monthStart, onSelectDay, todayStr }) {
+  const [y, m] = monthStart.split("-").map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const lastDay = new Date(y, m, 0);
+  const daysInMonth = lastDay.getDate();
+
+  // Weekday of first day (Mon=0..Sun=6)
+  const startWd = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+  const cells = [];
+  for (let i = 0; i < startWd; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
+  }
+
+  const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-0.5 mb-1">
+        {dayNames.map((d) => (
+          <div key={d} className="text-center text-[9px] font-medium text-muted-light dark:text-muted-dark uppercase py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((date, idx) => {
+          if (!date) return <div key={`empty-${idx}`} />;
+          const isToday = date === todayStr;
+          const isPast = date < todayStr;
+          const dayTasks = tasks.filter((tk) => {
+            if (tk.completed) {
+              if (!tk.completedAt) return false;
+              const d = new Date(tk.completedAt);
+              const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+              return cd === date;
+            }
+            if (date > todayStr) return tk.scheduledDate === date;
+            if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
+            return false;
+          });
+          const evCount = getEventsForDate(date).filter((ev) => !ev.allDay).length;
+          const pendingCount = dayTasks.filter((tk) => !tk.completed).length;
+          const completedCount = dayTasks.filter((tk) => tk.completed).length;
+
+          return (
+            <button
+              key={date}
+              onClick={() => onSelectDay(date)}
+              className={`flex flex-col items-center p-1 rounded-lg text-center min-h-[48px] transition-all border ${
+                isToday
+                  ? "border-accent bg-accent/10"
+                  : isPast
+                  ? "border-transparent bg-gray-50/50 dark:bg-white/2"
+                  : "border-transparent hover:bg-gray-50 dark:hover:bg-white/5"
+              }`}
+            >
+              <span className={`text-xs font-medium ${isToday ? "text-accent font-bold" : isPast ? "text-gray-400 dark:text-gray-600" : ""}`}>
+                {date.slice(8).replace(/^0/, "")}
+              </span>
+              {evCount > 0 && <div className="w-1 h-1 rounded-full bg-accent mt-0.5" />}
+              {pendingCount > 0 && <span className="text-[8px] text-muted-light dark:text-muted-dark">{pendingCount}</span>}
+              {completedCount > 0 && <span className="text-[8px] text-success">✓{completedCount}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 export default function HomePage() {
   const { t } = useI18n();
   const { state, dispatch } = useApp();
@@ -921,6 +1065,7 @@ export default function HomePage() {
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
   const [countdownTask, setCountdownTask] = useState(null);
   const [timelineShowFullDay, setTimelineShowFullDay] = useState(() => settings.features?.timeTrackingEnabled === false);
+  const [planView, setPlanView] = useState("day"); // "day" | "week" | "month"
 
   // Weekly report: show on Monday if not yet dismissed this week
   useEffect(() => {
@@ -1000,7 +1145,34 @@ export default function HomePage() {
   const prevDay = () => setViewDate((cur) => shiftDate(cur, -1));
   const nextDay = () => setViewDate((cur) => shiftDate(cur, +1));
 
+  // Week navigation: move viewDate by 7 days
+  const prevWeek = () => setViewDate((cur) => shiftDate(cur, -7));
+  const nextWeek = () => setViewDate((cur) => shiftDate(cur, +7));
+
+  // Month navigation
+  const prevMonth = () => setViewDate((cur) => {
+    const [y, m] = cur.split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+  });
+  const nextMonth = () => setViewDate((cur) => {
+    const [y, m] = cur.split("-").map(Number);
+    const d = new Date(y, m, 1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+  });
+
+  const weekStart = getWeekMonday(viewDate);
+  const monthStart = viewDate.slice(0, 7) + "-01";
+
   const formatViewDate = () => {
+    if (planView === "week") {
+      const weekEnd = shiftDateBy(weekStart, 6);
+      return `${weekStart.slice(8)}.${weekStart.slice(5,7)} – ${weekEnd.slice(8)}.${weekEnd.slice(5,7)}.${weekEnd.slice(0,4)}`;
+    }
+    if (planView === "month") {
+      const [y, m] = viewDate.split("-").map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    }
     if (isToday) return t("common.today");
     if (viewDate === shiftDate(todayStr, +1)) return t("common.tomorrow");
     if (viewDate === shiftDate(todayStr, -1)) return t("common.yesterday");
@@ -1107,18 +1279,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Active energy indicator */}
-      {isToday && state.energyLevel && (
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm ${
-          state.energyLevel === "high" ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300" :
-          state.energyLevel === "low" ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" :
-          "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-        }`}>
-          <span>{state.energyLevel === "high" ? "⚡" : state.energyLevel === "low" ? "🔋" : "🌀"}</span>
-          <span>{t(`home.energyActive.${state.energyLevel}`)}</span>
-        </div>
-      )}
-
       {/* Daily Challenge (Feature 7) */}
       {isToday && settings.gamification?.dailyChallengeEnabled && state.dailyChallenge && (() => {
         const def = DAILY_CHALLENGES.find((d) => d.id === state.dailyChallenge.challengeId);
@@ -1201,64 +1361,80 @@ export default function HomePage() {
       {/* Clock widget (only when time tracking is enabled) */}
       {features.timeTrackingEnabled !== false && <ClockWidget t={t} />}
 
-      {/* Unified Day Timeline */}
+      {/* Unified Day/Week/Month Timeline */}
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider">{t("home.dayPlan")}</h3>
             <p className="text-[10px] text-muted-light dark:text-muted-dark mt-0.5">{t("home.dayPlanHint")}</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            {/* View mode switcher */}
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
+              {["day", "week", "month"].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setPlanView(v)}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-all ${
+                    planView === v
+                      ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
+                      : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  }`}
+                >
+                  {t(`home.planView.${v}`)}
+                </button>
+              ))}
+            </div>
+            {/* Navigation */}
             <button
-              onClick={prevDay}
+              onClick={planView === "week" ? prevWeek : planView === "month" ? prevMonth : prevDay}
               className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              title={t("home.previousDay")}
               aria-label={t("home.previousDay")}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm font-medium min-w-[72px] text-center">{formatViewDate()}</span>
+            <span className="text-sm font-medium min-w-[90px] text-center">{formatViewDate()}</span>
             <button
-              onClick={nextDay}
+              onClick={planView === "week" ? nextWeek : planView === "month" ? nextMonth : nextDay}
               className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              title={t("home.nextDay")}
               aria-label={t("home.nextDay")}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
-            {overdueTasks.length > 0 && isToday && (
+            {overdueTasks.length > 0 && isToday && planView === "day" && (
               <span className="badge bg-danger/10 text-danger text-[10px] flex items-center gap-1 ml-1">
                 <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}
               </span>
             )}
-            {/* Grid interval selector + List mode */}
-            <div className="flex items-center gap-0.5 ml-2 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
-              {[15, 30, 60].map((iv) => (
+            {/* Grid interval selector + List mode – only in day view */}
+            {planView === "day" && (
+              <div className="flex items-center gap-0.5 ml-1 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
+                {[15, 30, 60].map((iv) => (
+                  <button
+                    key={iv}
+                    onClick={() => updateSettings("timeline", { gridInterval: iv })}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all ${
+                      gridInterval === iv
+                        ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
+                        : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                    }`}
+                    title={t("home.gridInterval")}
+                  >
+                    {iv}m
+                  </button>
+                ))}
                 <button
-                  key={iv}
-                  onClick={() => updateSettings("timeline", { gridInterval: iv })}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all ${
-                    gridInterval === iv
+                  onClick={() => updateSettings("timeline", { gridInterval: "list" })}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-0.5 ${
+                    gridInterval === "list"
                       ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
                       : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   }`}
-                  title={t("home.gridInterval")}
+                  title={t("home.listMode")}
                 >
-                  {iv}m
+                  <List className="w-3 h-3" />
                 </button>
-              ))}
-              <button
-                onClick={() => updateSettings("timeline", { gridInterval: "list" })}
-                className={`px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-0.5 ${
-                  gridInterval === "list"
-                    ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
-                    : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-                }`}
-                title={t("home.listMode")}
-              >
-                <List className="w-3 h-3" />
-              </button>
-              <button
+                <button
                   onClick={() => setTimelineShowFullDay(v => !v)}
                   className={`px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-0.5 ${
                     timelineShowFullDay
@@ -1269,43 +1445,70 @@ export default function HomePage() {
                 >
                   {timelineShowFullDay ? "24h" : t("home.workHoursOnly")}
                 </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {isToday && (
-          <div className="mb-3">
-            <QuickAddTask t={t} onAdd={handleQuickAdd} />
-          </div>
+        {planView === "week" && (
+          <WeekPlanView
+            t={t}
+            tasks={state.tasks}
+            getEventsForDate={getEventsForDate}
+            weekStart={weekStart}
+            onSelectDay={(date) => { setViewDate(date); setPlanView("day"); }}
+            todayStr={todayStr}
+          />
         )}
 
-        <UnifiedDayTimeline
-          t={t}
-          events={viewEvents}
-          tasks={topTasks}
-          settings={settings}
-          onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
-          onToggleSubtask={(taskId, subtaskId) => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId } })}
-          isTaskOverdue={isTaskOverdue}
-          onEditTask={(id, text) => dispatch({ type: "UPDATE_TASK", payload: { id, text } })}
-          onEditSubtask={(taskId, subtaskId, text) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId, text } })}
-          onUpdateScheduledTime={(id, time) => dispatch({ type: "UPDATE_TASK", payload: { id, scheduledTime: time } })}
-          onUpdateSubtaskScheduledTime={(taskId, subtaskId, time) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId, scheduledTime: time } })}
-          onRescheduleNextDay={handleRescheduleNextDay}
-          isToday={isToday}
-          isPastDay={isPast}
-          gridInterval={gridInterval}
-          viewDate={viewDate}
-          removedBreaks={removedBreaks}
-          onToggleBreakRemoved={handleToggleBreakRemoved}
-          breakTimeOverrides={breakTimeOverrides}
-          onUpdateBreakTime={handleUpdateBreakTime}
-          timeTrackingBreaks={viewDayTTBreaks}
-          onStartTask={(task) => setCountdownTask(task)}
-          countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
-          showFullDay={timelineShowFullDay}
-          hideParentWithSubtasks={settings.timeline?.hideParentWithSubtasks === true}
-        />
+        {planView === "month" && (
+          <MonthPlanView
+            t={t}
+            tasks={state.tasks}
+            getEventsForDate={getEventsForDate}
+            monthStart={monthStart}
+            onSelectDay={(date) => { setViewDate(date); setPlanView("day"); }}
+            todayStr={todayStr}
+          />
+        )}
+
+        {planView === "day" && (
+          <>
+            {isToday && (
+              <div className="mb-3">
+                <QuickAddTask t={t} onAdd={handleQuickAdd} />
+              </div>
+            )}
+
+            <UnifiedDayTimeline
+              t={t}
+              events={viewEvents}
+              tasks={topTasks}
+              settings={settings}
+              onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
+              onToggleSubtask={(taskId, subtaskId) => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId } })}
+              isTaskOverdue={isTaskOverdue}
+              onEditTask={(id, text) => dispatch({ type: "UPDATE_TASK", payload: { id, text } })}
+              onEditSubtask={(taskId, subtaskId, text) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId, text } })}
+              onUpdateScheduledTime={(id, time) => dispatch({ type: "UPDATE_TASK", payload: { id, scheduledTime: time } })}
+              onUpdateSubtaskScheduledTime={(taskId, subtaskId, time) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId, scheduledTime: time } })}
+              onRescheduleNextDay={handleRescheduleNextDay}
+              isToday={isToday}
+              isPastDay={isPast}
+              gridInterval={gridInterval}
+              viewDate={viewDate}
+              removedBreaks={removedBreaks}
+              onToggleBreakRemoved={handleToggleBreakRemoved}
+              breakTimeOverrides={breakTimeOverrides}
+              onUpdateBreakTime={handleUpdateBreakTime}
+              timeTrackingBreaks={viewDayTTBreaks}
+              onStartTask={(task) => setCountdownTask(task)}
+              countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
+              showFullDay={timelineShowFullDay}
+              hideParentWithSubtasks={settings.timeline?.hideParentWithSubtasks === true}
+            />
+          </>
+        )}
       </div>
 
       {countdownTask && (

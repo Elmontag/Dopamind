@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import AchievementsPanel from "../components/AchievementsPanel";
 import { Download, Trophy, BarChart2, Brain, TrendingUp } from "lucide-react";
+
 function StatCard({ label, value, color, unit }) {
   return (
     <div className="text-center p-3 rounded-xl bg-gray-50 dark:bg-white/5">
@@ -12,7 +13,64 @@ function StatCard({ label, value, color, unit }) {
   );
 }
 
+const ENERGY_COLORS = {
+  high:   { bg: "bg-green-500", text: "text-green-700 dark:text-green-300" },
+  normal: { bg: "bg-blue-400",  text: "text-blue-700 dark:text-blue-300"  },
+  low:    { bg: "bg-amber-400", text: "text-amber-700 dark:text-amber-300" },
+};
+
+function EnergyHistoryChart({ t, energyLog, period }) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  let filtered = energyLog || [];
+  if (period === "week") {
+    const cutoff = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+    filtered = filtered.filter((e) => e.date >= cutoff);
+  } else if (period === "month") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    filtered = filtered.filter((e) => e.date >= cutoff);
+  } else if (period === "year") {
+    filtered = filtered.filter((e) => e.date.slice(0, 4) === todayStr.slice(0, 4));
+  }
+
+  if (filtered.length === 0) {
+    return <p className="text-xs text-muted-light dark:text-muted-dark">{t("stats.noEnergyData")}</p>;
+  }
+
+  const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
+
+  return (
+    <div className="space-y-1.5">
+      {sorted.map((entry) => {
+        const cfg = ENERGY_COLORS[entry.level] || ENERGY_COLORS.normal;
+        return (
+          <div key={entry.date} className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-light dark:text-muted-dark w-20 shrink-0">{entry.date}</span>
+            <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+              <div className={`h-full rounded-full ${cfg.bg}`} style={{ width: "100%" }} />
+            </div>
+            <span className={`text-[10px] ${cfg.text} w-20 text-right shrink-0`}>{t(`home.energy.${entry.level}`)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function BrainReportTab({ t, state }) {
+  const [period, setPeriod] = useState("week");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
+  const filteredEnergyLog = (() => {
+    const log = state.energyLog || [];
+    if (period === "custom" && customFrom && customTo) {
+      return log.filter((e) => e.date >= customFrom && e.date <= customTo);
+    }
+    return log;
+  })();
+
   const handleExportJSON = () => {
     const report = {
       generatedAt: new Date().toISOString(),
@@ -29,9 +87,11 @@ function BrainReportTab({ t, state }) {
         level: state.level,
         xp: state.xp,
         achievements: (state.unlockedAchievements || []).length,
+        notMyDayCount: state.notMyDayCount || 0,
       },
       previousWeek: state.previousWeekStats || null,
       focusLog: (state.focusLog || []).slice(-30),
+      energyLog: state.energyLog || [],
       exportedBy: "Dopamind Brain Report",
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
@@ -42,6 +102,14 @@ function BrainReportTab({ t, state }) {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const PERIODS = [
+    { key: "week",   label: t("stats.thisWeek") },
+    { key: "month",  label: t("stats.thisMonth") },
+    { key: "year",   label: t("stats.thisYear") },
+    { key: "all",    label: t("stats.allTime") },
+    { key: "custom", label: t("stats.customPeriod") },
+  ];
 
   return (
     <div className="space-y-5">
@@ -55,6 +123,41 @@ function BrainReportTab({ t, state }) {
           {t("stats.exportPrint")}
         </button>
       </div>
+
+      {/* Period filter */}
+      <div className="flex flex-wrap gap-1 bg-gray-100 dark:bg-white/5 rounded-xl p-1">
+        {PERIODS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setPeriod(key)}
+            className={`flex-1 min-w-[60px] px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              period === key
+                ? "bg-white dark:bg-white/15 text-accent shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {period === "custom" && (
+        <div className="flex gap-2 items-center text-sm">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="input-field text-sm px-2 py-1"
+          />
+          <span className="text-muted-light dark:text-muted-dark">–</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="input-field text-sm px-2 py-1"
+          />
+        </div>
+      )}
 
       <div className="glass-card p-5">
         <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">{t("stats.thisWeek")}</h3>
@@ -81,6 +184,24 @@ function BrainReportTab({ t, state }) {
           <StatCard label={t("stats.longestStreak")} value={state.longestStreakDays} color="text-warn" />
           <StatCard label={t("stats.level")} value={state.level} color="text-purple-500" />
         </div>
+      </div>
+
+      {/* notMyDay count */}
+      <div className="glass-card p-5">
+        <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">{t("stats.notMyDayTitle")}</h3>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">💙</span>
+          <div>
+            <p className="text-2xl font-bold text-pink-500">{state.notMyDayCount || 0}</p>
+            <p className="text-[10px] text-muted-light dark:text-muted-dark uppercase">{t("stats.notMyDayLabel")}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Energy level history */}
+      <div className="glass-card p-5">
+        <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">{t("stats.energyHistory")}</h3>
+        <EnergyHistoryChart t={t} energyLog={period === "custom" ? filteredEnergyLog : state.energyLog} period={period} />
       </div>
 
       {state.previousWeekStats && (

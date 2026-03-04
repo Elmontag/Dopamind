@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "../services/api";
+import dailyChallengesData from "../data/dailyChallenges.json";
 
 const AppContext = createContext();
 
@@ -28,38 +29,7 @@ export function getLevelTitle(level, lang = "de") {
   return LEVEL_TITLES[1][lang] || LEVEL_TITLES[1].de;
 }
 
-export const DAILY_CHALLENGES = [
-  { id: "dc-01", type: "complete_tasks",   target: 3  },
-  { id: "dc-02", type: "complete_tasks",   target: 5  },
-  { id: "dc-03", type: "focus_minutes",    target: 25 },
-  { id: "dc-04", type: "focus_minutes",    target: 50 },
-  { id: "dc-05", type: "complete_tasks",   target: 2  },
-  { id: "dc-06", type: "focus_minutes",    target: 45 },
-  { id: "dc-07", type: "complete_tasks",   target: 4  },
-  { id: "dc-08", type: "focus_minutes",    target: 60 },
-  { id: "dc-09", type: "complete_tasks",   target: 1  },
-  { id: "dc-10", type: "focus_minutes",    target: 30 },
-  { id: "dc-11", type: "complete_tasks",   target: 6  },
-  { id: "dc-12", type: "focus_minutes",    target: 90 },
-  { id: "dc-13", type: "complete_tasks",   target: 3  },
-  { id: "dc-14", type: "focus_minutes",    target: 25 },
-  { id: "dc-15", type: "complete_tasks",   target: 5  },
-  { id: "dc-16", type: "focus_minutes",    target: 45 },
-  { id: "dc-17", type: "complete_tasks",   target: 2  },
-  { id: "dc-18", type: "focus_minutes",    target: 60 },
-  { id: "dc-19", type: "complete_tasks",   target: 4  },
-  { id: "dc-20", type: "focus_minutes",    target: 30 },
-  { id: "dc-21", type: "complete_tasks",   target: 7  },
-  { id: "dc-22", type: "focus_minutes",    target: 50 },
-  { id: "dc-23", type: "complete_tasks",   target: 3  },
-  { id: "dc-24", type: "focus_minutes",    target: 25 },
-  { id: "dc-25", type: "complete_tasks",   target: 5  },
-  { id: "dc-26", type: "focus_minutes",    target: 45 },
-  { id: "dc-27", type: "complete_tasks",   target: 2  },
-  { id: "dc-28", type: "focus_minutes",    target: 60 },
-  { id: "dc-29", type: "complete_tasks",   target: 4  },
-  { id: "dc-30", type: "focus_minutes",    target: 30 },
-];
+export const DAILY_CHALLENGES = dailyChallengesData;
 
 export const ACHIEVEMENTS = [
   // Small (25–75 XP)
@@ -135,6 +105,8 @@ const initialState = {
   flowModeActive: false,
   energyLevel: null,
   energyCheckDate: null,
+  energyLog: [],
+  notMyDayCount: 0,
   dailyChallenge: null,
   previousWeekStats: null,
   focusLog: [],
@@ -695,13 +667,19 @@ function reducer(state, action) {
       };
 
     case "SET_COMPASSION_MODE":
-      return { ...state, compassionModeDate: getTodayStr() };
+      return { ...state, compassionModeDate: getTodayStr(), notMyDayCount: state.notMyDayCount + 1 };
 
     case "SET_FLOW_MODE":
       return { ...state, flowModeActive: !!action.payload };
 
-    case "SET_ENERGY_LEVEL":
-      return { ...state, energyLevel: action.payload, energyCheckDate: getTodayStr() };
+    case "SET_ENERGY_LEVEL": {
+      const today = getTodayStr();
+      const newEnergyLog = [
+        ...(state.energyLog || []).filter((e) => e.date !== today),
+        { date: today, level: action.payload },
+      ];
+      return { ...state, energyLevel: action.payload, energyCheckDate: today, energyLog: newEnergyLog };
+    }
 
     case "UPDATE_DAILY_CHALLENGE": {
       if (!state.dailyChallenge) return state;

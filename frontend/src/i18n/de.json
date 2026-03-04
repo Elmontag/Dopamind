@@ -127,7 +127,12 @@
     "toNextLevel": "zum nächsten Level",
     "xpSources": "XP-Quellen",
     "xpFromTasks": "XP gesamt",
-    "thisYear": "Dieses Jahr"
+    "thisYear": "Dieses Jahr",
+    "customPeriod": "Zeitraum",
+    "energyHistory": "Energieverlauf",
+    "noEnergyData": "Noch keine Energiedaten für diesen Zeitraum.",
+    "notMyDayTitle": "\"Nicht mein Tag\"",
+    "notMyDayLabel": "Mal aktiviert"
   },
   "calendar": {
     "title": "Kalender",
@@ -420,7 +425,13 @@
     "pushDown": "Verschieben",
     "pushConfirmQuestion": "Bereits erledigt?",
     "toggleFullDay": "Ganzer Tag",
-    "workHoursOnly": "Nur Arbeitszeit"
+    "workHoursOnly": "Nur Arbeitszeit",
+    "energyEdit": "Energie bearbeiten",
+    "planView": {
+      "day": "Tag",
+      "week": "Woche",
+      "month": "Monat"
+    }
   },
   "rewards": {
     "levelUp": "Level {level} erreicht – {title}!",
