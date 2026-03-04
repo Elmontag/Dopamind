@@ -93,7 +93,7 @@ router.post(
         return res.status(409).json({ error: "Email already registered" });
       }
 
-      const hash = bcrypt.hashSync(password, 12);
+      const hash = await bcrypt.hash(password, 12);
       const id = uuidv4();
 
       await pool.query(
