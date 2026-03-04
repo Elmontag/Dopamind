@@ -18,7 +18,7 @@ function BrainReportTab({ t, state }) {
       generatedAt: new Date().toISOString(),
       period: "all-time",
       stats: {
-        totalTasksCompleted: (state.completedThisYear || 0),
+        tasksCompletedThisYear: (state.completedThisYear || 0),
         tasksThisWeek: state.completedThisWeek,
         tasksThisMonth: state.completedThisMonth,
         totalFocusMinutes: state.totalFocusMinutes,
