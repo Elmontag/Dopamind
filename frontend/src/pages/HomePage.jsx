@@ -109,6 +109,26 @@ function getTimeRangeBounds(settings, workStart, workEnd) {
   };
 }
 
+// Module-level utility: compute the earliest allowed start minute for a task based on scheduling settings
+// Compute the earliest allowed start minute for a task placement based on scheduling round settings.
+// Only applies rounding for tasks created today; returns workStart for tasks created on other days.
+// Modes: "halfHour" (next :00/:30), "fullHour" (next :00), "custom" (createdAt + N minutes).
+function computeTaskMinStart(task, { isToday, todayDate, workStart, taskSchedulingRound, taskSchedulingCustomMinutes }) {
+  if (!isToday || !task.createdAt) return workStart;
+  const created = new Date(task.createdAt);
+  if (created.toISOString().slice(0, 10) !== todayDate) return workStart;
+  const createdMin = created.getHours() * 60 + created.getMinutes();
+  let minStart;
+  if (taskSchedulingRound === "fullHour") {
+    minStart = Math.ceil(createdMin / 60) * 60;
+  } else if (taskSchedulingRound === "custom") {
+    minStart = createdMin + taskSchedulingCustomMinutes;
+  } else {
+    minStart = Math.ceil(createdMin / 30) * 30;
+  }
+  return Math.max(workStart, minStart);
+}
+
 function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onToggleSubtask, isTaskOverdue, onEditTask, onEditSubtask, onUpdateScheduledTime, onUpdateSubtaskScheduledTime, onRescheduleNextDay, isToday, isPastDay, gridInterval, viewDate, removedBreaks, onToggleBreakRemoved, breakTimeOverrides, onUpdateBreakTime, timeTrackingBreaks, onStartTask, countdownStartEnabled, hideParentWithSubtasks, onPushDownTask, energyLevel }) {
   const workStartH = parseInt(settings.workSchedule.start.split(":")[0], 10);
   const workStartM = parseInt(settings.workSchedule.start.split(":")[1] || "0", 10);
@@ -166,21 +186,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
 
   const taskSchedulingRound = settings.timeline?.taskSchedulingRound || "halfHour";
   const taskSchedulingCustomMinutes = settings.timeline?.taskSchedulingCustomMinutes ?? 30;
-  const getTaskMinStart = (task) => {
-    if (!isToday || !task.createdAt) return workStart;
-    const created = new Date(task.createdAt);
-    if (created.toISOString().slice(0, 10) !== todayDate) return workStart;
-    const createdMin = created.getHours() * 60 + created.getMinutes();
-    let minStart;
-    if (taskSchedulingRound === "fullHour") {
-      minStart = Math.ceil(createdMin / 60) * 60;
-    } else if (taskSchedulingRound === "custom") {
-      minStart = Math.ceil((createdMin + taskSchedulingCustomMinutes) / STEP) * STEP;
-    } else {
-      minStart = Math.ceil(createdMin / 30) * 30;
-    }
-    return Math.max(workStart, minStart);
-  };
+  const getTaskMinStart = (task) => computeTaskMinStart(task, { isToday, todayDate, workStart, taskSchedulingRound, taskSchedulingCustomMinutes });
   const fmtTime = (totalMin) => {
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
@@ -319,6 +325,11 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
 
   // --- Requirement 3: push overdue (non-event) entries below the now-line ---
   // If isToday: tasks/breaks whose scheduled end is in the past get repositioned after nowTotal
+  // Deadline-awareness:
+  //   Case 1 (deadline + scheduledTime): push to at least original scheduledTime; warn if end > deadline
+  //   Case 2 (deadline + no scheduledTime): push normally; warn if end > deadline
+  //   Case 3 (no deadline + scheduledTime): skip auto-push; show only complete/reschedule buttons
+  //   Case 4 (no deadline + no scheduledTime): normal push with confirmation
   if (isToday) {
     const overdueEntries = entries.filter((e) => e.type !== "event" && e.startMin + e.durationMin <= nowTotal);
     let pushCursor = nowTotal;
@@ -326,17 +337,43 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     pushCursor = Math.ceil(pushCursor / STEP) * STEP;
     for (const oe of overdueEntries) {
       const entryId = oe.task?.id || oe.subtask?.id;
-      if ((oe.type === "task" || oe.type === "task-parent" || oe.type === "subtask") && entryId && !confirmedPushIds.has(entryId)) {
-        oe.needsPushConfirm = true;
-        continue; // don't push yet, keep at original position for confirmation
+      const hasDeadline = !!(oe.task?.deadline);
+      const hasScheduledTime = !!(oe.task?.scheduledTime);
+      const isTaskEntry = oe.type === "task" || oe.type === "task-parent" || oe.type === "subtask";
+
+      // Case 3: no deadline + has explicit scheduledTime → do not auto-push; let user complete/reschedule
+      if (isTaskEntry && entryId && !hasDeadline && hasScheduledTime && !confirmedPushIds.has(entryId)) {
+        oe.skipAutoPush = true;
+        continue;
       }
+
+      // Cases 1, 2, 4: require user confirmation before pushing
+      if (isTaskEntry && entryId && !confirmedPushIds.has(entryId)) {
+        oe.needsPushConfirm = true;
+        continue;
+      }
+
       // Unclaim original range
       usedRanges = usedRanges.filter((r) => !(r.from === oe.startMin && r.to === oe.startMin + oe.durationMin));
-      // Find new spot after now
-      let s = pushCursor;
+
+      // Case 1: deadline + scheduledTime → push to at least original scheduledTime
+      let desiredStart = pushCursor;
+      if (hasDeadline && hasScheduledTime && oe.task?.scheduledTime) {
+        const [sh, sm] = oe.task.scheduledTime.split(":").map(Number);
+        desiredStart = Math.max(desiredStart, sh * 60 + sm);
+      }
+
+      // Find new spot after desired start
+      let s = desiredStart;
       while (s + oe.durationMin <= DAY_END && !isRangeFree(s, s + oe.durationMin)) s += STEP;
       oe.startMin = s;
       oe.pushedDown = true;
+
+      // Cases 1 & 2: warn if pushed end exceeds work hours on the deadline day
+      if (hasDeadline && oe.task?.deadline === todayDate && s + oe.durationMin > workEnd) {
+        oe.deadlineWarning = true;
+      }
+
       claimRange(s, s + oe.durationMin);
       pushCursor = s + oe.durationMin;
     }
@@ -446,6 +483,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
           const isEditing = editingTaskId === (entry.task?.id || entry.subtask?.id);
           const canReschedule = entry.pushedDown && (isTask || isSubtask) && entry.task &&
             (!entry.task.deadline || entry.task.deadline >= todayDate);
+          const canRescheduleSkipped = entry.skipAutoPush && (isTask || isSubtask) && entry.task;
 
           return (
             <div
@@ -547,9 +585,21 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                   <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
                 </button>
               )}
+              {/* Case 3: pinned scheduled task */}
+              {canRescheduleSkipped && !isEditing && (
+                <button onClick={() => onRescheduleNextDay(entry.task.id)}
+                  className="flex-shrink-0 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[10px] font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                  title={t("home.rescheduleNextDay")}>
+                  <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
+                </button>
+              )}
+              {/* Deadline warning indicator */}
+              {entry.deadlineWarning && !isEditing && (
+                <span className="flex-shrink-0 text-xs text-danger font-bold" title={t("home.deadlineWarning")}>⚠</span>
+              )}
 
               {/* Task actions */}
-              {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && (
+              {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && !entry.skipAutoPush && (
                 <>
                   <button onClick={() => onCompleteTask(entry.task.id)}
                     className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
@@ -568,6 +618,23 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                     title={t("common.edit")}>
                     <Pencil className="w-2.5 h-2.5 text-muted-light dark:text-muted-dark" />
                   </button>
+                </>
+              )}
+              {/* Case 3: pinned scheduled task — show complete button only (no push) */}
+              {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && entry.skipAutoPush && (
+                <>
+                  <button onClick={() => onCompleteTask(entry.task.id)}
+                    className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
+                    title={t("tasks.complete")}>
+                    <CheckCircle className="w-3 h-3 text-accent" />
+                  </button>
+                  {onStartTask && countdownStartEnabled && (
+                    <button onClick={() => onStartTask(entry.task)}
+                      className="w-5 h-5 rounded bg-accent/10 flex-shrink-0 hover:bg-accent hover:text-white transition-colors flex items-center justify-center text-accent text-[10px]"
+                      title={t("tasks.start")}>
+                      ▶
+                    </button>
+                  )}
                 </>
               )}
               {isSubtask && entry.subtask && entry.parentTask && !isPastEntry && !isEditing && (
@@ -750,6 +817,8 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
 
             const canReschedule = entry.pushedDown && (isTask || isSubtask) && entry.task &&
               (!entry.task.deadline || entry.task.deadline >= todayDate);
+            // Case 3: pinned scheduled tasks that are overdue show reschedule button instead of push button
+            const canRescheduleSkipped = entry.skipAutoPush && (isTask || isSubtask) && entry.task;
 
             return (
               <div
@@ -771,6 +840,8 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                   ${entry.type === "break" ? "bg-warn/10 text-amber-700 dark:text-warn border-l-2 border-warn" : ""}
                   ${entry.pushedDown ? "border-dashed !border-l-2 !border-orange-400 bg-orange-50 dark:bg-orange-900/10" : ""}
                   ${entry.needsPushConfirm ? "!border-l-2 !border-amber-400 bg-amber-50 dark:bg-amber-900/10" : ""}
+                  ${entry.skipAutoPush ? "!border-l-2 !border-gray-400 bg-gray-50 dark:bg-white/[0.04] opacity-70" : ""}
+                  ${entry.deadlineWarning ? "!border-l-2 !border-danger/70" : ""}
                 `}
                 style={{ top: `${entryTop}px`, height: `${entryHeight}px` }}
               >
@@ -844,6 +915,20 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                     <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
                   </button>
                 )}
+                {/* Case 3: pinned scheduled task — show reschedule button without push option */}
+                {canRescheduleSkipped && !isEditing && (
+                  <button
+                    onClick={() => onRescheduleNextDay(entry.task.id)}
+                    className="flex-shrink-0 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[10px] font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                    title={t("home.rescheduleNextDay")}
+                  >
+                    <CalendarPlus className="w-3 h-3 inline -mt-0.5" /> {t("home.rescheduleNextDay")}
+                  </button>
+                )}
+                {/* Deadline warning indicator */}
+                {entry.deadlineWarning && !isEditing && (
+                  <span className="flex-shrink-0 text-[9px] text-danger font-bold" title={t("home.deadlineWarning")}>⚠</span>
+                )}
 
                 {/* Break remove button */}
                 {entry.type === "break" && !isPastEntry && onToggleBreakRemoved && (
@@ -862,7 +947,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                 )}
 
                 {/* Task action buttons */}
-                {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && (
+                {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && !entry.skipAutoPush && (
                   <>
                     <button onClick={() => onCompleteTask(entry.task.id)}
                       className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
@@ -893,6 +978,23 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                       title={t("common.edit")} aria-label={t("common.edit")}>
                       <Pencil className="w-2.5 h-2.5 text-muted-light dark:text-muted-dark" />
                     </button>
+                  </>
+                )}
+                {/* Case 3: pinned scheduled task — show complete button only (no push) */}
+                {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && entry.skipAutoPush && (
+                  <>
+                    <button onClick={() => onCompleteTask(entry.task.id)}
+                      className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
+                      title={t("tasks.complete")} aria-label={t("tasks.complete")}>
+                      <CheckCircle className="w-3 h-3 text-accent" />
+                    </button>
+                    {onStartTask && countdownStartEnabled && (
+                      <button onClick={() => onStartTask(entry.task)}
+                        className="w-5 h-5 rounded bg-accent/10 flex-shrink-0 hover:bg-accent hover:text-white transition-colors flex items-center justify-center text-accent text-[10px]"
+                        title={t("tasks.start")} aria-label={t("tasks.start")}>
+                        ▶
+                      </button>
+                    )}
                   </>
                 )}
                 {isTask && !isPastEntry && isEditing && (
@@ -986,6 +1088,8 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
   const workStart = workStartH * 60 + workStartM;
   const workEnd = workEndH * 60 + workEndM;
   const hideParentWithSubtasks = settings.timeline?.hideParentWithSubtasks === true;
+  const taskSchedulingRound = settings.timeline?.taskSchedulingRound || "halfHour";
+  const taskSchedulingCustomMinutes = settings.timeline?.taskSchedulingCustomMinutes ?? 30;
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [dragItem, setDragItem] = useState(null); // { id, type: "task"|"subtask", parentId }
@@ -1042,23 +1146,23 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     for (const task of dayTasks) {
       if (task.completed) {
         // Show completed tasks as simple items (no subtask expansion needed)
-        items.push({ type: "task", id: task.id, parentId: null, text: task.text, estimatedMinutes: task.estimatedMinutes || 30, scheduledTime: task.scheduledTime, priority: task.priority, completed: true });
+        items.push({ type: "task", id: task.id, parentId: null, text: task.text, estimatedMinutes: task.estimatedMinutes || 30, scheduledTime: task.scheduledTime, priority: task.priority, completed: true, createdAt: task.createdAt });
         continue;
       }
       const incompleteSubs = (task.subtasks || []).filter((s) => !s.completed);
       if (hideParentWithSubtasks && incompleteSubs.length > 0) {
         for (const sub of incompleteSubs) {
           if (!sub.scheduledDate || sub.scheduledDate === date) {
-            items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes || 30, scheduledTime: sub.scheduledTime || task.scheduledTime, priority: task.priority });
+            items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes || 30, scheduledTime: sub.scheduledTime || task.scheduledTime, priority: task.priority, createdAt: task.createdAt });
           }
         }
       } else {
-        items.push({ type: "task", id: task.id, parentId: null, text: task.text, estimatedMinutes: task.estimatedMinutes || 30, scheduledTime: task.scheduledTime, priority: task.priority });
+        items.push({ type: "task", id: task.id, parentId: null, text: task.text, estimatedMinutes: task.estimatedMinutes || 30, scheduledTime: task.scheduledTime, priority: task.priority, createdAt: task.createdAt });
         for (const sub of incompleteSubs) {
           // Show subtask if it belongs to this day (no explicit scheduledDate or scheduled for this date)
           // Inherit parent's scheduledTime as fallback (consistent with hideParentWithSubtasks=true branch)
           if (!sub.scheduledDate || sub.scheduledDate === date) {
-            items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || 30, scheduledTime: sub.scheduledTime || task.scheduledTime, priority: task.priority });
+            items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || 30, scheduledTime: sub.scheduledTime || task.scheduledTime, priority: task.priority, createdAt: task.createdAt });
           }
         }
       }
@@ -1068,7 +1172,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
       if (task.completed) continue;
       if (dayTasks.some((dt) => dt.id === task.id)) continue;
       for (const sub of (task.subtasks || []).filter((s) => !s.completed && s.scheduledDate === date)) {
-        items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || 30, scheduledTime: sub.scheduledTime, priority: task.priority });
+        items.push({ type: "subtask", id: sub.id, parentId: task.id, text: sub.text, estimatedMinutes: sub.estimatedMinutes || 30, scheduledTime: sub.scheduledTime, priority: task.priority, createdAt: task.createdAt });
       }
     }
     return items;
@@ -1163,7 +1267,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
           const items = getItemsForDay(date);
           const events = getEventsForDate(date).filter((ev) => !ev.allDay && ev.start);
           const isDragTarget = dragOver === date;
-          // Place unscheduled items starting at workStart (consistent with day view)
+          // Place unscheduled items starting at workStart, applying scheduling round for today's tasks
           let unscheduledNextMin = workStart;
           // Push unscheduled cursor past any scheduled items that overlap workStart
           items.forEach((item) => {
@@ -1290,8 +1394,11 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
                     const [h, m] = item.scheduledTime.split(":").map(Number);
                     topPx = (h * 60 + m - effectiveStart) * PX_PER_MIN;
                   } else {
-                    topPx = (unscheduledNextMin - effectiveStart) * PX_PER_MIN;
-                    unscheduledNextMin += dur;
+                    // Apply scheduling round for today's unscheduled tasks (consistent with day view)
+                    const itemMinStart = computeTaskMinStart(item, { isToday, todayDate: todayStr, workStart, taskSchedulingRound, taskSchedulingCustomMinutes });
+                    const placedStart = Math.max(unscheduledNextMin, itemMinStart);
+                    topPx = (placedStart - effectiveStart) * PX_PER_MIN;
+                    unscheduledNextMin = placedStart + dur;
                   }
                   // Clip to canvas bounds (Req 2)
                   if (topPx + heightPx < 0 || topPx >= totalHeight) return null;

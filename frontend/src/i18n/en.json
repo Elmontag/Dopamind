@@ -71,6 +71,7 @@
     "weeklyReportDismiss": "Let's go this week!",
     "pushDown": "Push down",
     "pushConfirmQuestion": "Already done?",
+    "deadlineWarning": "Task exceeds today's deadline",
     "toggleFullDay": "Full day",
     "workHoursOnly": "Work hours only",
     "energyEdit": "Edit energy level",

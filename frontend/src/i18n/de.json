@@ -433,6 +433,7 @@
     "compassionActive": "Kompassion aktiv",
     "pushDown": "Verschieben",
     "pushConfirmQuestion": "Bereits erledigt?",
+    "deadlineWarning": "Aufgabe überschreitet heutigen Deadline-Termin",
     "toggleFullDay": "Ganzer Tag",
     "workHoursOnly": "Nur Arbeitszeit",
     "energyEdit": "Energie bearbeiten",
