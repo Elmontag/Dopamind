@@ -320,9 +320,9 @@ function rollVariableReward() {
 }
 
 function getDailyChallengeForDate(dateStr) {
-  // Deterministically pick a challenge by day-of-year
-  const d = new Date(dateStr + "T00:00:00");
-  const start = new Date(d.getFullYear() + "-01-01T00:00:00");
+  // Deterministically pick a challenge by day-of-year (using UTC to avoid DST issues)
+  const d = new Date(dateStr + "T00:00:00Z");
+  const start = new Date(d.getUTCFullYear() + "-01-01T00:00:00Z");
   const dayOfYear = Math.floor((d - start) / 86400000);
   return DAILY_CHALLENGES[dayOfYear % DAILY_CHALLENGES.length];
 }
@@ -589,7 +589,8 @@ function reducer(state, action) {
       const xpPerMin = calcFocusXpPerMin(minutes);
       const baseXp = Math.round(minutes * xpPerMin);
       const mult = getStreakMultiplier(state.currentStreakDays);
-      const xpGain = Math.round(baseXp * mult);
+      const flowMultiplier = action.flow ? 2 : 1;
+      const xpGain = Math.round(baseXp * mult * flowMultiplier);
       const newXp = state.xp + xpGain;
       const newLevel = calcLevel(newXp);
       const leveledUp = newLevel > state.level;
@@ -613,6 +614,14 @@ function reducer(state, action) {
       }
 
       let bonusXp = 0;
+      if (action.flow) {
+        newRewards.push({
+          id: Date.now() + 5,
+          type: "flow-session",
+          messageKey: "rewards.flowSession",
+          timestamp: Date.now(),
+        });
+      }
       if (focusBlocksToday === 3) {
         bonusXp += 15;
         newRewards.push({

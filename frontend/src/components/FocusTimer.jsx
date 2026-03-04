@@ -53,8 +53,7 @@ export default function FocusTimer() {
     setRunning(false);
     setCompleted(true);
     clearInterval(intervalRef.current);
-    const effectiveDuration = flowDetected ? duration * 2 : duration; // Flow shield: double XP minutes
-    dispatch({ type: "ADD_FOCUS_MINUTES", payload: effectiveDuration });
+    dispatch({ type: "ADD_FOCUS_MINUTES", payload: duration, flow: flowDetected && flowShieldEnabled });
     if (pauseSuggestionsEnabled) {
       const idx = Math.floor(Math.random() * PAUSE_ACTIVITIES.length);
       setPauseSuggestion(PAUSE_ACTIVITIES[idx]);
