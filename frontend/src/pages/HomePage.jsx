@@ -330,21 +330,23 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   }
 
   // Compute visible range: clip to span from 1 hour before earliest entry to 1 hour after latest entry (or work hours)
-  let visStart = workStart;
-  let visEnd = workEnd;
-  if (entries.length > 0) {
+  let visStart = showFullDay ? DAY_START : workStart;
+  let visEnd = showFullDay ? DAY_END : workEnd;
+  if (!showFullDay && entries.length > 0) {
     const earliest = Math.min(...entries.map((e) => e.startMin));
     const latest = Math.max(...entries.map((e) => e.startMin + e.durationMin));
     visStart = Math.min(visStart, earliest);
     visEnd = Math.max(visEnd, latest);
   }
-  if (isToday) {
+  if (!showFullDay && isToday) {
     visStart = Math.min(visStart, nowTotal);
     visEnd = Math.max(visEnd, nowTotal + 60);
   }
-  // Snap to STEP boundaries and add padding
-  visStart = Math.max(DAY_START, Math.floor(visStart / STEP) * STEP - STEP);
-  visEnd = Math.min(DAY_END, Math.ceil(visEnd / STEP) * STEP + STEP);
+  // Snap to STEP boundaries and add padding (only for work-hours mode)
+  if (!showFullDay) {
+    visStart = Math.max(DAY_START, Math.floor(visStart / STEP) * STEP - STEP);
+    visEnd = Math.min(DAY_END, Math.ceil(visEnd / STEP) * STEP + STEP);
+  }
   const visGridSlots = gridSlots.filter((s) => s >= visStart && s < visEnd);
 
   // --- Drag handlers (minute-precise D&D with time indicator) ---
@@ -918,7 +920,7 @@ export default function HomePage() {
   // New gamification state
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
   const [countdownTask, setCountdownTask] = useState(null);
-  const [timelineShowFullDay, setTimelineShowFullDay] = useState(false);
+  const [timelineShowFullDay, setTimelineShowFullDay] = useState(() => settings.features?.timeTrackingEnabled === false);
 
   // Weekly report: show on Monday if not yet dismissed this week
   useEffect(() => {
@@ -1256,19 +1258,17 @@ export default function HomePage() {
               >
                 <List className="w-3 h-3" />
               </button>
-              {features.timeTrackingEnabled !== false && (
-                <button
+              <button
                   onClick={() => setTimelineShowFullDay(v => !v)}
                   className={`px-2 py-0.5 rounded text-[10px] transition-all flex items-center gap-0.5 ${
                     timelineShowFullDay
                       ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
                       : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   }`}
-                  title={t("home.toggleFullDay")}
+                  title={timelineShowFullDay ? t("home.workHoursOnly") : t("home.toggleFullDay")}
                 >
-                  24h
+                  {timelineShowFullDay ? "24h" : t("home.workHoursOnly")}
                 </button>
-              )}
             </div>
           </div>
         </div>
@@ -1303,7 +1303,7 @@ export default function HomePage() {
           timeTrackingBreaks={viewDayTTBreaks}
           onStartTask={(task) => setCountdownTask(task)}
           countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
-          showFullDay={!features.timeTrackingEnabled || timelineShowFullDay}
+          showFullDay={timelineShowFullDay}
           hideParentWithSubtasks={settings.timeline?.hideParentWithSubtasks === true}
         />
       </div>
