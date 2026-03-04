@@ -76,6 +76,7 @@ export const DAILY_CHALLENGE_POOL = [
   { id: "dc-before-noon-3", type: "before-noon", target: 3, xp: 45 },
 ];
 
+// Seeded PRNG: standard POSIX LCG constants (glibc)
 function seededRandom(seed) {
   let s = seed;
   return () => {
@@ -481,7 +482,7 @@ function reducer(state, action) {
         const surprise = RANDOM_BONUS_MIN + Math.floor(Math.random() * (RANDOM_BONUS_MAX - RANDOM_BONUS_MIN + 1));
         bonusXp += surprise;
         newRewards.push({
-          id: Date.now() + 3,
+          id: Date.now() + Math.random() * 1000,
           type: "dopamine-surprise",
           messageKey: "rewards.dopamineSurprise",
           xp: surprise,
@@ -607,7 +608,7 @@ function reducer(state, action) {
       const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
       const streakContinues = state.lastActiveDate === yesterday;
 
-      // --- Streak Shield: protect streak when broken ---
+      // Streak Shield: protect streak on missed day (skip on first-ever login when lastActiveDate is null)
       let shieldsUsed = state.streakShieldsUsed || 0;
       let shields = state.streakShields || 0;
       let shieldUsedNow = false;
