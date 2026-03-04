@@ -24,10 +24,11 @@ import SettingsPage from "./pages/SettingsPage";
 import AchievementsPage from "./pages/AchievementsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import SetupPage from "./pages/SetupPage";
 import AdminPage from "./pages/AdminPage";
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, setupNeeded } = useAuth();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -35,22 +36,38 @@ function ProtectedRoute({ children }) {
       </div>
     );
   }
+  if (setupNeeded) return <Navigate to="/setup" replace />;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
 function AdminRoute({ children }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, setupNeeded } = useAuth();
   if (loading) return null;
+  if (setupNeeded) return <Navigate to="/setup" replace />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
   return children;
 }
 
 function AuthRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, setupNeeded } = useAuth();
   if (loading) return null;
+  if (setupNeeded) return <Navigate to="/setup" replace />;
   if (user) return <Navigate to="/" replace />;
+  return children;
+}
+
+function SetupRoute({ children }) {
+  const { loading, setupNeeded } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-accent text-lg font-semibold">Dopamind</div>
+      </div>
+    );
+  }
+  if (!setupNeeded) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -104,6 +121,7 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <Routes>
+              <Route path="/setup" element={<SetupRoute><SetupPage /></SetupRoute>} />
               <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
               <Route path="/register" element={<AuthRoute><RegisterPage /></AuthRoute>} />
               <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
