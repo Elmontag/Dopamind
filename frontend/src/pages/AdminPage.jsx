@@ -279,7 +279,7 @@ function DeleteUserDialog({ open, onClose, user, onDeleted, t }) {
         </div>
       )}
       <p className="text-sm text-muted-light dark:text-muted-dark">
-        {t("admin.deleteWarning", { name: user.name, email: user.email })}
+        {t("admin.deleteWarning")}
       </p>
       <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-3 text-sm">
         <span className="font-medium">{user.name}</span>
