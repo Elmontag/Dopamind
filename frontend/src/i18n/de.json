@@ -380,6 +380,7 @@
     "noMails": "Keine neuen Mails.",
     "openTasks": "Heutige Aufgaben",
     "noTasks": "Keine offenen Aufgaben.",
+    "moreTasksHidden": "weitere Aufgaben ausgeblendet (Aufgabenansicht öffnen, um alle zu sehen)",
     "quickAdd": "Schnell hinzufügen...",
     "dayPlan": "Tagesplanung",
     "dayPlanHint": "Vorgeschlagene Zeitblöcke basierend auf Terminen und Aufgaben.",
@@ -400,6 +401,7 @@
     "removeBreak": "Pause für heute entfernen",
     "restoreBreak": "Pause wiederherstellen",
     "breakMatched": "Abgeglichen mit Zeiterfassung",
+    "energyCost": "Energiebedarf",
     "energyCheckin": "Wie ist deine Energie heute?",
     "energy": {
       "low": "🔋 Niedrig",

@@ -949,7 +949,7 @@ function shiftDateBy(dateStr, delta) {
   return new Date(Date.UTC(y, m - 1, dd + delta)).toISOString().slice(0, 10);
 }
 
-function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, todayStr, settings, onMoveTask, onMoveSubtask }) {
+function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, todayStr, settings, onMoveTask, onMoveSubtask, onCompleteTask, onToggleSubtask, onStartTask, countdownStartEnabled, energyLevel }) {
   const HOUR_HEIGHT = 44; // px per hour
   const PX_PER_MIN = HOUR_HEIGHT / 60;
 
@@ -977,6 +977,18 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
+
+  // Energy cost indicator (mirrors day view logic):
+  // Priority "high" requires high energy, "medium" requires normal energy, "low" requires low energy.
+  const WEEK_PRIORITY_ENERGY = { high: "high", medium: "normal", low: "low" };
+  const WEEK_ENERGY_EMOJI = { high: "⚡", normal: "🔵", low: "🔋" };
+  // Minimum chip height in px required before showing hover action buttons
+  const MIN_HEIGHT_FOR_ACTIONS = 20;
+  const getWeekEnergyMatch = (priority) => {
+    const cost = WEEK_PRIORITY_ENERGY[priority] || "normal";
+    if (!energyLevel) return { emoji: WEEK_ENERGY_EMOJI[cost], matched: false };
+    return { emoji: WEEK_ENERGY_EMOJI[cost], matched: cost === energyLevel };
   };
 
   const nowTotal = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -1255,11 +1267,46 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
                         e.dataTransfer.setData("text/plain", item.id);
                       }}
                       onDragEnd={() => { setDragItem(null); setDragOver(null); }}
-                      className={`absolute rounded text-[8px] px-1 overflow-hidden cursor-grab active:cursor-grabbing z-10 transition-opacity ${priorityClass} ${isDragging ? "opacity-40" : "opacity-100"} ${isSubtask ? "mx-2 opacity-80" : "mx-0.5"}`}
+                      className={`absolute rounded text-[8px] px-1 overflow-hidden cursor-grab active:cursor-grabbing z-10 transition-opacity group ${priorityClass} ${isDragging ? "opacity-40" : "opacity-100"} ${isSubtask ? "mx-2 opacity-80" : "mx-0.5"}`}
                       style={{ top: `${topPx}px`, height: `${clippedHeight}px`, left: isSubtask ? "6px" : "2px", right: "2px" }}
                       title={`${item.text} — ${t("home.dragHint")}`}
                     >
-                      <span className="truncate block leading-tight font-medium">{item.text}</span>
+                      <div className="flex items-center gap-0.5 h-full min-w-0">
+                        <span className="flex-1 truncate leading-tight font-medium min-w-0">{item.text}</span>
+                        {/* Energy indicator */}
+                        {energyLevel && item.priority && (
+                          <span className={`text-[7px] flex-shrink-0 transition-opacity ${getWeekEnergyMatch(item.priority).matched ? "opacity-100" : "opacity-25"}`}>
+                            {getWeekEnergyMatch(item.priority).emoji}
+                          </span>
+                        )}
+                        {/* Action buttons (visible on hover when height permits) */}
+                        {clippedHeight >= MIN_HEIGHT_FOR_ACTIONS && (
+                          <span className="flex-shrink-0 flex items-center gap-px opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Complete / toggle subtask */}
+                            {item.type === "subtask" && onToggleSubtask ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onToggleSubtask(item.parentId, item.id); }}
+                                className="w-3 h-3 flex items-center justify-center rounded-sm bg-white/50 hover:bg-success/30 text-[7px]"
+                                title={t("tasks.complete")}
+                              >✓</button>
+                            ) : onCompleteTask ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onCompleteTask(item.id); }}
+                                className="w-3 h-3 flex items-center justify-center rounded-sm bg-white/50 hover:bg-success/30 text-[7px]"
+                                title={t("tasks.complete")}
+                              >✓</button>
+                            ) : null}
+                            {/* Start countdown */}
+                            {countdownStartEnabled && onStartTask && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes }); }}
+                                className="w-3 h-3 flex items-center justify-center rounded-sm bg-white/50 hover:bg-accent/30 text-[7px]"
+                                title={t("tasks.start")}
+                              >▶</button>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1424,8 +1471,9 @@ export default function HomePage() {
             return (p[b.priority] ?? 1) - (p[a.priority] ?? 1);
           }
           return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
-        })
-        .slice(0, MAX_TIMELINE_TASKS);
+        });
+  const hiddenTaskCount = Math.max(0, topTasks.length - MAX_TIMELINE_TASKS);
+  const topTasksSliced = topTasks.slice(0, MAX_TIMELINE_TASKS);
 
   const handleQuickAdd = (text) => {
     dispatch({ type: "ADD_TASK", payload: { text, priority: "medium", estimatedMinutes: 25 } });
@@ -1775,6 +1823,11 @@ export default function HomePage() {
             settings={settings}
             onMoveTask={(taskId, date, time) => dispatch({ type: "UPDATE_TASK", payload: { id: taskId, scheduledDate: date, scheduledTime: time } })}
             onMoveSubtask={(parentId, subId, date, time) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId: parentId, subtaskId: subId, scheduledDate: date, scheduledTime: time } })}
+            onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
+            onToggleSubtask={(taskId, subtaskId) => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId } })}
+            onStartTask={(task) => setCountdownTask(task)}
+            countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
+            energyLevel={state.energyLevel}
           />
         )}
 
@@ -1800,7 +1853,7 @@ export default function HomePage() {
             <UnifiedDayTimeline
               t={t}
               events={viewEvents}
-              tasks={topTasks}
+              tasks={topTasksSliced}
               settings={settings}
               onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
               onToggleSubtask={(taskId, subtaskId) => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId } })}
@@ -1827,10 +1880,16 @@ export default function HomePage() {
                 }
               }}
               onStartTask={(task) => setCountdownTask(task)}
+              countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
               showFullDay={timelineShowFullDay}
               hideParentWithSubtasks={settings.timeline?.hideParentWithSubtasks === true}
               energyLevel={state.energyLevel}
             />
+            {hiddenTaskCount > 0 && (
+              <p className="text-[11px] text-muted-light dark:text-muted-dark text-center mt-2">
+                +{hiddenTaskCount} {t("home.moreTasksHidden")}
+              </p>
+            )}
           </>
         )}
       </div>

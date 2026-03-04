@@ -25,6 +25,7 @@
     "noMails": "No new mails.",
     "openTasks": "Today's Tasks",
     "noTasks": "No open tasks.",
+    "moreTasksHidden": "more tasks not shown (open Task view to see all)",
     "quickAdd": "Quick add...",
     "dayPlan": "Day Plan",
     "dayPlanHint": "Suggested time blocks based on events and tasks.",
@@ -45,6 +46,7 @@
     "removeBreak": "Remove break for today",
     "restoreBreak": "Restore break",
     "breakMatched": "Matched with time tracking",
+    "energyCost": "Energy demand",
     "energyCheckin": "How is your energy today?",
     "energy": {
       "low": "🔋 Low",
