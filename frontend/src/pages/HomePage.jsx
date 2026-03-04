@@ -937,6 +937,11 @@ const CATEGORY_CONFIG = {
 
 const MAX_TIMELINE_TASKS = 8;
 
+// Helper: format Date to "YYYY-MM-DD" local date string
+function toLocalDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Helper: get ISO week's Monday
 function getWeekMonday(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
@@ -1001,9 +1006,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     if (tk.completed) {
       // Show completed tasks on the day they were completed
       if (tk.completedAt) {
-        const d = new Date(tk.completedAt);
-        const completedDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-        return completedDate === date;
+        return toLocalDateStr(new Date(tk.completedAt)) === date;
       }
       return false;
     }
@@ -1372,9 +1375,7 @@ function MonthPlanView({ t, tasks, getEventsForDate, monthStart, onSelectDay, to
           const dayTasks = tasks.filter((tk) => {
             if (tk.completed) {
               if (!tk.completedAt) return false;
-              const d = new Date(tk.completedAt);
-              const cd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-              return cd === date;
+              return toLocalDateStr(new Date(tk.completedAt)) === date;
             }
             if (date > todayStr) return tk.scheduledDate === date;
             if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
@@ -1460,9 +1461,7 @@ export default function HomePage() {
       if (!tk.completed) return false;
       // Check if completedAt matches viewDate (local timezone)
       if (tk.completedAt) {
-        const d = new Date(tk.completedAt);
-        const completedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        return completedDate === viewDate;
+        return toLocalDateStr(new Date(tk.completedAt)) === viewDate;
       }
       return false;
     });
@@ -1478,9 +1477,7 @@ export default function HomePage() {
       if (tk.completed) {
         // Include tasks completed today
         if (tk.completedAt) {
-          const d = new Date(tk.completedAt);
-          const completedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return completedDate === todayStr;
+          return toLocalDateStr(new Date(tk.completedAt)) === todayStr;
         }
         return false;
       }
@@ -1635,14 +1632,13 @@ export default function HomePage() {
       {/* Energy Check-in (Feature 6): energy is managed via the Header energy picker */}
 
       {/* Daily Challenge (Feature 7) — only on mobile (sidebar shows it on desktop) */}
-      <div className="md:hidden">
       {isToday && settings.gamification?.dailyChallengeEnabled && state.dailyChallenge && (() => {
         const def = DAILY_CHALLENGES.find((d) => d.id === state.dailyChallenge.challengeId);
         if (!def) return null;
         const progress = def.type === "complete_tasks" ? state.completedToday : state.focusMinutesToday;
         const pct = Math.min(100, Math.round((progress / def.target) * 100));
         return (
-          <div className={`glass-card p-4 border ${state.dailyChallenge.completed ? "border-green-300 dark:border-green-700" : "border-accent/20"}`}>
+          <div className={`md:hidden glass-card p-4 border ${state.dailyChallenge.completed ? "border-green-300 dark:border-green-700" : "border-accent/20"}`}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-semibold flex items-center gap-1.5">
                 🎯 {t("home.dailyChallenge")}
@@ -1663,7 +1659,6 @@ export default function HomePage() {
           </div>
         );
       })()}
-      </div>
 
       {/* Greeting + Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
