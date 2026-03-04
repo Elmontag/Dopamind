@@ -263,7 +263,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
         // Requirement 5: Main task is scheduled independently using its OWN estimatedMinutes.
         const parentDur = Math.max(STEP, task.estimatedMinutes || 25);
         const parentStart = findFreeStart(desiredStart, parentDur);
-        entries.push({ key: `task-${task.id}`, type: "task-parent", startMin: parentStart, durationMin: parentDur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime, subtaskCount: subtasks.length });
+        entries.push({ key: `task-${task.id}`, type: "task-parent", startMin: parentStart, durationMin: parentDur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime, subtaskCount: subtasks.length, completed: !!task.completed });
         claimRange(parentStart, parentStart + parentDur);
         cursor = parentStart + parentDur;
       }
@@ -281,7 +281,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     } else {
       const dur = Math.max(STEP, task.estimatedMinutes || 25);
       const actualStart = findFreeStart(desiredStart, dur);
-      entries.push({ key: `task-${task.id}`, type: "task", startMin: actualStart, durationMin: dur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime });
+      entries.push({ key: `task-${task.id}`, type: "task", startMin: actualStart, durationMin: dur, label: task.text, task, priority: task.priority, overdue: isTaskOverdue(task), scheduled: !!task.scheduledTime, completed: !!task.completed });
       claimRange(actualStart, actualStart + dur);
     }
   };
@@ -433,13 +433,14 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
               key={entry.key}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group
                 ${isPastEntry ? "opacity-50" : ""}
+                ${entry.completed ? "!opacity-60 line-through !bg-success/5 !border-success/30" : ""}
                 ${isSubtask ? "ml-6" : ""}
                 ${entry.type === "event" ? "bg-accent/5 border border-accent/15" : ""}
                 ${isParentSummary ? "bg-gray-50 dark:bg-white/[0.03] border border-dashed border-gray-200 dark:border-white/10 italic" : ""}
-                ${isTask && !isParentSummary ? "bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5" : ""}
+                ${isTask && !isParentSummary && !entry.completed ? "bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5" : ""}
                 ${isSubtask ? "bg-gray-50/50 dark:bg-white/[0.02] border border-gray-100/50 dark:border-white/[0.03]" : ""}
                 ${entry.type === "break" ? "bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-500/10" : ""}
-                ${entry.overdue ? "!border-danger/30 !bg-danger/5" : ""}
+                ${entry.overdue && !entry.completed ? "!border-danger/30 !bg-danger/5" : ""}
                 ${entry.pushedDown ? "!border-orange-300 dark:!border-orange-600/30 !bg-orange-50 dark:!bg-orange-900/10" : ""}
               `}
             >
@@ -529,7 +530,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
               )}
 
               {/* Task actions */}
-              {isTask && entry.task && !isPastEntry && !isEditing && (
+              {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && (
                 <>
                   <button onClick={() => onCompleteTask(entry.task.id)}
                     className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
@@ -740,13 +741,14 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                 className={`absolute left-0 right-0 flex items-start gap-1.5 px-2 py-0.5 rounded-md text-xs group transition-all overflow-hidden
                   ${dragging ? "opacity-50 scale-[0.97] z-10" : "z-10"}
                   ${isPastEntry ? "opacity-50" : ""}
+                  ${entry.completed ? "!opacity-60 line-through !bg-success/10 !border-l-2 !border-success/50" : ""}
                   ${isSubtask ? "ml-4 !left-4" : ""}
                   ${entry.type === "event" ? "bg-accent/10 text-accent font-medium border-l-2 border-accent" : ""}
                   ${isParentSummary ? "bg-gray-200 dark:bg-white/10 border border-dashed border-gray-300 dark:border-white/20 text-muted-light dark:text-muted-dark italic" : ""}
                   ${isSubtask && !entry.overdue ? "bg-gray-50 dark:bg-white/[0.03] border-l-2 border-accent/30" : ""}
                   ${isSubtask && entry.overdue ? "bg-danger/5 text-danger border-l-2 border-danger/30" : ""}
-                  ${isTask && !isParentSummary && entry.overdue ? "bg-danger/10 text-danger border-l-2 border-danger" : ""}
-                  ${isTask && !isParentSummary && !entry.overdue ? "bg-gray-100 dark:bg-white/5 border-l-2 border-gray-300 dark:border-white/15" : ""}
+                  ${isTask && !isParentSummary && entry.overdue && !entry.completed ? "bg-danger/10 text-danger border-l-2 border-danger" : ""}
+                  ${isTask && !isParentSummary && !entry.overdue && !entry.completed ? "bg-gray-100 dark:bg-white/5 border-l-2 border-gray-300 dark:border-white/15" : ""}
                   ${entry.type === "break" ? "bg-warn/10 text-amber-700 dark:text-warn border-l-2 border-warn" : ""}
                   ${entry.pushedDown ? "border-dashed !border-l-2 !border-orange-400 bg-orange-50 dark:bg-orange-900/10" : ""}
                   ${entry.needsPushConfirm ? "!border-l-2 !border-amber-400 bg-amber-50 dark:bg-amber-900/10" : ""}
@@ -841,7 +843,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
                 )}
 
                 {/* Task action buttons */}
-                {isTask && entry.task && !isPastEntry && !isEditing && (
+                {isTask && entry.task && !isPastEntry && !isEditing && !entry.completed && (
                   <>
                     <button onClick={() => onCompleteTask(entry.task.id)}
                       className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 hover:border-accent hover:bg-accent/10 transition-colors flex items-center justify-center"
@@ -994,12 +996,21 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
   const nowTotal = currentTime.getHours() * 60 + currentTime.getMinutes();
   const isCurrentWeek = days.includes(todayStr);
 
-  // Get top-level tasks for a day
+  // Get top-level tasks for a day (including completed tasks)
   const getTasksForDay = (date) => tasks.filter((tk) => {
-    if (tk.completed) return false;
+    if (tk.completed) {
+      // Show completed tasks on the day they were completed
+      if (tk.completedAt) {
+        const d = new Date(tk.completedAt);
+        const completedDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        return completedDate === date;
+      }
+      return false;
+    }
     if (date > todayStr) return tk.scheduledDate === date;
     if (date === todayStr) return !tk.scheduledDate || tk.scheduledDate <= todayStr;
-    return false;
+    // Past days: show tasks that were scheduled for that date (pending ones that weren't rescheduled)
+    return tk.scheduledDate === date;
   });
 
   // Expand tasks to renderable items (tasks + subtasks), respecting hideParentWithSubtasks
@@ -1007,6 +1018,11 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     const dayTasks = getTasksForDay(date);
     const items = [];
     for (const task of dayTasks) {
+      if (task.completed) {
+        // Show completed tasks as simple items (no subtask expansion needed)
+        items.push({ type: "task", id: task.id, parentId: null, text: task.text, estimatedMinutes: task.estimatedMinutes || 30, scheduledTime: task.scheduledTime, priority: task.priority, completed: true });
+        continue;
+      }
       const incompleteSubs = (task.subtasks || []).filter((s) => !s.completed);
       if (hideParentWithSubtasks && incompleteSubs.length > 0) {
         for (const sub of incompleteSubs) {
@@ -1252,7 +1268,10 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
                   const clippedHeight = Math.min(heightPx, totalHeight - topPx);
                   const isDragging = dragItem?.id === item.id && dragItem?.type === item.type;
                   const isSubtask = item.type === "subtask";
-                  const priorityClass = item.priority === "high"
+                  const isCompleted = !!item.completed;
+                  const priorityClass = isCompleted
+                    ? "bg-success/15 border-l-[3px] border-success/50 line-through opacity-60"
+                    : item.priority === "high"
                     ? "bg-danger/20 border-l-[3px] border-danger"
                     : item.priority === "medium"
                     ? "bg-warn/15 border-l-[3px] border-warn"
@@ -1272,15 +1291,16 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
                       title={`${item.text} — ${t("home.dragHint")}`}
                     >
                       <div className="flex items-center gap-0.5 h-full min-w-0">
+                        {isCompleted && <span className="text-success text-[8px] flex-shrink-0">✓</span>}
                         <span className="flex-1 truncate leading-tight font-medium min-w-0">{item.text}</span>
                         {/* Energy indicator */}
-                        {energyLevel && item.priority && (
+                        {energyLevel && item.priority && !isCompleted && (
                           <span className={`text-[7px] flex-shrink-0 transition-opacity ${getWeekEnergyMatch(item.priority).matched ? "opacity-100" : "opacity-25"}`}>
                             {getWeekEnergyMatch(item.priority).emoji}
                           </span>
                         )}
                         {/* Action buttons (visible on hover when height permits) */}
-                        {clippedHeight >= MIN_HEIGHT_FOR_ACTIONS && (
+                        {clippedHeight >= MIN_HEIGHT_FOR_ACTIONS && !isCompleted && (
                           <span className="flex-shrink-0 flex items-center gap-px opacity-0 group-hover:opacity-100 transition-opacity">
                             {/* Complete / toggle subtask */}
                             {item.type === "subtask" && onToggleSubtask ? (
@@ -1453,8 +1473,17 @@ export default function HomePage() {
       return false;
     });
   } else {
-    // Today: show pending tasks not scheduled for a future date
-    dayTasks = pendingTasks.filter((tk) => {
+    // Today: show pending tasks not scheduled for a future date + tasks completed today
+    dayTasks = state.tasks.filter((tk) => {
+      if (tk.completed) {
+        // Include tasks completed today
+        if (tk.completedAt) {
+          const d = new Date(tk.completedAt);
+          const completedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          return completedDate === todayStr;
+        }
+        return false;
+      }
       if (tk.scheduledDate && tk.scheduledDate > todayStr) return false;
       return true;
     });
@@ -1603,45 +1632,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Energy Check-in (Feature 6): shown once daily; also show compact changer when already set */}
-      {isToday && settings.gamification?.energyCheckinEnabled && (
-        state.energyCheckDate !== todayStr ? (
-          <div className="glass-card p-4">
-            <p className="text-sm font-medium mb-3">⚡ {t("home.energyCheckin")}</p>
-            <div className="flex gap-2">
-              {["low", "normal", "high"].map((level) => (
-                <button
-                  key={level}
-                  onClick={() => dispatch({ type: "SET_ENERGY_LEVEL", payload: level })}
-                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-gray-50 dark:bg-white/5 hover:bg-accent/10 hover:text-accent border border-gray-200 dark:border-white/10"
-                >
-                  {t(`home.energy.${level}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : state.energyLevel && (
-          <div className="glass-card px-4 py-2 flex items-center gap-3">
-            <span className="text-sm font-medium flex-1 flex items-center gap-1.5">
-              {state.energyLevel === "high" ? "⚡" : state.energyLevel === "low" ? "🔋" : "🔵"}
-              {t(`home.energy.${state.energyLevel}`)}
-            </span>
-            <div className="flex gap-1">
-              {["low", "normal", "high"].filter((l) => l !== state.energyLevel).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => dispatch({ type: "SET_ENERGY_LEVEL", payload: level })}
-                  className="px-2 py-1 rounded-lg text-[11px] font-medium transition-all bg-gray-50 dark:bg-white/5 hover:bg-accent/10 hover:text-accent border border-gray-200 dark:border-white/10"
-                >
-                  {t(`home.energy.${level}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )
-      )}
+      {/* Energy Check-in (Feature 6): energy is managed via the Header energy picker */}
 
-      {/* Daily Challenge (Feature 7) */}
+      {/* Daily Challenge (Feature 7) — only on mobile (sidebar shows it on desktop) */}
+      <div className="md:hidden">
       {isToday && settings.gamification?.dailyChallengeEnabled && state.dailyChallenge && (() => {
         const def = DAILY_CHALLENGES.find((d) => d.id === state.dailyChallenge.challengeId);
         if (!def) return null;
@@ -1669,6 +1663,7 @@ export default function HomePage() {
           </div>
         );
       })()}
+      </div>
 
       {/* Greeting + Quick Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
