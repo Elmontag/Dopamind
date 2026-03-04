@@ -118,6 +118,12 @@ export default function Sidebar() {
             </div>
             <div className="text-[10px] text-muted-light dark:text-muted-dark mb-1">{levelTitle}</div>
             <XpBar />
+            {(state.streakShields || 0) > 0 && (
+              <div className="flex items-center gap-1 mt-1.5 text-[10px] text-accent">
+                <Shield className="w-3 h-3" />
+                <span>{state.streakShields}× {t("streakShield.name")}</span>
+              </div>
+            )}
           </div>
         )}
 

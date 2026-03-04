@@ -59,6 +59,67 @@ export const ACHIEVEMENTS = [
   { id: "level-50",       size: "large",  xp: 750 },
 ];
 
+// --- Daily Challenges: deterministic pool, 3 picked per day via seeded RNG ---
+export const DAILY_CHALLENGE_POOL = [
+  // Task-based challenges
+  { id: "dc-complete-3",     type: "tasks",  target: 3,  xp: 30 },
+  { id: "dc-complete-5",     type: "tasks",  target: 5,  xp: 50 },
+  { id: "dc-complete-1-high",type: "tasks-high", target: 1, xp: 35 },
+  { id: "dc-subtask-2",     type: "subtasks", target: 2, xp: 25 },
+  // Focus-based challenges
+  { id: "dc-focus-15",      type: "focus",  target: 15, xp: 25 },
+  { id: "dc-focus-30",      type: "focus",  target: 30, xp: 40 },
+  { id: "dc-focus-45",      type: "focus",  target: 45, xp: 55 },
+  { id: "dc-focus-blocks-2",type: "focus-blocks", target: 2, xp: 30 },
+  // Early / time-based challenges
+  { id: "dc-early-task",    type: "early-task",  target: 1, xp: 30 },
+  { id: "dc-before-noon-3", type: "before-noon", target: 3, xp: 45 },
+];
+
+function seededRandom(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+function dateSeed(dateStr) {
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = ((hash << 5) - hash + dateStr.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+export function generateDailyChallenges(dateStr) {
+  const rng = seededRandom(dateSeed(dateStr));
+  const pool = [...DAILY_CHALLENGE_POOL];
+  const picked = [];
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(rng() * pool.length);
+    picked.push({ ...pool[idx], progress: 0, claimed: false });
+    pool.splice(idx, 1);
+  }
+  return picked;
+}
+
+export function checkChallengeProgress(challenge, state) {
+  switch (challenge.type) {
+    case "tasks":        return Math.min(state.completedToday, challenge.target);
+    case "tasks-high":   return Math.min((state._highPriorityToday || 0), challenge.target);
+    case "subtasks":     return Math.min((state._subtasksCompletedToday || 0), challenge.target);
+    case "focus":        return Math.min(state.focusMinutesToday, challenge.target);
+    case "focus-blocks": return Math.min(state.focusBlocksToday, challenge.target);
+    case "early-task":   return Math.min((state._earlyTaskToday || 0), challenge.target);
+    case "before-noon":  return Math.min((state._beforeNoonToday || 0), challenge.target);
+    default:             return 0;
+  }
+}
+
+// --- Streak Shield constants ---
+const STREAK_SHIELD_MILESTONES = [7, 30, 100];
+
 export const DEFAULT_CATEGORIES = [
   { id: "work",     name: "work",     emoji: "💼", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
   { id: "personal", name: "personal", emoji: "👤", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
@@ -96,6 +157,17 @@ const initialState = {
   deadlineHeroCount: 0,
   totalFocusMinutes: 0,
   penalizedTaskIds: [],
+  // Daily Challenges
+  dailyChallenges: [],
+  dailyChallengeDate: null,
+  _highPriorityToday: 0,
+  _subtasksCompletedToday: 0,
+  _earlyTaskToday: 0,
+  _beforeNoonToday: 0,
+  // Streak Shield
+  streakShields: 0,
+  streakShieldsUsed: 0,
+  shieldMilestonesAwarded: [],
 };
 
 function calcLevel(xp) {
@@ -111,6 +183,11 @@ function xpForNextLevel(level) {
 }
 
 const QUICK_STARTER_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+// Dopamine Surprise: ~20% chance for a random bonus on task completion
+const RANDOM_BONUS_CHANCE = 0.2;
+const RANDOM_BONUS_MIN = 5;
+const RANDOM_BONUS_MAX = 25;
 
 function calcOverduePenaltyXp(daysOverdue) {
   if (daysOverdue >= 15) return 50;
@@ -399,6 +476,26 @@ function reducer(state, action) {
         });
       }
 
+      // --- Dopamine Surprise: random bonus XP ---
+      if (Math.random() < RANDOM_BONUS_CHANCE) {
+        const surprise = RANDOM_BONUS_MIN + Math.floor(Math.random() * (RANDOM_BONUS_MAX - RANDOM_BONUS_MIN + 1));
+        bonusXp += surprise;
+        newRewards.push({
+          id: Date.now() + 3,
+          type: "dopamine-surprise",
+          messageKey: "rewards.dopamineSurprise",
+          xp: surprise,
+          timestamp: Date.now(),
+        });
+      }
+
+      // --- Daily challenge tracking helpers ---
+      const hour = new Date().getHours();
+      const _highPriorityToday = (state._highPriorityToday || 0) + (task.priority === "high" ? 1 : 0);
+      const _subtasksCompletedToday = (state._subtasksCompletedToday || 0) + completedSubs;
+      const _earlyTaskToday = (state._earlyTaskToday || 0) + (hour < 9 ? 1 : 0);
+      const _beforeNoonToday = (state._beforeNoonToday || 0) + (hour < 12 ? 1 : 0);
+
       const updatedState = {
         ...state,
         tasks: state.tasks.map((t) =>
@@ -412,6 +509,10 @@ function reducer(state, action) {
         completedThisYear,
         deadlineHeroCount,
         rewards: newRewards,
+        _highPriorityToday,
+        _subtasksCompletedToday,
+        _earlyTaskToday,
+        _beforeNoonToday,
       };
 
       const newAchs = checkAchievements(updatedState, { type: "COMPLETE_TASK", task });
@@ -505,7 +606,28 @@ function reducer(state, action) {
 
       const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
       const streakContinues = state.lastActiveDate === yesterday;
-      const newStreak = streakContinues ? (state.currentStreakDays || 0) + 1 : 1;
+
+      // --- Streak Shield: protect streak when broken ---
+      let shieldsUsed = state.streakShieldsUsed || 0;
+      let shields = state.streakShields || 0;
+      let shieldUsedNow = false;
+      let effectiveStreakContinues = streakContinues;
+      if (!streakContinues && state.lastActiveDate !== null && shields > 0) {
+        shields -= 1;
+        shieldsUsed += 1;
+        shieldUsedNow = true;
+        effectiveStreakContinues = true;
+      }
+      const newStreak = effectiveStreakContinues ? (state.currentStreakDays || 0) + 1 : 1;
+
+      // --- Award streak shields at milestones ---
+      const milestonesAwarded = [...(state.shieldMilestonesAwarded || [])];
+      for (const milestone of STREAK_SHIELD_MILESTONES) {
+        if (newStreak >= milestone && !milestonesAwarded.includes(milestone)) {
+          shields += 1;
+          milestonesAwarded.push(milestone);
+        }
+      }
 
       const currentWeekStart = getWeekStart(today);
       const currentMonthKey = getMonthKey(today);
@@ -550,8 +672,8 @@ function reducer(state, action) {
         }
       }
 
-      // --- Inactivity XP penalty (streak broken, not first-ever use, skipped during absence) ---
-      if (!isOnAbsence && !streakContinues && state.lastActiveDate !== null) {
+      // --- Inactivity XP penalty (streak broken, not first-ever use, skipped during absence, skipped when shield used) ---
+      if (!isOnAbsence && !streakContinues && !shieldUsedNow && state.lastActiveDate !== null) {
         const inactivityDays = state.lastActiveDate
           ? Math.max(1, Math.floor((new Date(today) - new Date(state.lastActiveDate)) / 86400000) - 1)
           : 0;
@@ -569,19 +691,53 @@ function reducer(state, action) {
         }
       }
 
+      // --- Streak Shield used notification ---
+      if (shieldUsedNow) {
+        penaltyRewards.push({
+          id: Date.now() + penaltyIdx * 1000 + 900,
+          type: "streak-shield-used",
+          messageKey: "rewards.streakShieldUsed",
+          timestamp: Date.now(),
+        });
+      }
+
+      // --- Streak Shield earned notification ---
+      const newMilestones = milestonesAwarded.filter((m) => !(state.shieldMilestonesAwarded || []).includes(m));
+      for (const m of newMilestones) {
+        penaltyRewards.push({
+          id: Date.now() + penaltyIdx * 1000 + 950 + m,
+          type: "streak-shield-earned",
+          messageKey: "rewards.streakShieldEarned",
+          milestone: m,
+          timestamp: Date.now(),
+        });
+      }
+
       const newXp = Math.max(0, state.xp - totalPenalty);
+
+      // --- Generate daily challenges ---
+      const dailyChallenges = generateDailyChallenges(today);
 
       return {
         ...state,
         completedToday: 0,
         focusMinutesToday: 0,
         focusBlocksToday: 0,
+        _highPriorityToday: 0,
+        _subtasksCompletedToday: 0,
+        _earlyTaskToday: 0,
+        _beforeNoonToday: 0,
         currentStreakDays: newStreak,
         longestStreakDays: Math.max(state.longestStreakDays || 0, newStreak),
         lastActiveDate: today,
         xp: newXp,
         level: calcLevel(newXp),
         penalizedTaskIds,
+        streakShields: shields,
+        streakShieldsUsed: shieldsUsed,
+        shieldMilestonesAwarded: milestonesAwarded,
+        dailyChallenges,
+        dailyChallengeDate: today,
         rewards: [...state.rewards, ...penaltyRewards],
         ...(weekReset ? {
           completedThisWeek: 0,
@@ -627,6 +783,47 @@ function reducer(state, action) {
           t.category === action.payload ? { ...t, category: null } : t
         ),
       };
+
+    case "CLAIM_DAILY_CHALLENGE": {
+      const challengeId = action.payload;
+      const challenges = (state.dailyChallenges || []).map((c) => {
+        if (c.id !== challengeId || c.claimed) return c;
+        return { ...c, claimed: true };
+      });
+      const claimed = challenges.find((c) => c.id === challengeId && c.claimed);
+      if (!claimed) return state;
+      const prev = (state.dailyChallenges || []).find((c) => c.id === challengeId);
+      if (prev && prev.claimed) return state;
+      const xpGain = claimed.xp;
+      const newXp = state.xp + xpGain;
+      const newLevel = calcLevel(newXp);
+      const leveledUp = newLevel > state.level;
+      const newRewards = [...state.rewards];
+      newRewards.push({
+        id: Date.now(),
+        type: "daily-challenge",
+        messageKey: "rewards.dailyChallengeComplete",
+        xp: xpGain,
+        challengeId,
+        timestamp: Date.now(),
+      });
+      if (leveledUp) {
+        newRewards.push({
+          id: Date.now() + 1,
+          type: "level-up",
+          messageKey: "rewards.levelUp",
+          level: newLevel,
+          timestamp: Date.now(),
+        });
+      }
+      return {
+        ...state,
+        dailyChallenges: challenges,
+        xp: newXp,
+        level: newLevel,
+        rewards: newRewards,
+      };
+    }
 
     default:
       return state;

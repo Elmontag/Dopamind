@@ -361,7 +361,11 @@
     "dailyBonus": "Tages-Bonus! +{xp} XP",
     "deadlineBonus": "Pünktlich! +15 XP Bonus",
     "overduePenalty": "⚠ Überfällige Aufgabe: -{xp} XP ({daysOverdue} Tage zu spät)",
-    "inactivityPenalty": "😴 Inaktivität: -{xp} XP ({days} Tage inaktiv)"
+    "inactivityPenalty": "😴 Inaktivität: -{xp} XP ({days} Tage inaktiv)",
+    "dopamineSurprise": "🎁 Dopamin-Überraschung! +{xp} Bonus-XP!",
+    "dailyChallengeComplete": "🎯 Tages-Challenge geschafft! +{xp} XP",
+    "streakShieldUsed": "🛡️ Streak-Schild eingesetzt! Dein Streak ist geschützt.",
+    "streakShieldEarned": "🛡️ Streak-Schild erhalten! Schütze deinen Streak bei einer Pause."
   },
   "achievements": {
     "title": "Erfolge",
@@ -471,6 +475,54 @@
       "name": "Halbzeit-Held",
       "desc": "Level 50 erreichen."
     }
+  },
+  "dailyChallenges": {
+    "title": "Tages-Challenges",
+    "claim": "Einlösen",
+    "dc-complete-3": {
+      "name": "Dreifach-Erlediger",
+      "desc": "Erledige 3 Aufgaben heute."
+    },
+    "dc-complete-5": {
+      "name": "Fünffach-Held",
+      "desc": "Erledige 5 Aufgaben heute."
+    },
+    "dc-complete-1-high": {
+      "name": "Prioritäts-Jäger",
+      "desc": "Erledige 1 Aufgabe mit hoher Priorität."
+    },
+    "dc-subtask-2": {
+      "name": "Detail-Profi",
+      "desc": "Schließe 2 Unteraufgaben ab."
+    },
+    "dc-focus-15": {
+      "name": "Kurzer Fokus",
+      "desc": "Sammle 15 Fokus-Minuten."
+    },
+    "dc-focus-30": {
+      "name": "Halbe Stunde",
+      "desc": "Sammle 30 Fokus-Minuten."
+    },
+    "dc-focus-45": {
+      "name": "Ausdauer-Fokus",
+      "desc": "Sammle 45 Fokus-Minuten."
+    },
+    "dc-focus-blocks-2": {
+      "name": "Doppel-Block",
+      "desc": "Schließe 2 Fokus-Blöcke ab."
+    },
+    "dc-early-task": {
+      "name": "Frühstart",
+      "desc": "Erledige eine Aufgabe vor 9 Uhr."
+    },
+    "dc-before-noon-3": {
+      "name": "Vormittags-Power",
+      "desc": "Erledige 3 Aufgaben vor 12 Uhr."
+    }
+  },
+  "streakShield": {
+    "name": "Streak-Schild",
+    "desc": "Schützt deinen Streak bei einem verpassten Tag. Wird bei Streak-Meilensteinen (7, 30, 100 Tage) verdient."
   },
   "common": {
     "save": "Speichern",

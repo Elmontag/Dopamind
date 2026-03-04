@@ -361,7 +361,11 @@
     "dailyBonus": "Daily Bonus! +{xp} XP",
     "deadlineBonus": "On time! +15 XP Bonus",
     "overduePenalty": "⚠ Overdue task: -{xp} XP ({daysOverdue} days late)",
-    "inactivityPenalty": "😴 Inactivity: -{xp} XP ({days} days inactive)"
+    "inactivityPenalty": "😴 Inactivity: -{xp} XP ({days} days inactive)",
+    "dopamineSurprise": "🎁 Dopamine Surprise! +{xp} Bonus XP!",
+    "dailyChallengeComplete": "🎯 Daily Challenge complete! +{xp} XP",
+    "streakShieldUsed": "🛡️ Streak Shield activated! Your streak is protected.",
+    "streakShieldEarned": "🛡️ Streak Shield earned! Protect your streak during a break."
   },
   "achievements": {
     "title": "Achievements",
@@ -471,6 +475,54 @@
       "name": "Halfway Hero",
       "desc": "Reach level 50."
     }
+  },
+  "dailyChallenges": {
+    "title": "Daily Challenges",
+    "claim": "Claim",
+    "dc-complete-3": {
+      "name": "Triple Finisher",
+      "desc": "Complete 3 tasks today."
+    },
+    "dc-complete-5": {
+      "name": "Five-Star Hero",
+      "desc": "Complete 5 tasks today."
+    },
+    "dc-complete-1-high": {
+      "name": "Priority Hunter",
+      "desc": "Complete 1 high-priority task."
+    },
+    "dc-subtask-2": {
+      "name": "Detail Pro",
+      "desc": "Complete 2 subtasks."
+    },
+    "dc-focus-15": {
+      "name": "Quick Focus",
+      "desc": "Accumulate 15 focus minutes."
+    },
+    "dc-focus-30": {
+      "name": "Half Hour",
+      "desc": "Accumulate 30 focus minutes."
+    },
+    "dc-focus-45": {
+      "name": "Endurance Focus",
+      "desc": "Accumulate 45 focus minutes."
+    },
+    "dc-focus-blocks-2": {
+      "name": "Double Block",
+      "desc": "Complete 2 focus blocks."
+    },
+    "dc-early-task": {
+      "name": "Early Start",
+      "desc": "Complete a task before 9 AM."
+    },
+    "dc-before-noon-3": {
+      "name": "Morning Power",
+      "desc": "Complete 3 tasks before noon."
+    }
+  },
+  "streakShield": {
+    "name": "Streak Shield",
+    "desc": "Protects your streak when you miss a day. Earned at streak milestones (7, 30, 100 days)."
   },
   "common": {
     "save": "Save",

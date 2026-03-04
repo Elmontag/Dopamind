@@ -8,6 +8,7 @@ import {
   CheckCircle, Calendar, Plus,
   LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical, CalendarPlus, List, Trash2,
 } from "lucide-react";
+import DailyChallengesPanel from "../components/DailyChallengesPanel";
 
 
 function ClockWidget({ t }) {
@@ -978,6 +979,9 @@ export default function HomePage() {
 
       {/* Clock widget (only when time tracking is enabled) */}
       {features.timeTrackingEnabled !== false && <ClockWidget t={t} />}
+
+      {/* Daily Challenges (only when gamification is enabled) */}
+      {features.gamificationEnabled !== false && <DailyChallengesPanel />}
 
       {/* Unified Day Timeline */}
       <div className="glass-card p-5">

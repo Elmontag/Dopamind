@@ -5,6 +5,7 @@ import {
   TrendingUp, Star, X, Sparkles, Brain, Sunrise, Moon, Zap,
   Rocket, ListChecks, Trophy, Crown, Clock, Shield, Flame,
   Target, Timer, Medal, Infinity, Swords, TrendingDown, AlertTriangle,
+  Gift, ShieldCheck, ShieldPlus,
 } from "lucide-react";
 
 const ICONS = {
@@ -39,6 +40,10 @@ const ICONS = {
   "focus-combo":        <Zap className="w-6 h-6 text-warn" />,
   "overdue-penalty":    <AlertTriangle className="w-6 h-6 text-danger" />,
   "inactivity-penalty": <TrendingDown className="w-6 h-6 text-danger" />,
+  "dopamine-surprise":  <Gift className="w-6 h-6 text-warn animate-bounce" />,
+  "daily-challenge":    <Target className="w-6 h-6 text-success" />,
+  "streak-shield-used": <ShieldCheck className="w-6 h-6 text-accent" />,
+  "streak-shield-earned": <ShieldPlus className="w-6 h-6 text-success" />,
 };
 
 const SIZE_CLASSES = {
