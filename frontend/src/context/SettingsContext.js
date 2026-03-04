@@ -45,6 +45,8 @@ const defaultSettings = {
   timeline: {
     gridInterval: 30, // 15 | 30 | 60
     hideParentWithSubtasks: false,
+    taskSchedulingRound: "halfHour", // "halfHour" | "fullHour" | "custom"
+    taskSchedulingCustomMinutes: 30,
   },
 };
 

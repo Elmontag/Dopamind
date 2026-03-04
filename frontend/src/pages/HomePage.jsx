@@ -144,6 +144,24 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const DAY_START = showFullDay ? 0 : workStart;
   const DAY_END = showFullDay ? 24 * 60 : workEnd;
   const isNonWorkTime = (minFromMidnight) => timeTrackingEnabled && (minFromMidnight < workStart || minFromMidnight >= workEnd);
+
+  const taskSchedulingRound = settings.timeline?.taskSchedulingRound || "halfHour";
+  const taskSchedulingCustomMinutes = settings.timeline?.taskSchedulingCustomMinutes ?? 30;
+  const getTaskMinStart = (task) => {
+    if (!isToday || !task.createdAt) return workStart;
+    const created = new Date(task.createdAt);
+    if (created.toISOString().slice(0, 10) !== todayDate) return workStart;
+    const createdMin = created.getHours() * 60 + created.getMinutes();
+    let minStart;
+    if (taskSchedulingRound === "fullHour") {
+      minStart = Math.ceil(createdMin / 60) * 60;
+    } else if (taskSchedulingRound === "custom") {
+      minStart = Math.ceil((createdMin + taskSchedulingCustomMinutes) / STEP) * STEP;
+    } else {
+      minStart = Math.ceil(createdMin / 30) * 30;
+    }
+    return Math.max(workStart, minStart);
+  };
   const fmtTime = (totalMin) => {
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
@@ -262,7 +280,8 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   }
   let nextFree = workStart;
   for (const task of unscheduledTasks) {
-    placeTask(task, nextFree);
+    const minStart = getTaskMinStart(task);
+    placeTask(task, Math.max(nextFree, minStart));
     const justPlaced = entries.filter((e) => e.key === `task-${task.id}` || e.key.startsWith(`sub-${task.id}-`));
     if (justPlaced.length > 0) nextFree = Math.max(...justPlaced.map((e) => e.startMin + e.durationMin));
   }

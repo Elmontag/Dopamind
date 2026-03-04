@@ -357,6 +357,12 @@
     "pauseSuggestionsEnabled": "Pausenvorschläge",
     "weeklyReportEnabled": "Wochenbericht",
     "hideParentWithSubtasks": "Hauptaufgaben ausblenden wenn Unteraufgaben vorhanden",
+    "taskSchedulingRound": "Frühester Terminvorschlag (Rundung)",
+    "taskSchedulingRoundDesc": "Ab wann darf eine neue Aufgabe frühestens vorgeschlagen werden?",
+    "taskSchedulingRound_halfHour": "Halbe Stunde (xx:00 / xx:30)",
+    "taskSchedulingRound_fullHour": "Volle Stunde (xx:00)",
+    "taskSchedulingRound_custom": "Minuten nach Erstellung",
+    "taskSchedulingCustomMinutes": "Minuten nach Erstellung",
     "timeline": "Tagesplanung"
   },
   "home": {

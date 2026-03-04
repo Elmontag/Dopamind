@@ -414,6 +414,12 @@
     "pauseSuggestionsEnabled": "Pause Suggestions",
     "weeklyReportEnabled": "Weekly Report",
     "hideParentWithSubtasks": "Hide parent tasks when subtasks are present",
+    "taskSchedulingRound": "Earliest task scheduling (rounding)",
+    "taskSchedulingRoundDesc": "How early can a newly created task be suggested in the day plan?",
+    "taskSchedulingRound_halfHour": "Half hour (xx:00 / xx:30)",
+    "taskSchedulingRound_fullHour": "Full hour (xx:00)",
+    "taskSchedulingRound_custom": "Minutes after creation",
+    "taskSchedulingCustomMinutes": "Minutes after creation",
     "timeline": "Day Planning"
   },
   "rewards": {

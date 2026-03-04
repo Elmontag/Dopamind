@@ -538,6 +538,33 @@ export default function SettingsPage() {
                 </button>
               </div>
             </Section>
+            <Section title={t("settings.taskSchedulingRound")}>
+              <p className="text-xs text-muted-light dark:text-muted-dark mb-3">{t("settings.taskSchedulingRoundDesc")}</p>
+              <div className="flex gap-2 flex-wrap">
+                {["halfHour", "fullHour", "custom"].map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => updateSettings("timeline", { taskSchedulingRound: mode })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      (settings.timeline?.taskSchedulingRound || "halfHour") === mode
+                        ? "bg-accent text-white"
+                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    {t(`settings.taskSchedulingRound_${mode}`)}
+                  </button>
+                ))}
+              </div>
+              {(settings.timeline?.taskSchedulingRound || "halfHour") === "custom" && (
+                <Field label={t("settings.taskSchedulingCustomMinutes")}>
+                  <Input
+                    type="number"
+                    value={settings.timeline?.taskSchedulingCustomMinutes ?? 30}
+                    onChange={(v) => updateSettings("timeline", { taskSchedulingCustomMinutes: Math.min(1440, Math.max(1, Number(v))) })}
+                  />
+                </Field>
+              )}
+            </Section>
             <Section title={t("settings.timeline")}>
               <Toggle
                 checked={settings.timeline?.hideParentWithSubtasks === true}
