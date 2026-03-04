@@ -116,9 +116,6 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const PX_PER_MIN = ROW_HEIGHT / STEP;
   const MIN_ENTRY_HEIGHT_PX = 20;
 
-  const DAY_START = showFullDay ? 0 : workStart;
-  const DAY_END = showFullDay ? 24 * 60 : workEnd;
-
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingSubtaskParent, setEditingSubtaskParent] = useState(null);
   const [editText, setEditText] = useState("");
@@ -143,6 +140,9 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const toMin = (h, m) => h * 60 + m;
   const workStart = toMin(workStartH, workStartM);
   const workEnd = toMin(workEndH, workEndM);
+
+  const DAY_START = showFullDay ? 0 : workStart;
+  const DAY_END = showFullDay ? 24 * 60 : workEnd;
   const isNonWorkTime = (minFromMidnight) => timeTrackingEnabled && (minFromMidnight < workStart || minFromMidnight >= workEnd);
   const fmtTime = (totalMin) => {
     const h = Math.floor(totalMin / 60);
