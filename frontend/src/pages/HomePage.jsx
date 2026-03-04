@@ -1891,6 +1891,8 @@ export default function HomePage() {
 
       {countdownTask && (
         <CountdownStart
+          taskId={countdownTask.id}
+          taskText={countdownTask.text}
           estimatedMinutes={countdownTask.estimatedMinutes || 25}
           onClose={() => setCountdownTask(null)}
         />
