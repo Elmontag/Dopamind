@@ -108,6 +108,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const ROW_HEIGHT = STEP === 15 ? 32 : STEP === 30 ? 40 : 52;
   // Pixels per minute for minute-precise rendering in grid mode
   const PX_PER_MIN = ROW_HEIGHT / STEP;
+  const MIN_ENTRY_HEIGHT_PX = 20;
 
   const DAY_START = timeTrackingEnabled ? 0 : 6 * 60;
   const DAY_END = timeTrackingEnabled ? 24 * 60 : 22 * 60;
@@ -631,7 +632,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
             const isSubtask = entry.type === "subtask";
             const isParentSummary = entry.type === "task-parent";
             const entryTop = (entry.startMin - visStart) * PX_PER_MIN;
-            const entryHeight = Math.max(entry.durationMin * PX_PER_MIN, 20); // min 20px visible
+            const entryHeight = Math.max(entry.durationMin * PX_PER_MIN, MIN_ENTRY_HEIGHT_PX);
 
             const canReschedule = entry.pushedDown && (isTask || isSubtask) && entry.task &&
               (!entry.task.deadline || entry.task.deadline >= todayDate);
