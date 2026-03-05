@@ -6,15 +6,12 @@ const SCROLL_TOLERANCE = 8; // px — movement within this range doesn't cancel 
 /**
  * useTouchDragDrop — provides touch-based drag-and-drop support.
  *
+ * Uses a native (non-passive) touchmove listener so e.preventDefault() works
+ * and page scrolling is suppressed during an active drag.
+ *
  * Usage:
- *   const { getTouchDragProps, getTouchDropProps } = useTouchDragDrop({
- *     onDrop: (dragData, dropTarget) => { ... }
- *   });
- *
- *   // On draggable element:
+ *   const { getTouchDragProps, getTouchDropProps } = useTouchDragDrop({ onDrop });
  *   <div {...getTouchDragProps(myData)} />
- *
- *   // On drop zone element (must have data-droptarget attribute):
  *   <div {...getTouchDropProps(dropId)} />
  */
 export function useTouchDragDrop({ onDrop }) {
@@ -29,6 +26,7 @@ export function useTouchDragDrop({ onDrop }) {
     startY: 0,
     longPressTimer: null,
     isDragging: false,
+    nativeMoveHandler: null, // native touchmove handler (non-passive)
   });
 
   const cleanup = useCallback(() => {
@@ -39,6 +37,11 @@ export function useTouchDragDrop({ onDrop }) {
     }
     if (s.dragEl) {
       s.dragEl.classList.remove("touch-dragging");
+      // Remove the non-passive native listener to avoid leaks
+      if (s.nativeMoveHandler) {
+        s.dragEl.removeEventListener("touchmove", s.nativeMoveHandler);
+        s.nativeMoveHandler = null;
+      }
     }
     document.body.classList.remove("touch-drag-active");
     s.dragData = null;
@@ -61,27 +64,36 @@ export function useTouchDragDrop({ onDrop }) {
         document.body.classList.add("touch-drag-active");
         if (typeof navigator.vibrate === "function") navigator.vibrate(50);
       }, LONG_PRESS_DELAY);
-    },
-    onTouchMove(e) {
-      const s = stateRef.current;
-      const touch = e.touches[0];
-      const dx = touch.clientX - s.startX;
-      const dy = touch.clientY - s.startY;
 
-      // If significant movement before long-press triggers, cancel long-press
-      if (!s.isDragging) {
-        if (Math.abs(dx) > SCROLL_TOLERANCE || Math.abs(dy) > SCROLL_TOLERANCE) {
-          if (s.longPressTimer) {
-            clearTimeout(s.longPressTimer);
-            s.longPressTimer = null;
+      // Register a non-passive touchmove listener directly on the element.
+      // React registers touch listeners as passive, making e.preventDefault() a
+      // no-op. A native {passive:false} listener is the only reliable way to
+      // prevent the page from scrolling while a drag is in progress.
+      const nativeMoveHandler = (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        const dx = t.clientX - s.startX;
+        const dy = t.clientY - s.startY;
+
+        if (!s.isDragging) {
+          // Cancel long-press if finger moves too much before threshold
+          if (Math.abs(dx) > SCROLL_TOLERANCE || Math.abs(dy) > SCROLL_TOLERANCE) {
+            if (s.longPressTimer) {
+              clearTimeout(s.longPressTimer);
+              s.longPressTimer = null;
+            }
           }
+          return;
         }
-        return;
-      }
 
-      // Prevent page scrolling during drag
-      e.preventDefault();
+        // Suppress page scroll during active drag
+        e.preventDefault();
+      };
+
+      s.nativeMoveHandler = nativeMoveHandler;
+      e.currentTarget.addEventListener("touchmove", nativeMoveHandler, { passive: false });
     },
+
     onTouchEnd(e) {
       const s = stateRef.current;
 
@@ -102,7 +114,7 @@ export function useTouchDragDrop({ onDrop }) {
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
       if (s.dragEl) s.dragEl.style.pointerEvents = "";
 
-      // Walk up DOM to find the nearest element with data-droptarget
+      // Walk up DOM to find nearest element with data-droptarget
       let dropEl = el;
       while (dropEl && !dropEl.dataset.droptarget) {
         dropEl = dropEl.parentElement;
@@ -114,6 +126,7 @@ export function useTouchDragDrop({ onDrop }) {
 
       cleanup();
     },
+
     onTouchCancel() {
       cleanup();
     },

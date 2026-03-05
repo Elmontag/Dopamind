@@ -51,7 +51,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`hidden lg:flex flex-col max-h-screen overflow-y-auto sticky top-0 z-40 transition-all duration-200 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-r border-gray-200/50 dark:border-white/5 ${
+      className={`hidden lg:flex flex-col h-full overflow-y-auto z-40 transition-all duration-200 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-r border-gray-200/50 dark:border-white/5 ${
         collapsed ? "w-16" : "w-56"
       }`}
     >

@@ -2226,22 +2226,24 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
-            {/* Navigation */}
-            <button
-              onClick={prevDay}
-              className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              aria-label={t("home.previousDay")}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-medium min-w-[90px] text-center">{formatViewDate()}</span>
-            <button
-              onClick={nextDay}
-              className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              aria-label={t("home.nextDay")}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {/* Navigation — keep all three together to prevent flex-wrap splitting */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={prevDay}
+                className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                aria-label={t("home.previousDay")}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium min-w-[90px] text-center">{formatViewDate()}</span>
+              <button
+                onClick={nextDay}
+                className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                aria-label={t("home.nextDay")}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             {overdueTasks.length > 0 && isToday && (planView === "block" || planView === "timeline") && (
               <span className="badge bg-danger/10 text-danger text-[10px] flex items-center gap-1 ml-1">
                 <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}

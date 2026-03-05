@@ -26,7 +26,7 @@ export default function WeekSummaryView({ t, tasks, getEventsForDate, weekStart,
 
   return (
     <div className="overflow-x-auto -mx-1 px-1">
-      <div className="grid grid-cols-7 gap-1.5 min-w-[420px]">
+      <div className="grid grid-cols-7 gap-1.5 min-w-[320px]">
       {days.map((date, i) => {
         const dayTasks = getTasksForDay(date);
         const pendingTasks = dayTasks.filter((tk) => !tk.completed);
@@ -55,16 +55,16 @@ export default function WeekSummaryView({ t, tasks, getEventsForDate, weekStart,
               <span className={`text-xs font-mono ${isToday ? "text-accent font-bold" : ""}`}>{dayNum}</span>
             </div>
 
-            {/* Task count */}
-            <div className="flex items-center gap-1 mb-1">
+            {/* Compact counts row — no emojis, no text */}
+            <div className="flex items-center gap-1 mb-1 flex-wrap">
               {pendingTasks.length > 0 && <span className="text-xs font-bold">{pendingTasks.length}</span>}
-              {completedTasks.length > 0 && <span className="text-[10px] text-success">✓{completedTasks.length}</span>}
-              {events.length > 0 && <span className="text-[10px] text-accent">📅{events.length}</span>}
+              {completedTasks.length > 0 && <span className="text-[10px] text-success font-medium">✓</span>}
+              {events.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />}
             </div>
 
-            {/* Energy dots */}
+            {/* Energy color dots only */}
             {pendingTasks.length > 0 && (
-              <div className="flex gap-0.5 mb-1">
+              <div className="flex gap-0.5 flex-wrap">
                 {Object.entries(energyCounts).filter(([, c]) => c > 0).map(([level, count]) => (
                   <div key={level} className="flex gap-px">
                     {Array.from({ length: Math.min(count, 3) }).map((_, j) => (
@@ -75,16 +75,6 @@ export default function WeekSummaryView({ t, tasks, getEventsForDate, weekStart,
                 ))}
               </div>
             )}
-
-            {/* Top 2 task names */}
-            <div className="space-y-0.5">
-              {pendingTasks.slice(0, 2).map((tk) => (
-                <p key={tk.id} className="text-[9px] truncate text-muted-light dark:text-muted-dark leading-tight">{tk.text}</p>
-              ))}
-              {pendingTasks.length > 2 && (
-                <p className="text-[8px] text-muted-light dark:text-muted-dark">+{pendingTasks.length - 2}</p>
-              )}
-            </div>
           </button>
         );
       })}
