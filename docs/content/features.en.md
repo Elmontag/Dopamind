@@ -1,25 +1,24 @@
-## Features
+## What Makes Dopamind Different
 
-### 🏠 Home Dashboard
-Calendar-synced day planning — tasks are automatically scheduled into free time slots based on work hours and calendar events. Quick stats, quick-add, and time tracking at a glance.
+Most to-do lists show you everything at once — and leave you alone with it. Dopamind thinks along with you.
 
-### ✅ Task Management
-Priorities (High / Medium / Low) with color coding. Deadlines, subtasks, tags, and estimated time per task. Filter and sort by priority, deadline, or creation date.
+### ⭐ Next Step — No More Decision Paralysis
+Instead of an endless list, you get **exactly one** highlighted task: your next step. No deliberating, no scrolling — just start.
 
-### 📅 Calendar (CalDAV)
-CalDAV integration with Nextcloud, iCloud, Google Calendar, and more. Month view with day detail panel. Full event CRUD — create, edit, and delete events.
+### 🗓️ Smart Day Planning — No Double-Booking
+Dopamind knows your calendar and your work hours. Tasks are automatically scheduled into **free time slots** — without conflicts with appointments. You don't plan; Dopamind suggests.
 
-### 📧 Smart IMAP Inbox
-IMAP proxy — emails remain on the server, no local storage. Reply, archive, delete, and tag directly from the UI. SMTP send included.
+### ⚡ Energy, Not Discipline
+Every task gets an **energy level** (low / medium / high). Dopamind shows demanding tasks in the morning and lighter ones in the evening — matched to your natural energy rhythm.
 
-### ⏱️ Time Tracking
-Clock in/out with real-time display. Break management and absences (vacation, sick, child sick, compensatory time). Weekly overview with target/actual comparison.
+### 🎮 Rewards That Actually Motivate
+XP, levels, achievements, and streaks make progress **tangible** — even on small days. **10 level ranks**, 25+ achievements, streak multipliers. No XP loss during recorded absences.
 
-### 🎮 Gamification & Rewards
-XP system for completed tasks and focus blocks. 10 level ranks from "Newcomer" to "Legendary Focus". 25+ achievements in three tiers. Streak tracking with multiplier bonuses. Penalty protection during registered absences.
+### 🛡️ Compassion Mode — For Tough Days
+No guilt when nothing works out. Absences (vacation, sick, child sick) are recognized — XP penalties for overdue tasks are automatically suspended.
 
-### 🌍 Internationalization
-German and English fully supported. Language toggle in the header.
+### 📧 Inbox → Task in One Click
+Smart IMAP proxy: turn any email into a task with one click. Emails stay on the server — no local storage, full privacy.
 
-### ⚙️ Settings
-Language, theme, work schedule, mail/calendar configuration, gamification options, and feature toggles. Everything individually customizable.
+### 🔒 Self-Hosted — Your Data Stays Yours
+No cloud subscription, no data sharing. Dopamind runs on your own infrastructure. All credentials are stored encrypted with **AES-256-GCM**.

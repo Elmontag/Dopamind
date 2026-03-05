@@ -407,44 +407,90 @@ blockquote p { margin: 0; }
   color: var(--text-secondary);
 }
 
-/* ---------- Tech Stack ------------------------------------ */
-.techstack-grid {
+/* ---------- Screenshots Section --------------------------- */
+.section-intro {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin-bottom: 2.5rem;
+  max-width: 640px;
+}
+
+.screenshot-item {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
+  grid-template-columns: 1fr;
+  gap: 1.75rem;
+  margin-bottom: 4rem;
 }
 
-.tech-item {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+@media (min-width: 900px) {
+  .screenshot-item {
+    grid-template-columns: 3fr 2fr;
+    align-items: center;
+    gap: 2.5rem;
+  }
+
+  .screenshot-item--reverse {
+    grid-template-columns: 2fr 3fr;
+  }
+
+  .screenshot-item--reverse .screenshot-frame {
+    order: 2;
+  }
+
+  .screenshot-item--reverse .screenshot-caption {
+    order: 1;
+  }
+}
+
+.screenshot-frame {
   border-radius: var(--radius);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-lg);
+  background: #1A1A2E;
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+
+.screenshot-frame:hover {
+  box-shadow: 0 12px 64px rgba(108, 99, 255, 0.22);
+  transform: translateY(-3px);
+}
+
+.screenshot-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.screenshot-caption {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  transition: box-shadow var(--transition), border-color var(--transition);
+  gap: 1rem;
+  align-items: flex-start;
 }
 
-.tech-item:hover {
-  border-color: rgba(108, 99, 255, 0.4);
-  box-shadow: var(--shadow);
-}
-
-.tech-category {
-  font-size: 0.72rem;
+.caption-number {
+  font-size: 2.5rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  line-height: 1;
   color: var(--accent);
+  opacity: 0.35;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
 }
 
-.tech-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+.screenshot-caption h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.screenshot-caption p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0;
 }
 
 /* ---------- Deployment / Markdown content ---------------- */

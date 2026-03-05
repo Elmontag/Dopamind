@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" width="900" height="480" font-family="system-ui, -apple-system, sans-serif" role="img" aria-labelledby="gamification-title">
+  <title id="gamification-title">Dopamind Gamification – Level 7 Focus Champion, XP-Balken 2450/3000, Streak 12 Tage, Achievement-Badges.</title>
+  <defs>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#9B59B6"/>
+    </linearGradient>
+    <linearGradient id="xpBarGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#8B83FF"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1A2E"/>
+      <stop offset="100%" stop-color="#16213E"/>
+    </linearGradient>
+    <clipPath id="roundedWin">
+      <rect width="900" height="480" rx="12" ry="12"/>
+    </clipPath>
+  </defs>
+
+  <!-- Window -->
+  <rect width="900" height="480" rx="12" ry="12" fill="url(#bgGrad)"/>
+  <rect width="900" height="480" rx="12" ry="12" fill="none" stroke="rgba(108,99,255,0.25)" stroke-width="1.5"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="900" height="44" rx="0" fill="rgba(22,33,62,0.95)" clip-path="url(#roundedWin)"/>
+  <rect x="0" y="43" width="900" height="1" fill="rgba(108,99,255,0.2)"/>
+  <circle cx="20" cy="22" r="6" fill="#FF6B6B" opacity="0.8"/>
+  <circle cx="38" cy="22" r="6" fill="#FFB84C" opacity="0.8"/>
+  <circle cx="56" cy="22" r="6" fill="#00C9A7" opacity="0.8"/>
+  <text x="450" y="27" text-anchor="middle" fill="url(#accentGrad)" font-size="15" font-weight="700">Dopamind · Gamification</text>
+
+  <!-- Level hero card -->
+  <rect x="30" y="60" width="260" height="160" rx="12" fill="rgba(108,99,255,0.12)" stroke="rgba(108,99,255,0.4)" stroke-width="1.5"/>
+  <!-- Big level badge -->
+  <circle cx="100" cy="115" r="42" fill="rgba(108,99,255,0.15)" stroke="rgba(108,99,255,0.5)" stroke-width="2"/>
+  <text x="100" y="107" text-anchor="middle" fill="#6C63FF" font-size="11" font-weight="700" letter-spacing="0.05em">LEVEL</text>
+  <text x="100" y="131" text-anchor="middle" fill="url(#accentGrad)" font-size="28" font-weight="700">7</text>
+  <!-- Rank name -->
+  <text x="165" y="95" fill="#F0EFF9" font-size="14" font-weight="700">Focus Champion</text>
+  <text x="165" y="113" fill="#9CA3AF" font-size="11">2450 / 3000 XP</text>
+  <!-- XP bar -->
+  <rect x="165" y="122" width="115" height="8" rx="4" fill="rgba(108,99,255,0.15)"/>
+  <rect x="165" y="122" width="86" height="8" rx="4" fill="url(#xpBarGrad)"/>
+  <text x="165" y="146" fill="#6B7280" font-size="10">550 XP bis Level 8</text>
+  <!-- Streak -->
+  <rect x="40" y="168" width="240" height="40" rx="8" fill="rgba(255,184,76,0.1)" stroke="rgba(255,184,76,0.3)" stroke-width="1"/>
+  <text x="60" y="194" fill="#FFB84C" font-size="22">🔥</text>
+  <text x="90" y="190" fill="#FFB84C" font-size="18" font-weight="700">12</text>
+  <text x="118" y="190" fill="#FFB84C" font-size="13" font-weight="600">Tage Streak</text>
+  <text x="220" y="190" fill="#6B7280" font-size="10">×1.5 Bonus</text>
+
+  <!-- Total stats card -->
+  <rect x="310" y="60" width="250" height="160" rx="12" fill="rgba(22,33,62,0.8)" stroke="rgba(108,99,255,0.18)" stroke-width="1"/>
+  <text x="330" y="85" fill="#9CA3AF" font-size="12" font-weight="600" letter-spacing="0.05em">STATISTIKEN</text>
+  <!-- Stat rows -->
+  <text x="330" y="112" fill="#6B7280" font-size="11">Abgeschlossene Aufgaben</text>
+  <text x="545" y="112" text-anchor="end" fill="#F0EFF9" font-size="14" font-weight="700">247</text>
+  <line x1="330" y1="120" x2="545" y2="120" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+
+  <text x="330" y="141" fill="#6B7280" font-size="11">Fokus-Minuten gesamt</text>
+  <text x="545" y="141" text-anchor="end" fill="#F0EFF9" font-size="14" font-weight="700">3 420</text>
+  <line x1="330" y1="149" x2="545" y2="149" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+
+  <text x="330" y="170" fill="#6B7280" font-size="11">Aufgaben diese Woche</text>
+  <text x="545" y="170" text-anchor="end" fill="#00C9A7" font-size="14" font-weight="700">18</text>
+  <line x1="330" y1="178" x2="545" y2="178" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+
+  <text x="330" y="199" fill="#6B7280" font-size="11">Längster Streak</text>
+  <text x="545" y="199" text-anchor="end" fill="#FFB84C" font-size="14" font-weight="700">24 Tage</text>
+
+  <!-- Achievements section -->
+  <text x="30" y="244" fill="#9CA3AF" font-size="12" font-weight="700" letter-spacing="0.08em">ACHIEVEMENTS</text>
+
+  <!-- Achievement 1 – earned -->
+  <rect x="30" y="255" width="196" height="90" rx="10" fill="rgba(0,201,167,0.08)" stroke="rgba(0,201,167,0.35)" stroke-width="1.5"/>
+  <text x="60" y="285" font-size="28">🏆</text>
+  <text x="95" y="282" fill="#F0EFF9" font-size="13" font-weight="600">Erstaufgabe</text>
+  <text x="95" y="297" fill="#9CA3AF" font-size="10">Erste Aufgabe abgeschlossen</text>
+  <rect x="95" y="306" width="46" height="14" rx="3" fill="rgba(0,201,167,0.2)"/>
+  <text x="118" y="317" text-anchor="middle" fill="#00C9A7" font-size="9" font-weight="700">+50 XP</text>
+  <text x="210" y="268" text-anchor="end" fill="#00C9A7" font-size="10">✓ Erreicht</text>
+
+  <!-- Achievement 2 – earned -->
+  <rect x="240" y="255" width="196" height="90" rx="10" fill="rgba(108,99,255,0.08)" stroke="rgba(108,99,255,0.35)" stroke-width="1.5"/>
+  <text x="270" y="285" font-size="28">🔥</text>
+  <text x="305" y="282" fill="#F0EFF9" font-size="13" font-weight="600">Streak-Starter</text>
+  <text x="305" y="297" fill="#9CA3AF" font-size="10">7 Tage am Stück aktiv</text>
+  <rect x="305" y="306" width="55" height="14" rx="3" fill="rgba(108,99,255,0.2)"/>
+  <text x="332" y="317" text-anchor="middle" fill="#8B83FF" font-size="9" font-weight="700">+100 XP</text>
+  <text x="420" y="268" text-anchor="end" fill="#00C9A7" font-size="10">✓ Erreicht</text>
+
+  <!-- Achievement 3 – earned -->
+  <rect x="450" y="255" width="196" height="90" rx="10" fill="rgba(255,184,76,0.06)" stroke="rgba(255,184,76,0.3)" stroke-width="1.5"/>
+  <text x="480" y="285" font-size="28">⚡</text>
+  <text x="515" y="282" fill="#F0EFF9" font-size="13" font-weight="600">Fokus-Meister</text>
+  <text x="515" y="297" fill="#9CA3AF" font-size="10">10 Fokus-Blöcke abgeschlossen</text>
+  <rect x="515" y="306" width="55" height="14" rx="3" fill="rgba(255,184,76,0.15)"/>
+  <text x="542" y="317" text-anchor="middle" fill="#FFB84C" font-size="9" font-weight="700">+150 XP</text>
+  <text x="630" y="268" text-anchor="end" fill="#00C9A7" font-size="10">✓ Erreicht</text>
+
+  <!-- Achievement 4 – locked -->
+  <rect x="660" y="255" width="210" height="90" rx="10" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+  <text x="685" y="285" font-size="28" opacity="0.4">🌟</text>
+  <text x="720" y="282" fill="#6B7280" font-size="13" font-weight="600">Legendär</text>
+  <text x="720" y="297" fill="#6B7280" font-size="10">100 Aufgaben · noch 15</text>
+  <rect x="720" y="306" width="60" height="14" rx="3" fill="rgba(108,99,255,0.08)"/>
+  <text x="750" y="317" text-anchor="middle" fill="#6B7280" font-size="9">+500 XP</text>
+  <!-- progress bar -->
+  <rect x="720" y="330" width="90" height="4" rx="2" fill="rgba(108,99,255,0.15)"/>
+  <rect x="720" y="330" width="76" height="4" rx="2" fill="rgba(108,99,255,0.4)"/>
+  <text x="815" y="336" fill="#6B7280" font-size="9">85 / 100</text>
+
+  <!-- Level progression row -->
+  <text x="30" y="374" fill="#9CA3AF" font-size="12" font-weight="700" letter-spacing="0.08em">LEVEL-VERLAUF</text>
+  <!-- Level steps -->
+  <!-- Each level orb -->
+  <g>
+    <circle cx="55"  cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="55"  y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">1</text>
+    <line x1="73" y1="415" x2="90" y2="415" stroke="rgba(0,201,167,0.4)" stroke-width="1.5"/>
+
+    <circle cx="108" cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="108" y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">2</text>
+    <line x1="126" y1="415" x2="143" y2="415" stroke="rgba(0,201,167,0.4)" stroke-width="1.5"/>
+
+    <circle cx="161" cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="161" y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">3</text>
+    <line x1="179" y1="415" x2="196" y2="415" stroke="rgba(0,201,167,0.4)" stroke-width="1.5"/>
+
+    <circle cx="214" cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="214" y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">4</text>
+    <line x1="232" y1="415" x2="249" y2="415" stroke="rgba(0,201,167,0.4)" stroke-width="1.5"/>
+
+    <circle cx="267" cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="267" y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">5</text>
+    <line x1="285" y1="415" x2="302" y2="415" stroke="rgba(0,201,167,0.4)" stroke-width="1.5"/>
+
+    <circle cx="320" cy="415" r="18" fill="rgba(0,201,167,0.2)"  stroke="#00C9A7" stroke-width="1.5"/>
+    <text x="320" y="420" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="700">6</text>
+    <line x1="338" y1="415" x2="355" y2="415" stroke="rgba(108,99,255,0.5)" stroke-width="1.5" stroke-dasharray="3,2"/>
+
+    <!-- Current level - highlighted -->
+    <circle cx="373" cy="415" r="22" fill="rgba(108,99,255,0.25)" stroke="#6C63FF" stroke-width="2.5"/>
+    <text x="373" y="421" text-anchor="middle" fill="#8B83FF" font-size="14" font-weight="700">7</text>
+    <text x="373" y="449" text-anchor="middle" fill="#6C63FF" font-size="9">Du bist hier</text>
+    <line x1="395" y1="415" x2="415" y2="415" stroke="rgba(108,99,255,0.2)" stroke-width="1.5" stroke-dasharray="3,2"/>
+
+    <circle cx="433" cy="415" r="18" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.2)" stroke-width="1"/>
+    <text x="433" y="420" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="700">8</text>
+    <line x1="451" y1="415" x2="468" y2="415" stroke="rgba(108,99,255,0.1)" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <circle cx="486" cy="415" r="18" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+    <text x="486" y="420" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="700">9</text>
+    <line x1="504" y1="415" x2="521" y2="415" stroke="rgba(108,99,255,0.1)" stroke-width="1" stroke-dasharray="3,2"/>
+
+    <circle cx="539" cy="415" r="18" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.1)" stroke-width="1"/>
+    <text x="539" y="420" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="700">10</text>
+    <line x1="557" y1="415" x2="574" y2="415" stroke="rgba(108,99,255,0.1)" stroke-width="1" stroke-dasharray="3,2"/>
+  </g>
+
+  <!-- Labels for some levels -->
+  <text x="55"  y="444" text-anchor="middle" fill="#6B7280" font-size="8">Newcomer</text>
+  <text x="539" y="444" text-anchor="middle" fill="#6B7280" font-size="8">Legendary</text>
+
+  <!-- Abuse protection note -->
+  <rect x="620" y="388" width="256" height="70" rx="10" fill="rgba(0,201,167,0.06)" stroke="rgba(0,201,167,0.25)" stroke-width="1"/>
+  <text x="748" y="408" text-anchor="middle" fill="#00C9A7" font-size="11" font-weight="600">🛡️ Strafschutz aktiv</text>
+  <text x="635" y="426" fill="#9CA3AF" font-size="10">Urlaub eingetragen:</text>
+  <text x="635" y="441" fill="#9CA3AF" font-size="10">Kein XP-Verlust durch</text>
+  <text x="635" y="456" fill="#9CA3AF" font-size="10">überfällige Aufgaben.</text>
+</svg>

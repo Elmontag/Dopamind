@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" font-family="system-ui, -apple-system, sans-serif" role="img" aria-labelledby="dashboard-title">
+  <title id="dashboard-title">Dopamind Dashboard – Tagesblöcke mit Morgen, Mittag, Abend. Nächster Schritt „Report vorbereiten" ist hervorgehoben.</title>
+  <defs>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#9B59B6"/>
+    </linearGradient>
+    <linearGradient id="xpGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#8B83FF"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1A2E"/>
+      <stop offset="100%" stop-color="#16213E"/>
+    </linearGradient>
+    <clipPath id="rounded">
+      <rect width="900" height="560" rx="12" ry="12"/>
+    </clipPath>
+  </defs>
+
+  <!-- Window frame -->
+  <rect width="900" height="560" rx="12" ry="12" fill="url(#bgGrad)"/>
+  <rect width="900" height="560" rx="12" ry="12" fill="none" stroke="rgba(108,99,255,0.25)" stroke-width="1.5"/>
+
+  <!-- Title bar -->
+  <rect width="900" height="44" rx="0" fill="#0D0D1A" clip-path="url(#rounded)"/>
+  <rect x="0" y="0" width="900" height="44" fill="rgba(22,33,62,0.95)"/>
+  <rect x="0" y="43" width="900" height="1" fill="rgba(108,99,255,0.2)"/>
+  <!-- Traffic lights -->
+  <circle cx="20" cy="22" r="6" fill="#FF6B6B" opacity="0.8"/>
+  <circle cx="38" cy="22" r="6" fill="#FFB84C" opacity="0.8"/>
+  <circle cx="56" cy="22" r="6" fill="#00C9A7" opacity="0.8"/>
+  <!-- App name -->
+  <text x="450" y="27" text-anchor="middle" fill="url(#accentGrad)" font-size="15" font-weight="700" letter-spacing="-0.3">Dopamind</text>
+  <!-- Date -->
+  <text x="720" y="27" text-anchor="middle" fill="#9CA3AF" font-size="12">Mittwoch, 5. März</text>
+  <!-- User avatar placeholder -->
+  <circle cx="870" cy="22" r="12" fill="rgba(108,99,255,0.3)" stroke="rgba(108,99,255,0.5)" stroke-width="1"/>
+  <text x="870" y="27" text-anchor="middle" fill="#8B83FF" font-size="11" font-weight="700">A</text>
+
+  <!-- XP Bar area -->
+  <rect x="0" y="44" width="900" height="36" fill="rgba(13,13,26,0.6)"/>
+  <!-- XP label -->
+  <text x="20" y="67" fill="#9CA3AF" font-size="11" font-weight="600">Level 7 · Focus Champion</text>
+  <!-- XP bar background -->
+  <rect x="160" y="57" width="220" height="8" rx="4" fill="rgba(108,99,255,0.15)"/>
+  <!-- XP bar fill (75%) -->
+  <rect x="160" y="57" width="165" height="8" rx="4" fill="url(#xpGrad)"/>
+  <!-- XP text -->
+  <text x="390" y="67" fill="#6B7280" font-size="10">2450 / 3000 XP</text>
+  <!-- Streak -->
+  <text x="460" y="67" fill="#FFB84C" font-size="12">🔥</text>
+  <text x="478" y="67" fill="#FFB84C" font-size="11" font-weight="700">12</text>
+  <text x="493" y="67" fill="#6B7280" font-size="11">Tage Streak</text>
+  <!-- Stats quick -->
+  <text x="650" y="67" fill="#00C9A7" font-size="11" font-weight="600">✓ 4 erledigt</text>
+  <text x="750" y="67" fill="#9CA3AF" font-size="11">6 offen</text>
+  <text x="820" y="67" fill="#6C63FF" font-size="11">90 min</text>
+  <rect x="0" y="79" width="900" height="1" fill="rgba(108,99,255,0.1)"/>
+
+  <!-- Sidebar -->
+  <rect x="0" y="80" width="68" height="480" fill="rgba(13,13,26,0.5)"/>
+  <rect x="67" y="80" width="1" height="480" fill="rgba(108,99,255,0.12)"/>
+  <!-- Sidebar icons -->
+  <rect x="15" y="100" width="38" height="38" rx="8" fill="rgba(108,99,255,0.25)" stroke="rgba(108,99,255,0.6)" stroke-width="1.5"/>
+  <text x="34" y="124" text-anchor="middle" font-size="18">🏠</text>
+  <text x="34" y="152" text-anchor="middle" fill="#6B7280" font-size="10">Home</text>
+
+  <text x="34" y="185" text-anchor="middle" font-size="18">✅</text>
+  <text x="34" y="200" text-anchor="middle" fill="#6B7280" font-size="10">Tasks</text>
+
+  <text x="34" y="230" text-anchor="middle" font-size="18">📅</text>
+  <text x="34" y="245" text-anchor="middle" fill="#6B7280" font-size="10">Kalender</text>
+
+  <text x="34" y="275" text-anchor="middle" font-size="18">📧</text>
+  <text x="34" y="290" text-anchor="middle" fill="#6B7280" font-size="10">Inbox</text>
+
+  <text x="34" y="320" text-anchor="middle" font-size="18">⏱️</text>
+  <text x="34" y="335" text-anchor="middle" fill="#6B7280" font-size="10">Zeit</text>
+
+  <text x="34" y="370" text-anchor="middle" font-size="18">🎮</text>
+  <text x="34" y="385" text-anchor="middle" fill="#6B7280" font-size="10">XP</text>
+
+  <!-- Main content area -->
+  <!-- Date header -->
+  <text x="90" y="113" fill="#F0EFF9" font-size="18" font-weight="700">Heute · Mittwoch, 5. März</text>
+  <text x="90" y="133" fill="#6B7280" font-size="12">Arbeitszeit 09:00 – 17:30 · Nächste Aufgabe in Block: Morgen</text>
+
+  <!-- ───────── MORGEN BLOCK ───────── -->
+  <rect x="85" y="148" width="790" height="116" rx="10" fill="rgba(22,33,62,0.7)" stroke="rgba(108,99,255,0.18)" stroke-width="1"/>
+  <!-- Block header -->
+  <text x="105" y="170" fill="#8B83FF" font-size="13" font-weight="700">🌅  Morgen</text>
+  <text x="105" y="185" fill="#6B7280" font-size="11">09:00 – 12:00</text>
+
+  <!-- NEXT STEP highlight card -->
+  <rect x="200" y="153" width="300" height="105" rx="8" fill="rgba(108,99,255,0.15)" stroke="#6C63FF" stroke-width="1.5"/>
+  <!-- Star badge -->
+  <rect x="204" y="157" width="82" height="18" rx="4" fill="#6C63FF"/>
+  <text x="245" y="170" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">⭐ Nächster Schritt</text>
+  <!-- Task title -->
+  <text x="215" y="193" fill="#F0EFF9" font-size="13" font-weight="600">Report vorbereiten</text>
+  <!-- Priority badge -->
+  <rect x="215" y="200" width="64" height="16" rx="4" fill="rgba(255,107,107,0.2)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/>
+  <text x="247" y="212" text-anchor="middle" fill="#FF6B6B" font-size="10" font-weight="600">Muss sein</text>
+  <!-- Time -->
+  <text x="290" y="212" fill="#6B7280" font-size="10">45 min</text>
+  <!-- Tags -->
+  <rect x="215" y="222" width="40" height="14" rx="3" fill="rgba(108,99,255,0.15)"/>
+  <text x="235" y="233" text-anchor="middle" fill="#8B83FF" font-size="9">Arbeit</text>
+  <!-- Sub progress -->
+  <text x="215" y="248" fill="#6B7280" font-size="10">0 / 3 Unteraufgaben</text>
+  <rect x="215" y="252" width="86" height="3" rx="1.5" fill="rgba(108,99,255,0.15)"/>
+
+  <!-- Second task in morning -->
+  <rect x="515" y="153" width="350" height="105" rx="8" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.12)" stroke-width="1"/>
+  <text x="530" y="175" fill="#9CA3AF" font-size="13" font-weight="500">E-Mails bearbeiten</text>
+  <rect x="530" y="182" width="52" height="16" rx="4" fill="rgba(255,184,76,0.2)" stroke="rgba(255,184,76,0.4)" stroke-width="1"/>
+  <text x="556" y="194" text-anchor="middle" fill="#FFB84C" font-size="10" font-weight="600">Wichtig</text>
+  <text x="594" y="194" fill="#6B7280" font-size="10">30 min</text>
+  <text x="530" y="215" fill="#6B7280" font-size="10">09:30 – 10:00</text>
+  <!-- Calendar sync indicator -->
+  <text x="530" y="240" fill="#6B7280" font-size="10">📅 Automatisch eingeplant</text>
+
+  <!-- ───────── MITTAG BLOCK ───────── -->
+  <rect x="85" y="274" width="790" height="106" rx="10" fill="rgba(22,33,62,0.7)" stroke="rgba(108,99,255,0.18)" stroke-width="1"/>
+  <text x="105" y="296" fill="#8B83FF" font-size="13" font-weight="700">☀️  Mittag</text>
+  <text x="105" y="311" fill="#6B7280" font-size="11">12:00 – 17:00</text>
+
+  <!-- Calendar event (blocked) -->
+  <rect x="200" y="279" width="235" height="96" rx="8" fill="rgba(0,201,167,0.08)" stroke="rgba(0,201,167,0.35)" stroke-width="1"/>
+  <text x="215" y="299" fill="#00C9A7" font-size="10" font-weight="600">📅 KALENDER-TERMIN</text>
+  <text x="215" y="316" fill="#F0EFF9" font-size="13" font-weight="600">Team-Meeting</text>
+  <text x="215" y="333" fill="#6B7280" font-size="10">14:00 – 15:00 · 60 min</text>
+  <text x="215" y="350" fill="#6B7280" font-size="10">Raum A3</text>
+  <text x="215" y="366" fill="#00C9A7" font-size="10">Keine Aufgaben eingeplant</text>
+
+  <!-- Task in afternoon -->
+  <rect x="450" y="279" width="415" height="96" rx="8" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.12)" stroke-width="1"/>
+  <text x="465" y="301" fill="#9CA3AF" font-size="13" font-weight="500">Projektplan aktualisieren</text>
+  <rect x="465" y="308" width="52" height="16" rx="4" fill="rgba(255,184,76,0.2)" stroke="rgba(255,184,76,0.4)" stroke-width="1"/>
+  <text x="491" y="320" text-anchor="middle" fill="#FFB84C" font-size="10" font-weight="600">Wichtig</text>
+  <text x="529" y="320" fill="#6B7280" font-size="10">30 min · 15:15 – 15:45</text>
+  <text x="465" y="360" fill="#6B7280" font-size="10">📅 Automatisch nach Meeting eingeplant</text>
+
+  <!-- ───────── ABEND BLOCK ───────── -->
+  <rect x="85" y="390" width="790" height="80" rx="10" fill="rgba(22,33,62,0.7)" stroke="rgba(108,99,255,0.18)" stroke-width="1"/>
+  <text x="105" y="412" fill="#8B83FF" font-size="13" font-weight="700">🌙  Abend</text>
+  <text x="105" y="427" fill="#6B7280" font-size="11">17:00 – 20:00</text>
+
+  <rect x="200" y="395" width="200" height="70" rx="8" fill="rgba(22,33,62,0.5)" stroke="rgba(108,99,255,0.12)" stroke-width="1"/>
+  <text x="215" y="415" fill="#9CA3AF" font-size="13" font-weight="500">Sport</text>
+  <rect x="215" y="422" width="62" height="16" rx="4" fill="rgba(156,163,175,0.15)" stroke="rgba(156,163,175,0.3)" stroke-width="1"/>
+  <text x="246" y="434" text-anchor="middle" fill="#9CA3AF" font-size="10" font-weight="600">Wäre schön</text>
+  <text x="290" y="434" fill="#6B7280" font-size="10">60 min</text>
+  <text x="215" y="456" fill="#6B7280" font-size="10">Energie: niedrig ⚡</text>
+
+  <!-- Quick Add Button -->
+  <rect x="85" y="483" width="790" height="44" rx="10" fill="rgba(108,99,255,0.08)" stroke="rgba(108,99,255,0.2)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="450" y="511" text-anchor="middle" fill="#6B7280" font-size="13">+ Aufgabe schnell hinzufügen...</text>
+</svg>
