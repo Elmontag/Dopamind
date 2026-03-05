@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { X, ChevronDown, ChevronRight, AlertCircle, Folder, Tag } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -13,21 +14,6 @@ const ENERGY_CONFIG = {
 };
 const WHEN_OPTIONS = ["today", "tomorrow", "dayAfter", "nextWeek", "pickDate"];
 const TIME_OF_DAY_OPTIONS = ["morning", "afternoon", "evening", "exact"];
-const TAG_COLORS = [
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-];
-
-function getTagColor(tag) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
-
 function sanitizeTag(input) {
   return input.trim().replace(/,/g, "");
 }
@@ -210,18 +196,23 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                 ) : (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                    {categories.map((cat) => (
-                      <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
-                        {cat.name || cat.emoji}
-                      </button>
-                    ))}
+                    {categories.map((cat) => {
+                      const fmck = resolveCatColorKey(cat.color);
+                      const fmlc = LABEL_COLORS[fmck] || LABEL_COLORS.gray;
+                      return (
+                        <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? fmlc.bg + " " + fmlc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${fmlc.dot}`} />
+                          {cat.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {/* Tags */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                   {tags.map((tag) => (
-                    <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>
+                    <span key={tag} className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} flex items-center gap-1`}>
                       {tag}
                       <button type="button" onClick={() => setTags(tags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button>
                     </span>

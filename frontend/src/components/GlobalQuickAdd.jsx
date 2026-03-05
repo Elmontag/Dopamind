@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useApp } from "../context/AppContext";
+import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
 import { useI18n } from "../i18n/I18nContext";
 import { useQuickAdd } from "../context/QuickAddContext";
@@ -21,19 +22,6 @@ const SIZE_COLORS = {
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   long: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
 };
-const TAG_COLORS = [
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-];
-function getTagColor(tag) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
 function sanitizeTag(input) {
   return input.trim().replace(/,/g, "");
 }
@@ -603,20 +591,25 @@ export default function GlobalQuickAdd() {
                                 ) : (
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                                    {categories.map((cat) => (
-                                      <button
-                                        key={cat.id}
-                                        type="button"
-                                        onClick={() => setDetailCategory(detailCategory === cat.id ? "" : cat.id)}
-                                        className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
-                                          detailCategory === cat.id
-                                            ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20"
-                                            : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
-                                        }`}
-                                      >
-                                        {cat.name || cat.emoji}
-                                      </button>
-                                    ))}
+                                    {categories.map((cat) => {
+                                      const qck = resolveCatColorKey(cat.color);
+                                      const qlc = LABEL_COLORS[qck] || LABEL_COLORS.gray;
+                                      return (
+                                        <button
+                                          key={cat.id}
+                                          type="button"
+                                          onClick={() => setDetailCategory(detailCategory === cat.id ? "" : cat.id)}
+                                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${
+                                            detailCategory === cat.id
+                                              ? qlc.bg + " " + qlc.text + " ring-1 ring-current/20"
+                                              : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"
+                                          }`}
+                                        >
+                                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${qlc.dot}`} />
+                                          {cat.name}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
 
@@ -624,7 +617,7 @@ export default function GlobalQuickAdd() {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                                   {detailTags.map((tag) => (
-                                    <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>
+                                    <span key={tag} className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} flex items-center gap-1`}>
                                       {tag}
                                       <button type="button" onClick={() => setDetailTags(detailTags.filter((x) => x !== tag))}>
                                         <X className="w-2.5 h-2.5" />
