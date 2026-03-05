@@ -24,7 +24,7 @@ export default function MobileNav() {
   });
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-t border-gray-200/50 dark:border-white/5 safe-area-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-t border-gray-200/50 dark:border-white/5 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-1">
         {visibleNavItems.map(({ to, icon: Icon, key }) => (
           <NavLink

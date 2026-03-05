@@ -66,3 +66,51 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* Touch drag visual feedback */
+
+/* Original element while dragging — dimmed placeholder showing the item's origin */
+.touch-dragging {
+  opacity: 0.35;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+
+/* Floating clone that follows the finger during a touch drag */
+#touch-drag-ghost {
+  pointer-events: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Drop-zone highlight — applied programmatically while hovering.
+   Uses the app's accent color (#6C63FF from tailwind.config.js). */
+.touch-drop-active {
+  outline: 2px dashed rgba(108, 99, 255, 0.55) !important;
+  outline-offset: 2px;
+  background-color: rgba(108, 99, 255, 0.07) !important;
+}
+
+/* Prevent text selection during drag on touch */
+.touch-drag-active * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Better touch targets */
+@media (pointer: coarse) {
+  .touch-target-lg {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Landscape phone detection - hide sidebar for short viewports */
+@media (max-height: 500px) and (orientation: landscape) {
+  .landscape-hide {
+    display: none !important;
+  }
+  .landscape-show {
+    display: flex !important;
+  }
+}

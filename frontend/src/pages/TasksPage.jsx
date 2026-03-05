@@ -10,6 +10,7 @@ import CountdownStart from "../components/CountdownStart";
 import TaskFormModal from "../components/TaskFormModal";
 import TagInput from "../components/TagInput";
 import { getCatDisplayName } from "../utils/catUtils";
+import { useTouchDragDrop } from "../hooks/useTouchDragDrop";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -131,7 +132,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
   );
 }
 
-function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings, allTags }) {
+function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings, allTags, touchDragProps }) {
   const { dispatch } = useApp();
   const { untagMail } = useMail();
   const { openQuickAdd } = useQuickAdd();
@@ -327,6 +328,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
     <div
       draggable={!editing}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", task.id); }}
+      {...(editing ? {} : (touchDragProps || {}))}
       className={`group rounded-xl transition-all duration-200 border-l-[3px] ${catLabelColor ? catLabelColor.leftBorder : "border-l-transparent"} ${task.completed ? "opacity-60 scale-[0.98]" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}
     >
       <div className="flex items-center gap-3 p-3">
@@ -578,6 +580,15 @@ export default function TasksPage() {
     }
   };
 
+  // Touch drag-and-drop support for category assignment
+  const { getTouchDragProps, getTouchDropProps } = useTouchDragDrop({
+    onDrop: (taskId, catId) => {
+      if (taskId) {
+        dispatch({ type: "UPDATE_TASK", payload: { id: taskId, category: catId === "_none" ? null : catId } });
+      }
+    },
+  });
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header bar */}
@@ -633,6 +644,7 @@ export default function TasksPage() {
                 onDragOver={(e) => handleCatDragOver(e, "_none")}
                 onDragLeave={handleCatDragLeave}
                 onDrop={(e) => handleCatDrop(e, "_none")}
+                {...getTouchDropProps("_none")}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
                   !filterCategory ? "bg-accent/10 text-accent dark:bg-accent/20 font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
                 } ${dragOverCatId === "_none" ? "ring-2 ring-accent/40" : ""}`}
@@ -680,6 +692,7 @@ export default function TasksPage() {
                         onDragOver={(e) => handleCatDragOver(e, cat.id)}
                         onDragLeave={handleCatDragLeave}
                         onDrop={(e) => handleCatDrop(e, cat.id)}
+                        {...getTouchDropProps(cat.id)}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all group/cat ${
                           filterCategory === cat.id ? blc.bg + " " + blc.text + " font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
                         } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
@@ -764,6 +777,7 @@ export default function TasksPage() {
                   onDragOver={(e) => handleCatDragOver(e, cat.id)}
                   onDragLeave={handleCatDragLeave}
                   onDrop={(e) => handleCatDrop(e, cat.id)}
+                  {...getTouchDropProps(cat.id)}
                   className={`badge text-xs ${mlc.bg} ${mlc.text} transition-opacity ${filterCategory === cat.id ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"} ${dragOverCatId === cat.id ? "ring-2 ring-accent/40" : ""}`}
                 >
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${mlc.dot} mr-1`} />
@@ -855,6 +869,7 @@ export default function TasksPage() {
                   countdownStartEnabled={countdownStartEnabled}
                   sizeMappings={settings.estimation?.sizeMappings}
                   allTags={allTags}
+                  touchDragProps={getTouchDragProps(task.id)}
                 />
               ))}
             </div>

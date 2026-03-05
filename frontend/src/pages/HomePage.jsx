@@ -8,6 +8,7 @@ import { useSettings } from "../context/SettingsContext";
 import { useQuickAdd } from "../context/QuickAddContext";
 import CountdownStart from "../components/CountdownStart";
 import TaskFormModal from "../components/TaskFormModal";
+import { useTouchDragDrop } from "../hooks/useTouchDragDrop";
 import {
   CheckCircle, Calendar, Plus,
   LogIn, LogOut, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical, CalendarPlus, List,
@@ -101,6 +102,16 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   const [dragTaskId, setDragTaskId] = useState(null);
   const [dropTargetBlock, setDropTargetBlock] = useState(null);
   const workStart = parseTimeToMin(settings.workSchedule?.start || "08:00");
+
+  // Touch drag-and-drop support
+  const { getTouchDragProps, getTouchDropProps } = useTouchDragDrop({
+    onDrop: (dragData, dropTargetId) => {
+      if (!dragData || !onMoveTaskBlock) return;
+      const check = checkDropAllowed(dragData.itemId, dragData.itemType, dragData.taskId, dropTargetId);
+      if (!check.ok) return;
+      onMoveTaskBlock(dragData.itemId, dragData.itemType, dragData.taskId, dropTargetId);
+    },
+  });
   const workEnd = parseTimeToMin(settings.workSchedule?.end || "18:00");
   const hideParent = settings.timeline?.hideParentWithSubtasks === true;
 
@@ -344,6 +355,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
             onDragOver={(e) => handleDragOver(e, block.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, block.id)}
+            {...getTouchDropProps(block.id)}
           >
             <div className="flex items-center justify-between mb-2">
               <h4 className={`text-xs font-bold uppercase tracking-wider ${BLOCK_HEADER[block.id]}`}>
@@ -370,7 +382,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
             <div className="space-y-1">
               {blockItems.map((item) => item.type === "subtask" ? (
                 /* Standalone subtask (hideParent ON) — shows parent name as context */
-                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "subtask", item.taskId)} onDragEnd={handleDragEnd} className={`group/item flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${dragItemId === item.id ? "opacity-40" : ""}`}>
+                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "subtask", item.taskId)} onDragEnd={handleDragEnd} {...getTouchDragProps({ itemId: item.id, itemType: "subtask", taskId: item.taskId })} className={`group/item flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${dragItemId === item.id ? "opacity-40" : ""}`}>
                   <button onClick={() => onToggleSubtask(item.taskId, item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-muted-light dark:text-muted-dark truncate">{item.parentText}</p>
@@ -396,7 +408,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                 </div>
               ) : (
                 /* Parent task (hideParent OFF or no subtasks) — prominent ring when subtasks exist */
-                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "task", item.taskId)} onDragEnd={handleDragEnd} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${item.subtasks?.length > 0 ? "ring-1 ring-accent/10" : ""} ${dragItemId === item.id ? "opacity-40" : ""}`}>
+                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "task", item.taskId)} onDragEnd={handleDragEnd} {...getTouchDragProps({ itemId: item.id, itemType: "task", taskId: item.taskId })} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${item.subtasks?.length > 0 ? "ring-1 ring-accent/10" : ""} ${dragItemId === item.id ? "opacity-40" : ""}`}>
                   <button onClick={() => onCompleteTask(item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium truncate">{item.text}</p>
@@ -2214,22 +2226,24 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
-            {/* Navigation */}
-            <button
-              onClick={prevDay}
-              className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              aria-label={t("home.previousDay")}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-medium min-w-[90px] text-center">{formatViewDate()}</span>
-            <button
-              onClick={nextDay}
-              className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-              aria-label={t("home.nextDay")}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {/* Navigation — keep all three together to prevent flex-wrap splitting */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={prevDay}
+                className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                aria-label={t("home.previousDay")}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium min-w-[90px] text-center">{formatViewDate()}</span>
+              <button
+                onClick={nextDay}
+                className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                aria-label={t("home.nextDay")}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             {overdueTasks.length > 0 && isToday && (planView === "block" || planView === "timeline") && (
               <span className="badge bg-danger/10 text-danger text-[10px] flex items-center gap-1 ml-1">
                 <AlertCircle className="w-3 h-3" /> {overdueTasks.length} {t("tasks.overdue")}

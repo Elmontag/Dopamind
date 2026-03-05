@@ -51,7 +51,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`hidden md:flex flex-col h-screen sticky top-0 z-40 transition-all duration-200 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-r border-gray-200/50 dark:border-white/5 ${
+      className={`hidden lg:flex flex-col h-full overflow-y-auto z-40 transition-all duration-200 bg-card-light/90 dark:bg-card-dark/90 backdrop-blur-md border-r border-gray-200/50 dark:border-white/5 ${
         collapsed ? "w-16" : "w-56"
       }`}
     >
@@ -66,7 +66,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 py-3 px-2 space-y-1">
+      <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
         {visibleNavItems.map(({ to, icon: Icon, key }) => (
           <NavLink
             key={to}

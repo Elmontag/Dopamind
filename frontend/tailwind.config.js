@@ -4,6 +4,10 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      screens: {
+        'touch': { 'raw': '(pointer: coarse)' },
+        'landscape-phone': { 'raw': '(max-height: 500px) and (orientation: landscape)' },
+      },
       colors: {
         // Calm, focus-optimized palette
         surface: {
