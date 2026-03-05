@@ -28,7 +28,7 @@ export default function MonthPlanView({ t, tasks, getEventsForDate, monthStart, 
           <div key={d} className="text-center text-[9px] font-medium text-muted-light dark:text-muted-dark uppercase py-1">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((date, idx) => {
           if (!date) return <div key={`empty-${idx}`} />;
           const isToday = date === todayStr;
@@ -50,7 +50,7 @@ export default function MonthPlanView({ t, tasks, getEventsForDate, monthStart, 
             <button
               key={date}
               onClick={() => onSelectDay(date)}
-              className={`flex flex-col items-center p-1 rounded-lg text-center min-h-[48px] transition-all border ${
+              className={`flex flex-col items-center p-1 rounded-lg text-center min-h-[44px] transition-all border ${
                 isToday
                   ? "border-accent bg-accent/10"
                   : isPast

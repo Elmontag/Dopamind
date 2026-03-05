@@ -32,10 +32,10 @@ export default function Header() {
   }, [showEnergyPicker]);
 
   return (
-    <header className="sticky top-0 z-30 md:relative bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
+    <header className="sticky top-0 z-30 lg:relative bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
       <div className="px-4 py-3 flex items-center justify-between gap-4">
         {/* Mobile: Logo */}
-        <div className="flex items-center gap-3 md:hidden">
+        <div className="flex items-center gap-3 lg:hidden">
           <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
             <span className="text-white font-bold text-sm">D</span>
           </div>
@@ -46,7 +46,7 @@ export default function Header() {
           {features.gamificationEnabled !== false && (
             <Link
               to="/achievements"
-              className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-muted-light dark:text-muted-dark"
+              className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-muted-light dark:text-muted-dark"
               aria-label="Achievements"
             >
               <Trophy className="w-4 h-4" />
@@ -54,7 +54,7 @@ export default function Header() {
           )}
           <Link
             to="/settings"
-            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-muted-light dark:text-muted-dark"
+            className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-muted-light dark:text-muted-dark"
             aria-label="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function Header() {
 
       {/* Mobile: XP / Level (only on mobile, not on desktop where Sidebar shows it) */}
       {features.gamificationEnabled !== false && (
-        <div className="md:hidden px-4 pb-2">
+        <div className="lg:hidden px-4 pb-2">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] text-muted-light dark:text-muted-dark">Lv. {state.level}</span>
             <span className="text-[10px] text-muted-light dark:text-muted-dark">{levelTitle}</span>

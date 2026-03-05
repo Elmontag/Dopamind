@@ -98,7 +98,7 @@ function AppLayout() {
                     <Sidebar />
                     <div className="flex-1 flex flex-col min-w-0">
                       <Header />
-                      <main className="flex-1 px-4 py-6 pb-24 md:pb-6 max-w-7xl w-full mx-auto">
+                      <main className="flex-1 px-4 py-6 pb-24 lg:pb-6 max-w-7xl w-full mx-auto">
                         <Routes>
                           <Route path="/" element={<HomePage />} />
                           <Route path="/tasks" element={<TasksPage />} />
@@ -112,7 +112,7 @@ function AppLayout() {
                           <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
                         </Routes>
                       </main>
-                      <footer className="hidden md:block text-center py-4 text-[10px] text-muted-light dark:text-muted-dark">
+                      <footer className="hidden lg:block text-center py-4 text-[10px] text-muted-light dark:text-muted-dark">
                         Dopamind &middot; For the ADHD Community
                       </footer>
                     </div>

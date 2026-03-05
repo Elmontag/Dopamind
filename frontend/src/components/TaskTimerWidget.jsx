@@ -62,7 +62,7 @@ export default function TaskTimerWidget() {
   const barColor = pct >= 1.0 ? "bg-danger" : pct >= 0.8 ? "bg-warn" : "bg-accent";
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 md:bottom-6 md:right-6 animate-fade-in">
+    <div className="fixed bottom-20 right-4 z-50 lg:bottom-6 lg:right-6 animate-fade-in">
       <div className="glass-card p-3 shadow-lg border border-accent/20 min-w-[220px]">
         {/* Warning banners */}
         {showWarning100 && (

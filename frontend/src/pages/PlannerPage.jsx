@@ -166,11 +166,11 @@ export default function PlannerPage() {
     <div className="space-y-5 animate-fade-in">
       {/* Header + view switcher */}
       <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
           <div>
             <h2 className="text-base font-bold">{t("nav.planner")}</h2>
           </div>
-          <div className="flex items-center gap-1 flex-wrap justify-end">
+          <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 flex-wrap">
             {/* View switcher */}
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
               {["week", "month"].map((v) => (
@@ -188,6 +188,7 @@ export default function PlannerPage() {
               ))}
             </div>
             {/* Period navigation */}
+            <div className="flex items-center gap-1">
             <button
               onClick={prevPeriod}
               className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
@@ -195,7 +196,7 @@ export default function PlannerPage() {
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm font-medium min-w-[120px] text-center">{formatPeriodLabel()}</span>
+            <span className="text-sm font-medium min-w-[100px] text-center">{formatPeriodLabel()}</span>
             <button
               onClick={nextPeriod}
               className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
@@ -203,6 +204,7 @@ export default function PlannerPage() {
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+            </div>
           </div>
         </div>
 
@@ -327,13 +329,13 @@ export default function PlannerPage() {
                   </div>
                   <button
                     onClick={() => handleEditEvent(event)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-accent/50 hover:text-accent transition-all"
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-accent/50 hover:text-accent transition-all"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteEvent(event.id)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-accent/50 hover:text-danger transition-all"
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-accent/50 hover:text-danger transition-all"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -362,13 +364,13 @@ export default function PlannerPage() {
                   </div>
                   <button
                     onClick={() => handleEditEvent(event)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-muted-light hover:text-accent transition-all"
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-muted-light hover:text-accent transition-all"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteEvent(event.id)}
-                    className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-muted-light hover:text-danger transition-all"
+                    className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-muted-light hover:text-danger transition-all"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
