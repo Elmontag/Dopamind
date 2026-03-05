@@ -73,7 +73,6 @@
     "editCategory": "Bearbeiten",
     "deleteCategory": "Löschen",
     "categoryName": "Name",
-    "categoryEmoji": "Emoji",
     "categoryTasks": "Aufgaben",
     "addTaskExpand": "Aufgabe anlegen ▸",
     "addTaskCollapse": "▾ Einklappen",
@@ -127,7 +126,16 @@
       "long": "Lang"
     },
     "sizeCustom": "Genauer angeben",
-    "sizeUsePreset": "Vorgabe verwenden"
+    "sizeUsePreset": "Vorgabe verwenden",
+    "labels": "Labels",
+    "areas": "Bereiche",
+    "tags": "Tags",
+    "addLabel": "Neues Label",
+    "labelType": {
+      "area": "Bereich",
+      "tag": "Tag"
+    },
+    "pickColor": "Farbe"
   },
   "focus": {
     "title": "Fokus-Block",
@@ -703,7 +711,9 @@
     "hours": "h",
     "today": "Heute",
     "yesterday": "Gestern",
-    "tomorrow": "Morgen"
+    "tomorrow": "Morgen",
+    "expand": "Erweitern",
+    "collapse": "Einklappen"
   },
   "auth": {
     "login": "Anmelden",

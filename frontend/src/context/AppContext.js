@@ -63,15 +63,50 @@ export const ACHIEVEMENTS = [
   { id: "daily-champion", size: "large",  xp: 500 },
 ];
 
+export const LABEL_COLORS = {
+  blue:   { dot: "bg-blue-500",   bg: "bg-blue-100 dark:bg-blue-900/30",   text: "text-blue-700 dark:text-blue-300",   border: "border-blue-400",   leftBorder: "border-l-blue-500"   },
+  purple: { dot: "bg-purple-500", bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", border: "border-purple-400", leftBorder: "border-l-purple-500" },
+  green:  { dot: "bg-green-500",  bg: "bg-green-100 dark:bg-green-900/30",  text: "text-green-700 dark:text-green-300",  border: "border-green-400",  leftBorder: "border-l-green-500"  },
+  yellow: { dot: "bg-yellow-500", bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-300", border: "border-yellow-400", leftBorder: "border-l-yellow-500" },
+  indigo: { dot: "bg-indigo-500", bg: "bg-indigo-100 dark:bg-indigo-900/30", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-400", leftBorder: "border-l-indigo-500" },
+  orange: { dot: "bg-orange-500", bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-400", leftBorder: "border-l-orange-500" },
+  teal:   { dot: "bg-teal-500",   bg: "bg-teal-100 dark:bg-teal-900/30",   text: "text-teal-700 dark:text-teal-300",   border: "border-teal-400",   leftBorder: "border-l-teal-500"   },
+  pink:   { dot: "bg-pink-500",   bg: "bg-pink-100 dark:bg-pink-900/30",   text: "text-pink-700 dark:text-pink-300",   border: "border-pink-400",   leftBorder: "border-l-pink-500"   },
+  red:    { dot: "bg-red-500",    bg: "bg-red-100 dark:bg-red-900/30",    text: "text-red-700 dark:text-red-300",    border: "border-red-400",    leftBorder: "border-l-red-500"    },
+  gray:   { dot: "bg-gray-500",   bg: "bg-gray-100 dark:bg-gray-900/30",   text: "text-gray-700 dark:text-gray-300",   border: "border-gray-400",   leftBorder: "border-l-gray-400"   },
+};
+
+// Maps old full-class color strings to palette keys for backward compat
+const OLD_COLOR_TO_KEY = {
+  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300": "blue",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300": "purple",
+  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300": "green",
+  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300": "yellow",
+  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300": "indigo",
+  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300": "orange",
+  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300": "teal",
+  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300": "pink",
+  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300": "red",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300": "gray",
+  "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300": "gray",
+};
+
+/** Converts a color value (old full-class string or new palette key) to a palette key. */
+export function resolveCatColorKey(color) {
+  if (!color) return "gray";
+  if (LABEL_COLORS[color]) return color;
+  return OLD_COLOR_TO_KEY[color] || "gray";
+}
+
 export const DEFAULT_CATEGORIES = [
-  { id: "work",     name: "work",     emoji: "💼", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-  { id: "personal", name: "personal", emoji: "👤", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
-  { id: "health",   name: "health",   emoji: "💪", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
-  { id: "finance",  name: "finance",  emoji: "💰", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
-  { id: "learning", name: "learning", emoji: "📚", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
-  { id: "home",     name: "home",     emoji: "🏠", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
-  { id: "errand",   name: "errand",   emoji: "🏃", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300" },
-  { id: "creative", name: "creative", emoji: "🎨", color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
+  { id: "work",     name: "work",     type: "area", color: "blue"   },
+  { id: "personal", name: "personal", type: "area", color: "purple" },
+  { id: "health",   name: "health",   type: "area", color: "green"  },
+  { id: "finance",  name: "finance",  type: "area", color: "yellow" },
+  { id: "learning", name: "learning", type: "area", color: "indigo" },
+  { id: "home",     name: "home",     type: "area", color: "orange" },
+  { id: "errand",   name: "errand",   type: "area", color: "teal"   },
+  { id: "creative", name: "creative", type: "area", color: "pink"   },
 ];
 
 // Compute calibrated size mappings from timeLog data (min 5 data points per category)
@@ -907,25 +942,32 @@ function reducer(state, action) {
       };
     }
 
-    case "ADD_CATEGORY": {
+    case "ADD_CATEGORY":
+    case "ADD_LABEL": {
       const cat = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+        id: action.payload.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 4)),
         name: action.payload.name,
-        emoji: action.payload.emoji || "📁",
-        color: action.payload.color || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+        type: action.payload.type || "area",
+        color: resolveCatColorKey(action.payload.color) || "gray",
       };
       return { ...state, categories: [...(state.categories || []), cat] };
     }
 
     case "UPDATE_CATEGORY":
+    case "UPDATE_LABEL": {
+      const updates = { ...action.payload };
+      if (updates.color) updates.color = resolveCatColorKey(updates.color);
+      delete updates.emoji;
       return {
         ...state,
         categories: (state.categories || []).map((c) =>
-          c.id === action.payload.id ? { ...c, ...action.payload } : c
+          c.id === updates.id ? { ...c, ...updates } : c
         ),
       };
+    }
 
     case "DELETE_CATEGORY":
+    case "DELETE_LABEL":
       return {
         ...state,
         categories: (state.categories || []).filter((c) => c.id !== action.payload),
@@ -985,7 +1027,8 @@ export function AppProvider({ children }) {
       apiFetch("/tasks").catch(() => null),
       apiFetch("/stats").catch(() => null),
       apiFetch("/achievements").catch(() => null),
-    ]).then(([tasksRes, statsRes, achievementsRes]) => {
+      apiFetch("/categories").catch(() => null),
+    ]).then(([tasksRes, statsRes, achievementsRes, categoriesRes]) => {
       // Use the new granular API if it responded
       if (Array.isArray(tasksRes)) {
         const loadPayload = {};
@@ -1048,6 +1091,24 @@ export function AppProvider({ children }) {
           loadPayload.unlockedAchievements = achievementsRes.map((a) => a.id);
           // Track already synced achievements
           achievementsRes.forEach((a) => syncedAchievements.current.add(a.id));
+        }
+
+        // Categories: use backend data if available; otherwise migrate from localStorage to backend
+        if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
+          loadPayload.categories = categoriesRes;
+        } else {
+          // Backend has no categories yet – keep current (localStorage) categories and save them
+          const localCategories = state.categories && state.categories.length > 0
+            ? state.categories
+            : DEFAULT_CATEGORIES;
+          loadPayload.categories = localCategories;
+          // Migrate to backend so they persist from now on
+          localCategories.forEach((cat, idx) => {
+            apiFetch("/categories", {
+              method: "POST",
+              body: JSON.stringify({ id: cat.id, name: cat.name, type: cat.type || "area", color: cat.color || "gray", sortOrder: idx }),
+            }).catch(() => {});
+          });
         }
 
         dispatch({ type: "LOAD_STATE", payload: loadPayload });
@@ -1248,11 +1309,52 @@ export function AppProvider({ children }) {
         }
         return;
       }
+      case "ADD_CATEGORY":
+      case "ADD_LABEL": {
+        // Pre-generate ID so reducer and API use the same one
+        const catId = Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+        const enhancedAction = { ...action, payload: { ...action.payload, id: catId } };
+        dispatch(enhancedAction);
+        if (token) {
+          const { name, type, color } = action.payload;
+          apiFetch("/categories", {
+            method: "POST",
+            body: JSON.stringify({ id: catId, name, type: type || "area", color: color || "gray", sortOrder: state.categories.length }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "UPDATE_CATEGORY":
+      case "UPDATE_LABEL": {
+        dispatch(action);
+        if (token) {
+          const { id: ucId, name, type, color } = action.payload;
+          const patch = {};
+          if (name !== undefined) patch.name = name;
+          if (type !== undefined) patch.type = type;
+          if (color !== undefined) patch.color = color;
+          if (Object.keys(patch).length > 0) {
+            apiFetch(`/categories/${ucId}`, {
+              method: "PUT",
+              body: JSON.stringify(patch),
+            }).catch(() => {});
+          }
+        }
+        return;
+      }
+      case "DELETE_CATEGORY":
+      case "DELETE_LABEL": {
+        dispatch(action);
+        if (token) {
+          apiFetch(`/categories/${action.payload}`, { method: "DELETE" }).catch(() => {});
+        }
+        return;
+      }
       default:
         dispatch(action);
         break;
     }
-  }, [state.tasks]); // eslint-disable-line
+  }, [state.tasks, state.categories]); // eslint-disable-line
 
   // Sync stats after any state change that might affect them
   useEffect(() => {

@@ -2,11 +2,14 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
+import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { useMail } from "../context/MailContext";
 import { useSettings } from "../context/SettingsContext";
 import { useQuickAdd } from "../context/QuickAddContext";
 import CountdownStart from "../components/CountdownStart";
 import TaskFormModal from "../components/TaskFormModal";
+import TagInput from "../components/TagInput";
+import { getCatDisplayName } from "../utils/catUtils";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -23,43 +26,13 @@ const ENERGY_CONFIG = {
 
 const TIME_OF_DAY_OPTIONS = ["morning", "afternoon", "evening", "exact"];
 
-const CATEGORY_COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
-  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
-  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
-];
-
-const TAG_COLORS = [
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-];
-
-function getTagColor(tag) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
-
-function sanitizeTag(input) {
-  return input.trim().replace(/,/g, "");
-}
+const LABEL_COLOR_KEYS = Object.keys(LABEL_COLORS);
 
 function isTaskOverdue(task) {
   return !!(task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date());
 }
 
-function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings }) {
+function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings, onTagClick, allTags }) {
   const { dispatch } = useApp();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -106,40 +79,10 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           <Trash2 className="w-3 h-3" />
         </button>
       </div>
-      {/* Badges row */}
+      {/* Badges row — priority dot, deadline, tags only */}
       <div className="flex items-center gap-1.5 mt-0.5 ml-6 flex-wrap">
         {priCfg && (
-          <span className={`badge text-[9px] ${priCfg.color}`}>
-            <span className={`w-1 h-1 rounded-full ${priCfg.dot} mr-0.5`} />
-            {t(`tasks.priority.${subtask.priority}`)}
-          </span>
-        )}
-        {subtask.energyCost && (
-          <span className={`badge text-[9px] ${ENERGY_CONFIG[subtask.energyCost]?.color || "bg-gray-100 text-gray-700"}`}>
-            {t(`tasks.energy.${subtask.energyCost}`)}
-          </span>
-        )}
-        {subtask.estimatedMinutes > 0 && (
-          <span className="text-[9px] text-muted-light dark:text-muted-dark font-mono">
-            ~{subtask.estimatedMinutes}{t("common.min")}
-          </span>
-        )}
-        {subtask.timeOfDay && subtask.timeOfDay !== "exact" && (
-          <span className="badge text-[9px] bg-accent/10 text-accent">
-            {t(`tasks.timeOfDayOptions.${subtask.timeOfDay}`)}
-          </span>
-        )}
-        {subtask.scheduledTime && (
-          <span className="badge text-[9px] bg-accent/10 text-accent flex items-center gap-0.5">
-            <Clock className="w-2.5 h-2.5" />
-            {subtask.scheduledTime}
-          </span>
-        )}
-        {subtask.scheduledDate && (
-          <span className="badge text-[9px] bg-accent/10 text-accent flex items-center gap-0.5">
-            <CalendarDays className="w-2.5 h-2.5" />
-            {new Date(subtask.scheduledDate + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
-          </span>
+          <span className={`w-1.5 h-1.5 rounded-full ${priCfg.dot} flex-shrink-0`} role="img" aria-label={subtask.priority} />
         )}
         {subtask.deadline && (
           <span className={`badge text-[9px] flex items-center gap-0.5 ${isOverdue ? "bg-danger/10 text-danger" : "bg-gray-100 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}>
@@ -149,7 +92,17 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           </span>
         )}
         {(subtask.tags || []).map((tag) => (
-          <span key={tag} className={`badge text-[9px] ${getTagColor(tag)}`}>{tag}</span>
+          onTagClick ? (
+            <button
+              key={tag}
+              onClick={() => onTagClick(tag)}
+              className={`badge text-[9px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} cursor-pointer hover:opacity-80 transition-opacity`}
+            >
+              {tag}
+            </button>
+          ) : (
+            <span key={tag} className={`badge text-[9px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text}`}>{tag}</span>
+          )
         ))}
       </div>
       {showEditModal && (
@@ -159,6 +112,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           initialValues={subtask}
           inheritedCategory={task?.category}
           categories={categories}
+          allTags={allTags}
           sizeMappings={sizeMappings}
           onSubmit={handleEditSubmit}
           onClose={() => setShowEditModal(false)}
@@ -177,7 +131,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
   );
 }
 
-function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings }) {
+function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings, allTags }) {
   const { dispatch } = useApp();
   const { untagMail } = useMail();
   const { openQuickAdd } = useQuickAdd();
@@ -233,15 +187,6 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
       },
     });
     setEditing(false);
-  };
-
-  const handleEditTagKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && editTagInput.trim()) {
-      e.preventDefault();
-      const tag = sanitizeTag(editTagInput);
-      if (tag && !editTags.includes(tag)) setEditTags([...editTags, tag]);
-      setEditTagInput("");
-    }
   };
 
   if (editing) {
@@ -336,18 +281,31 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                     <button type="button" onClick={() => setEditCategory("")} className={`px-2.5 py-1 rounded-lg text-xs transition-all ${!editCategory ? "bg-gray-200 dark:bg-white/10 ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>{t("tasks.noCategory")}</button>
-                    {categories.map((cat) => (
-                      <button key={cat.id} type="button" onClick={() => setEditCategory(cat.id)} className={`px-2.5 py-1 rounded-lg text-xs transition-all ${editCategory === cat.id ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
-                        {cat.name || cat.emoji}
-                      </button>
-                    ))}
+                    {categories.map((cat) => {
+                      const ck = resolveCatColorKey(cat.color);
+                      const lc = LABEL_COLORS[ck] || LABEL_COLORS.gray;
+                      return (
+                        <button key={cat.id} type="button" onClick={() => setEditCategory(cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${editCategory === cat.id ? lc.bg + " " + lc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lc.dot}`} />
+                          {getCatDisplayName(cat, t)}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                     {editTags.map((tag) => (
-                      <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>{tag}<button type="button" onClick={() => setEditTags(editTags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button></span>
+                      <span key={tag} className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} flex items-center gap-1`}>{tag}<button type="button" onClick={() => setEditTags(editTags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button></span>
                     ))}
-                    <input type="text" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} onKeyDown={handleEditTagKeyDown} placeholder={t("tasks.addTag")} className="flex-1 min-w-[80px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30" />
+                    <TagInput
+                      value={editTagInput}
+                      onChange={setEditTagInput}
+                      onAddTag={(tag) => setEditTags([...editTags, tag])}
+                      existingTags={editTags}
+                      allTags={allTags}
+                      placeholder={t("tasks.addTag")}
+                      className="w-full text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    />
                   </div>
                 </div>
               )}
@@ -362,11 +320,14 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
     );
   }
 
+  const catColorKey = catObj ? resolveCatColorKey(catObj.color) : null;
+  const catLabelColor = catColorKey ? (LABEL_COLORS[catColorKey] || LABEL_COLORS.gray) : null;
+
   return (
     <div
       draggable={!editing}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", task.id); }}
-      className={`group rounded-xl transition-all duration-200 ${task.completed ? "opacity-60 scale-[0.98]" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}
+      className={`group rounded-xl transition-all duration-200 border-l-[3px] ${catLabelColor ? catLabelColor.leftBorder : "border-l-transparent"} ${task.completed ? "opacity-60 scale-[0.98]" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}
     >
       <div className="flex items-center gap-3 p-3">
         <span className="w-4 flex-shrink-0 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing transition-opacity">
@@ -390,24 +351,83 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            {(subtasks.length > 0 || !task.completed) && (
-              <button onClick={() => setExpanded(!expanded)} className="text-muted-light dark:text-muted-dark hover:text-accent transition-colors">
-                {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              </button>
-            )}
+            <button onClick={() => setExpanded(!expanded)} className="text-muted-light dark:text-muted-dark hover:text-accent transition-colors" aria-label={expanded ? t("common.collapse") : t("common.expand")}>
+              {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
             <p className={`text-sm font-medium truncate ${task.completed ? "line-through text-muted-light" : ""}`}>
               {task.text}
             </p>
           </div>
+          {/* Collapsed badge row: priority dot, deadline, subtask counter, tags */}
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {catObj && (
-              <button
-                onClick={() => onCategoryClick(catObj.id)}
-                className={`badge text-[10px] ${catObj.color || "bg-gray-100 text-gray-700"} cursor-pointer hover:opacity-80 transition-opacity`}
-              >
-                {catObj.name || catObj.emoji}
-              </button>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priority.dot}`} role="img" aria-label={t(`tasks.priority.${task.priority}`)} />
+            {task.deadline && (
+              <span className={`badge text-[10px] flex items-center gap-1 ${isOverdue ? "bg-danger/10 text-danger" : "bg-gray-100 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}>
+                {isOverdue && <AlertCircle className="w-3 h-3" />}
+                <Calendar className="w-3 h-3" />
+                {new Date(task.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
+              </span>
             )}
+            {subtasks.length > 0 && (
+              <span className="text-[10px] text-muted-light dark:text-muted-dark">
+                {completedSubtasks}/{subtasks.length}
+              </span>
+            )}
+            {tags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => onTagClick(tag)}
+                className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} cursor-pointer hover:opacity-80 transition-opacity`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          {!task.completed && countdownStartEnabled && (
+            <button
+              onClick={() => setShowCountdown(true)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
+              title={t("tasks.startNow")}
+            >
+              <span className="text-xs font-bold">▶</span>
+            </button>
+          )}
+          <button
+            onClick={() => { setEditText(task.text); setEditPriority(task.priority); setEditEnergyCost(task.energyCost || "medium"); setEditDeadline(task.deadline || ""); setEditTimeOfDay(task.timeOfDay || ""); setEditScheduledTime(task.scheduledTime || ""); setEditScheduledDate(task.scheduledDate || ""); setEditCategory(task.category || ""); setEditTags(task.tags || []); setEditing(true); }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
+            title={t("common.edit")}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          {task.completed && (
+            <button
+              onClick={() => dispatch({ type: "REOPEN_TASK", payload: task.id })}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
+              title={t("tasks.reopen")}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            onClick={handleDelete}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-danger hover:bg-danger/10 transition-all"
+            title={t("common.delete")}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded: metadata + subtasks + add form */}
+      {expanded && (
+        <div className="pb-3 px-3">
+          {/* Expanded metadata row */}
+          <div className="flex items-center gap-2 pl-8 pb-2 flex-wrap">
             <span className={`badge text-[10px] ${priority.color}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${priority.dot} mr-1`} />
               {t(`tasks.priority.${task.priority}`)}
@@ -437,76 +457,12 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                 {new Date(task.scheduledDate + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
               </span>
             )}
-            {task.deadline && (
-              <span className={`badge text-[10px] flex items-center gap-1 ${isOverdue ? "bg-danger/10 text-danger" : "bg-gray-100 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}>
-                {isOverdue && <AlertCircle className="w-3 h-3" />}
-                <Calendar className="w-3 h-3" />
-                {new Date(task.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
-              </span>
-            )}
             {task.mailRef && (
               <Link to="/mail" className="badge text-[10px] bg-accent/10 text-accent flex items-center gap-1 hover:bg-accent/20 transition-colors">
                 <Mail className="w-3 h-3" /> {t("tasks.fromMail")}
               </Link>
             )}
-            {subtasks.length > 0 && (
-              <span className="text-[10px] text-muted-light dark:text-muted-dark">
-                {completedSubtasks}/{subtasks.length}
-              </span>
-            )}
-            {tags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => onTagClick(tag)}
-                className={`badge text-[10px] ${getTagColor(tag)} cursor-pointer hover:opacity-80 transition-opacity`}
-              >
-                {tag}
-              </button>
-            ))}
           </div>
-        </div>
-
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-          {!task.completed && countdownStartEnabled && (
-            <button
-              onClick={() => setShowCountdown(true)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
-              title={t("tasks.startNow")}
-            >
-              <span className="text-xs font-bold">▶</span>
-            </button>
-          )}
-          <button
-            onClick={() => { setEditText(task.text); setEditPriority(task.priority); setEditEnergyCost(task.energyCost || "medium"); setEditMinutes(task.estimatedMinutes); setEditDeadline(task.deadline || ""); setEditTimeOfDay(task.timeOfDay || ""); setEditScheduledTime(task.scheduledTime || ""); setEditScheduledDate(task.scheduledDate || ""); setEditCategory(task.category || ""); setEditTags(task.tags || []); setEditing(true); }}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
-            title={t("common.edit")}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          {task.completed && (
-            <button
-              onClick={() => dispatch({ type: "REOPEN_TASK", payload: task.id })}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
-              title={t("tasks.reopen")}
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button
-            onClick={handleDelete}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-light hover:text-danger hover:bg-danger/10 transition-all"
-            title={t("common.delete")}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Expanded: subtasks + add form */}
-      {expanded && (
-        <div className="pb-3 px-3">
           {task.mailRef && (
             <Link to="/mail" className="pl-8 pb-2 text-xs text-muted-light dark:text-muted-dark block hover:text-accent transition-colors">
               <Mail className="w-3 h-3 inline mr-1" />
@@ -515,7 +471,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </Link>
           )}
           {subtasks.map((s) => (
-            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} />
+            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} onTagClick={onTagClick} allTags={allTags} />
           ))}
           {!task.completed && (
             <div className="pl-8 mt-1">
@@ -554,23 +510,30 @@ export default function TasksPage() {
   const [managingCategories, setManagingCategories] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [newCatName, setNewCatName] = useState("");
-  const [newCatEmoji, setNewCatEmoji] = useState("📁");
+  const [newCatColor, setNewCatColor] = useState("blue");
   const [editingCatId, setEditingCatId] = useState(null);
   const [editCatName, setEditCatName] = useState("");
-  const [editCatEmoji, setEditCatEmoji] = useState("");
+  const [editCatColor, setEditCatColor] = useState("blue");
 
   const categories = state.categories || [];
 
   const allTags = useMemo(() => {
     const tagSet = new Set();
-    state.tasks.forEach((tk) => (tk.tags || []).forEach((tag) => tagSet.add(tag)));
+    state.tasks.forEach((tk) => {
+      (tk.tags || []).forEach((tag) => tagSet.add(tag));
+      (tk.subtasks || []).forEach((s) => (s.tags || []).forEach((tag) => tagSet.add(tag)));
+    });
     return [...tagSet].sort();
   }, [state.tasks]);
 
   const filteredTasks = state.tasks.filter((task) => {
     if (filter === "open" && task.completed) return false;
     if (filter === "done" && !task.completed) return false;
-    if (filterTag && !(task.tags || []).includes(filterTag)) return false;
+    if (filterTag) {
+      const inTask = (task.tags || []).includes(filterTag);
+      const inSubtask = (task.subtasks || []).some((s) => (s.tags || []).includes(filterTag));
+      if (!inTask && !inSubtask) return false;
+    }
     if (filterCategory && task.category !== filterCategory) return false;
     return true;
   });
@@ -602,14 +565,6 @@ export default function TasksPage() {
     return counts;
   }, [state.tasks]);
 
-  // Helper: get display name for a category (strips emoji prefix from i18n if present)
-  const getCatDisplayName = (cat) => {
-    const key = `tasks.categories.${cat.name}`;
-    const translated = t(key);
-    if (translated !== key) return translated.replace(/^[^\s]+\s/, '');
-    return cat.name;
-  };
-
   // Handle drag-and-drop of tasks into categories
   const [dragOverCatId, setDragOverCatId] = useState(null);
   const handleCatDragOver = (e, catId) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCatId(catId); };
@@ -629,12 +584,18 @@ export default function TasksPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">{t("tasks.title")}</h2>
-          {filterCategory && categories.find((c) => c.id === filterCategory) && (
-            <span className="badge bg-accent/10 text-accent text-xs flex items-center gap-1">
-              {categories.find((c) => c.id === filterCategory)?.emoji} {getCatDisplayName(categories.find((c) => c.id === filterCategory))}
-              <button onClick={() => setFilterCategory(null)} className="ml-0.5 hover:text-danger"><X className="w-3 h-3" /></button>
-            </span>
-          )}
+          {filterCategory && categories.find((c) => c.id === filterCategory) && (() => {
+            const fc = categories.find((c) => c.id === filterCategory);
+            const fck = resolveCatColorKey(fc.color);
+            const flc = LABEL_COLORS[fck] || LABEL_COLORS.gray;
+            return (
+              <span className={`badge text-xs flex items-center gap-1 ${flc.bg} ${flc.text}`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${flc.dot}`} />
+                {getCatDisplayName(fc, t)}
+                <button onClick={() => setFilterCategory(null)} className="ml-0.5 hover:text-danger"><X className="w-3 h-3" /></button>
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -682,81 +643,99 @@ export default function TasksPage() {
               </button>
 
               {/* Category list — each is a drop target */}
-              {categories.map((cat) => (
-                <div key={cat.id}>
-                  {editingCatId === cat.id ? (
-                    <div className="flex items-center gap-1.5 px-2 py-1">
-                      <input
-                        value={editCatEmoji}
-                        onChange={(e) => setEditCatEmoji(e.target.value)}
-                        className="w-8 px-1 py-1 rounded-lg text-center text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-                      />
-                      <input
-                        value={editCatName}
-                        onChange={(e) => setEditCatName(e.target.value)}
-                        className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-                      />
+              {categories.map((cat) => {
+                const bck = resolveCatColorKey(cat.color);
+                const blc = LABEL_COLORS[bck] || LABEL_COLORS.gray;
+                return (
+                  <div key={cat.id}>
+                    {editingCatId === cat.id ? (
+                      <div className="px-2 py-1.5 space-y-1.5">
+                        <input
+                          value={editCatName}
+                          onChange={(e) => setEditCatName(e.target.value)}
+                          className="w-full px-2 py-1 rounded-lg text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {LABEL_COLOR_KEYS.map((ck) => (
+                            <button
+                              key={ck}
+                              type="button"
+                              onClick={() => setEditCatColor(ck)}
+                              className={`w-5 h-5 rounded-full ${LABEL_COLORS[ck].dot} transition-all ${editCatColor === ck ? "ring-2 ring-offset-1 ring-gray-400 dark:ring-offset-gray-800 scale-110" : "opacity-70 hover:opacity-100"}`}
+                              title={ck}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => { dispatch({ type: "UPDATE_CATEGORY", payload: { id: cat.id, name: editCatName, color: editCatColor, type: cat.type || "area" } }); setEditingCatId(null); }}
+                            className="text-accent"
+                          ><Check className="w-4 h-4" /></button>
+                          <button onClick={() => setEditingCatId(null)} className="text-muted-light"><X className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ) : (
                       <button
-                        onClick={() => { dispatch({ type: "UPDATE_CATEGORY", payload: { id: cat.id, name: editCatName, emoji: editCatEmoji } }); setEditingCatId(null); }}
-                        className="text-accent"
-                      ><Check className="w-4 h-4" /></button>
-                      <button onClick={() => setEditingCatId(null)} className="text-muted-light"><X className="w-4 h-4" /></button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
-                      onDragOver={(e) => handleCatDragOver(e, cat.id)}
-                      onDragLeave={handleCatDragLeave}
-                      onDrop={(e) => handleCatDrop(e, cat.id)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all group/cat ${
-                        filterCategory === cat.id ? (cat.color || "bg-accent/10 text-accent") + " font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-                      } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
-                    >
-                      <span className="flex-shrink-0 text-base">{cat.emoji}</span>
-                      <span className="flex-1 text-left truncate">{getCatDisplayName(cat)}</span>
-                      <span className="text-xs font-mono opacity-60">{taskCountByCategory[cat.id] || 0}</span>
-                      {managingCategories && (
-                        <span className="flex items-center gap-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
-                          <span
-                            onClick={(e) => { e.stopPropagation(); setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatEmoji(cat.emoji); }}
-                            className="cursor-pointer hover:text-accent"
-                          ><Pencil className="w-3 h-3" /></span>
-                          <span
-                            onClick={(e) => { e.stopPropagation(); dispatch({ type: "DELETE_CATEGORY", payload: cat.id }); }}
-                            className="cursor-pointer hover:text-danger"
-                          ><Trash2 className="w-3 h-3" /></span>
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              ))}
+                        onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+                        onDragOver={(e) => handleCatDragOver(e, cat.id)}
+                        onDragLeave={handleCatDragLeave}
+                        onDrop={(e) => handleCatDrop(e, cat.id)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all group/cat ${
+                          filterCategory === cat.id ? blc.bg + " " + blc.text + " font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+                        } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${blc.dot}`} />
+                        <span className="flex-1 text-left truncate">{getCatDisplayName(cat, t)}</span>
+                        <span className="text-xs font-mono opacity-60">{taskCountByCategory[cat.id] || 0}</span>
+                        {managingCategories && (
+                          <span className="flex items-center gap-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                            <span
+                              onClick={(e) => { e.stopPropagation(); setEditingCatId(cat.id); setEditCatName(cat.name); setEditCatColor(resolveCatColorKey(cat.color)); }}
+                              className="cursor-pointer hover:text-accent"
+                            ><Pencil className="w-3 h-3" /></span>
+                            <span
+                              onClick={(e) => { e.stopPropagation(); dispatch({ type: "DELETE_CATEGORY", payload: cat.id }); }}
+                              className="cursor-pointer hover:text-danger"
+                            ><Trash2 className="w-3 h-3" /></span>
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Add category (visible in manage mode) */}
               {managingCategories && (
-                <div className="pt-2 flex items-center gap-1.5">
-                  <input
-                    value={newCatEmoji}
-                    onChange={(e) => setNewCatEmoji(e.target.value)}
-                    placeholder="📁"
-                    className="w-8 px-1 py-1 rounded-lg text-center text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-                  />
-                  <input
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    placeholder={t("tasks.categoryName")}
-                    className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => {
-                      if (!newCatName.trim()) return;
-                      const colorIdx = categories.length % CATEGORY_COLORS.length;
-                      dispatch({ type: "ADD_CATEGORY", payload: { name: newCatName.trim(), emoji: newCatEmoji || "📁", color: CATEGORY_COLORS[colorIdx] } });
-                      setNewCatName("");
-                      setNewCatEmoji("📁");
-                    }}
-                    className="text-accent"
-                  ><Plus className="w-4 h-4" /></button>
+                <div className="pt-2 space-y-1.5">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {LABEL_COLOR_KEYS.map((ck) => (
+                      <button
+                        key={ck}
+                        type="button"
+                        onClick={() => setNewCatColor(ck)}
+                        className={`w-5 h-5 rounded-full ${LABEL_COLORS[ck].dot} transition-all ${newCatColor === ck ? "ring-2 ring-offset-1 ring-gray-400 dark:ring-offset-gray-800 scale-110" : "opacity-70 hover:opacity-100"}`}
+                        title={ck}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      placeholder={t("tasks.categoryName")}
+                      className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!newCatName.trim()) return;
+                        dispatch({ type: "ADD_CATEGORY", payload: { name: newCatName.trim(), color: newCatColor, type: "area" } });
+                        setNewCatName("");
+                        setNewCatColor("blue");
+                      }}
+                      className="text-accent"
+                    ><Plus className="w-4 h-4" /></button>
+                  </div>
                 </div>
               )}
             </div>
@@ -775,18 +754,23 @@ export default function TasksPage() {
                 <X className="w-3 h-3" /> {t("tasks.clearFilter")}
               </button>
             )}
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
-                onDragOver={(e) => handleCatDragOver(e, cat.id)}
-                onDragLeave={handleCatDragLeave}
-                onDrop={(e) => handleCatDrop(e, cat.id)}
-                className={`badge text-xs ${cat.color || "bg-gray-100 text-gray-700"} transition-opacity ${filterCategory === cat.id ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"} ${dragOverCatId === cat.id ? "ring-2 ring-accent/40" : ""}`}
-              >
-                {cat.emoji} <span className="ml-0.5 font-mono">{taskCountByCategory[cat.id] || 0}</span>
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const mck = resolveCatColorKey(cat.color);
+              const mlc = LABEL_COLORS[mck] || LABEL_COLORS.gray;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+                  onDragOver={(e) => handleCatDragOver(e, cat.id)}
+                  onDragLeave={handleCatDragLeave}
+                  onDrop={(e) => handleCatDrop(e, cat.id)}
+                  className={`badge text-xs ${mlc.bg} ${mlc.text} transition-opacity ${filterCategory === cat.id ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"} ${dragOverCatId === cat.id ? "ring-2 ring-accent/40" : ""}`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${mlc.dot} mr-1`} />
+                  {getCatDisplayName(cat, t)} <span className="ml-0.5 font-mono">{taskCountByCategory[cat.id] || 0}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -844,7 +828,7 @@ export default function TasksPage() {
                   <button
                     key={tag}
                     onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                    className={`badge text-xs ${getTagColor(tag)} transition-opacity ${filterTag === tag ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
+                    className={`badge text-xs ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} transition-opacity ${filterTag === tag ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"}`}
                   >
                     {tag}
                   </button>
@@ -870,6 +854,7 @@ export default function TasksPage() {
                   onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
                   countdownStartEnabled={countdownStartEnabled}
                   sizeMappings={settings.estimation?.sizeMappings}
+                  allTags={allTags}
                 />
               ))}
             </div>

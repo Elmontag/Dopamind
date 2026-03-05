@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { X, ChevronDown, ChevronRight, AlertCircle, Folder, Tag } from "lucide-react";
+import TagInput from "./TagInput";
+import { getCatDisplayName } from "../utils/catUtils";
 
 const PRIORITY_CONFIG = {
   high: { color: "bg-danger/10 text-danger dark:bg-danger/20" },
@@ -13,24 +16,6 @@ const ENERGY_CONFIG = {
 };
 const WHEN_OPTIONS = ["today", "tomorrow", "dayAfter", "nextWeek", "pickDate"];
 const TIME_OF_DAY_OPTIONS = ["morning", "afternoon", "evening", "exact"];
-const TAG_COLORS = [
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
-];
-
-function getTagColor(tag) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
-
-function sanitizeTag(input) {
-  return input.trim().replace(/,/g, "");
-}
 
 const SIZE_KEYS = ["quick", "short", "medium", "long"];
 const DEFAULT_SIZE_MAPPINGS = { quick: 10, short: 25, medium: 45, long: 90 };
@@ -41,7 +26,7 @@ const SIZE_COLORS = {
   long: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
-export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title, initialValues, sizeMappings }) {
+export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], allTags = [], title, initialValues, sizeMappings }) {
   const iv = initialValues || {};
   const isEdit = !!initialValues;
   const mappings = sizeMappings || DEFAULT_SIZE_MAPPINGS;
@@ -87,15 +72,6 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
       tags,
     });
     onClose();
-  };
-
-  const handleTagKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
-      e.preventDefault();
-      const tag = sanitizeTag(tagInput);
-      if (tag && !tags.includes(tag)) setTags([...tags, tag]);
-      setTagInput("");
-    }
   };
 
   return (
@@ -210,23 +186,36 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                 ) : (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                    {categories.map((cat) => (
-                      <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? (cat.color || "bg-gray-100 text-gray-700") + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
-                        {cat.name || cat.emoji}
-                      </button>
-                    ))}
+                    {categories.map((cat) => {
+                      const fmck = resolveCatColorKey(cat.color);
+                      const fmlc = LABEL_COLORS[fmck] || LABEL_COLORS.gray;
+                      return (
+                        <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? fmlc.bg + " " + fmlc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${fmlc.dot}`} />
+                          {getCatDisplayName(cat, t)}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {/* Tags */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <Tag className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                   {tags.map((tag) => (
-                    <span key={tag} className={`badge text-[10px] ${getTagColor(tag)} flex items-center gap-1`}>
+                    <span key={tag} className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} flex items-center gap-1`}>
                       {tag}
                       <button type="button" onClick={() => setTags(tags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button>
                     </span>
                   ))}
-                  <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} placeholder={t("tasks.addTag")} className="flex-1 min-w-[80px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30" />
+                  <TagInput
+                    value={tagInput}
+                    onChange={setTagInput}
+                    onAddTag={(tag) => setTags([...tags, tag])}
+                    existingTags={tags}
+                    allTags={allTags}
+                    placeholder={t("tasks.addTag")}
+                    className="w-full text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                  />
                 </div>
               </div>
             )}

@@ -147,7 +147,6 @@
     "editCategory": "Edit",
     "deleteCategory": "Delete",
     "categoryName": "Name",
-    "categoryEmoji": "Emoji",
     "categoryTasks": "Tasks",
     "addTaskExpand": "Create task ▸",
     "addTaskCollapse": "▾ Collapse",
@@ -201,7 +200,16 @@
       "long": "Long"
     },
     "sizeCustom": "Set exact time",
-    "sizeUsePreset": "Use preset"
+    "sizeUsePreset": "Use preset",
+    "labels": "Labels",
+    "areas": "Areas",
+    "tags": "Tags",
+    "addLabel": "New label",
+    "labelType": {
+      "area": "Area",
+      "tag": "Tag"
+    },
+    "pickColor": "Color"
   },
   "focus": {
     "title": "Focus Block",
@@ -703,7 +711,9 @@
     "hours": "h",
     "today": "Today",
     "yesterday": "Yesterday",
-    "tomorrow": "Tomorrow"
+    "tomorrow": "Tomorrow",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "auth": {
     "login": "Log In",
