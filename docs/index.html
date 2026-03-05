@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Dopamind – ADHS-freundliches Planungs- und Produktivitätstool mit Gamification. Self-hosted, open source." />
+  <meta name="theme-color" content="#1A1A2E" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Dopamind – ADHS-freundliches Produktivitätstool" />
+  <meta property="og:description" content="ADHS-freundliches Planungs- & Produktivitätstool mit Gamification. Self-hosted & Open Source." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://elmontag.github.io/Dopamind/" />
+
+  <title>Dopamind – ADHS-freundliches Produktivitätstool</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     NAVIGATION
+════════════════════════════════════════════════════════ -->
+<nav class="nav" role="navigation" aria-label="Hauptnavigation">
+  <a href="#hero" class="nav-logo gradient-text" aria-label="Dopamind – Startseite">Dopamind</a>
+
+  <ul class="nav-links" id="nav-links" role="menubar">
+    <li role="none"><a href="#vision"     role="menuitem" data-i18n="nav.vision">Vision</a></li>
+    <li role="none"><a href="#features"   role="menuitem" data-i18n="nav.features">Features</a></li>
+    <li role="none"><a href="#deployment" role="menuitem" data-i18n="nav.deployment">Deployment</a></li>
+    <li role="none">
+      <a href="https://github.com/Elmontag/Dopamind" target="_blank" rel="noopener noreferrer"
+         role="menuitem" data-i18n="nav.github">GitHub</a>
+    </li>
+  </ul>
+
+  <div class="nav-controls">
+    <!-- Language Toggle -->
+    <button id="lang-toggle" class="btn-lang" aria-label="Sprache wechseln / Switch language">EN</button>
+    <!-- Theme Toggle -->
+    <button id="theme-toggle" class="btn-icon" aria-label="Theme wechseln">☀️</button>
+    <!-- Mobile Hamburger -->
+    <button id="nav-hamburger" class="nav-hamburger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="nav-links">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════ -->
+<section id="hero" aria-label="Hero">
+  <div class="hero-inner">
+    <h1 class="hero-title gradient-text anim-hidden">Dopamind</h1>
+    <p class="hero-tagline anim-hidden" data-i18n="hero.tagline">
+      ADHS-freundliches Planungs- &amp; Produktivitätstool mit Gamification.
+    </p>
+    <p class="hero-subtitle anim-hidden" data-i18n="hero.subtitle">
+      Dopamind hilft Menschen mit ADHS, Entscheidungslähmung zu überwinden – durch priorisierte Aufgaben,
+      zeitblockierte Tagespläne und ein motivierendes Gamification-System.
+    </p>
+    <div class="hero-buttons anim-hidden">
+      <a href="https://github.com/Elmontag/Dopamind" target="_blank" rel="noopener noreferrer"
+         class="btn btn-outline" data-i18n="hero.cta.github">
+        Auf GitHub ansehen
+      </a>
+      <a href="#deployment" class="btn btn-primary" data-i18n="hero.cta.start">Jetzt starten</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     VISION
+════════════════════════════════════════════════════════ -->
+<section id="vision" aria-labelledby="vision-heading">
+  <div class="section">
+    <span class="section-label" data-i18n="vision.label">UNSERE MISSION</span>
+    <article class="glass-card vision-content md-content anim-hidden" id="vision-content">
+      <!-- Markdown content injected by script.js -->
+      <p style="color:var(--muted)">Lädt…</p>
+    </article>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     FEATURES
+════════════════════════════════════════════════════════ -->
+<section id="features" aria-labelledby="features-heading">
+  <div class="section">
+    <span class="section-label" data-i18n="features.label">WAS DOPAMIND KANN</span>
+    <div class="md-content" id="features-content">
+      <!-- Feature cards injected by script.js -->
+      <p style="color:var(--muted)">Lädt…</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREENSHOTS
+════════════════════════════════════════════════════════ -->
+<section id="screenshots" aria-labelledby="screenshots-heading">
+  <div class="section">
+    <span class="section-label" data-i18n="screenshots.label">EINBLICKE</span>
+    <h2 id="screenshots-heading" data-i18n="screenshots.title">Dopamind in Aktion</h2>
+    <p class="section-intro" data-i18n="screenshots.intro">Keine endlosen Listen – sondern klare Tagesstruktur, smarte Planung und echte Motivation.</p>
+
+    <!-- Screenshot 1: Dashboard -->
+    <div class="screenshot-item anim-hidden">
+      <div class="screenshot-frame">
+        <img src="screenshots/dashboard.svg"
+             alt="Dopamind Dashboard mit Morgen-, Mittag- und Abend-Block. Der nächste Schritt ist hervorgehoben."
+             loading="lazy" width="900" height="560"/>
+      </div>
+      <div class="screenshot-caption">
+        <span class="caption-number">01</span>
+        <div>
+          <h3 data-i18n="screenshots.s1.title">Tagesblöcke statt To-Do-Liste</h3>
+          <p data-i18n="screenshots.s1.desc">Morgen, Mittag und Abend als strukturierte Blöcke – mit automatisch eingeplanten Aufgaben und einer klar hervorgehobenen nächsten Aufgabe. Keine Entscheidungslähmung.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screenshot 2: Quick Add -->
+    <div class="screenshot-item screenshot-item--reverse anim-hidden">
+      <div class="screenshot-frame">
+        <img src="screenshots/quickadd.svg"
+             alt="Dopamind Aufgabe anlegen mit Priorität, Wann und Energie-Auswahl."
+             loading="lazy" width="900" height="500"/>
+      </div>
+      <div class="screenshot-caption">
+        <span class="caption-number">02</span>
+        <div>
+          <h3 data-i18n="screenshots.s2.title">Intelligente Aufgaben-Erfassung</h3>
+          <p data-i18n="screenshots.s2.desc">Aufgaben bekommen nicht nur eine Priorität, sondern auch einen Energie-Level. Dopamind plant sie automatisch ins passende Zeitfenster – ohne Kalender-Konflikte.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screenshot 3: Gamification -->
+    <div class="screenshot-item anim-hidden">
+      <div class="screenshot-frame">
+        <img src="screenshots/gamification.svg"
+             alt="Dopamind Gamification: Level 7, XP-Balken, Streak und Achievement-Badges."
+             loading="lazy" width="900" height="480"/>
+      </div>
+      <div class="screenshot-caption">
+        <span class="caption-number">03</span>
+        <div>
+          <h3 data-i18n="screenshots.s3.title">Gamification – Motivation durch Belohnung</h3>
+          <p data-i18n="screenshots.s3.desc">XP für jede erledigte Aufgabe, 10 Level-Ränge, 25+ Achievements und ein Streak-Multiplikator. Bei Abwesenheiten greift der Strafschutz – kein XP-Verlust für unverschuldete Rückstände.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     DEPLOYMENT
+════════════════════════════════════════════════════════ -->
+<section id="deployment" aria-labelledby="deployment-heading">
+  <div class="section">
+    <span class="section-label" data-i18n="deployment.label">SCHNELLSTART</span>
+    <article class="glass-card md-content anim-hidden" id="deployment-content">
+      <!-- Markdown content injected by script.js -->
+      <p style="color:var(--muted)">Lädt…</p>
+    </article>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════ -->
+<footer class="footer" role="contentinfo">
+  <div class="footer-inner">
+    <nav class="footer-links" aria-label="Footer-Links">
+      <a href="https://github.com/Elmontag/Dopamind" target="_blank" rel="noopener noreferrer"
+         data-i18n="footer.github">GitHub</a>
+      <a href="#impressum" data-i18n="footer.impressum">Impressum</a>
+    </nav>
+    <p class="footer-copy" data-i18n="footer.made">Made with ❤️ for the ADHD Community</p>
+    <p class="footer-copy">© 2025 Dopamind</p>
+  </div>
+</footer>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     IMPRESSUM
+════════════════════════════════════════════════════════ -->
+<section id="impressum" aria-labelledby="impressum-heading">
+  <div class="section">
+    <span class="section-label" data-i18n="impressum.label">RECHTLICHES</span>
+    <article class="glass-card md-content impressum-content" id="impressum-content">
+      <!-- Markdown content injected by script.js -->
+      <p style="color:var(--muted)">Lädt…</p>
+    </article>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     Scripts
+════════════════════════════════════════════════════════ -->
+<!-- marked.js – Markdown parser (local copy; CDN as fallback) -->
+<script src="marked.min.js"></script>
+<script>
+  if (typeof marked === 'undefined') {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    document.head.appendChild(s);
+  }
+</script>
+<!-- Site script -->
+<script src="script.js"></script>
+
+</body>
+</html>
