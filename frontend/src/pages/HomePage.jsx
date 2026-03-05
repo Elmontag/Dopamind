@@ -104,6 +104,11 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   const workEnd = parseTimeToMin(settings.workSchedule?.end || "18:00");
   const hideParent = settings.timeline?.hideParentWithSubtasks === true;
 
+  const allTags = (tasks || []).flatMap((tk) => [
+    ...(tk.tags || []),
+    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
+
   // Block boundaries clipped to assistance window
   const blocks = [
     { id: "morning", start: Math.max(workStart, 0), end: Math.min(12 * 60, workEnd) },
@@ -424,6 +429,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         initialValues={editSubtask.subtask}
         inheritedCategory={tasks.find((tk) => tk.id === editSubtask.taskId)?.category}
         categories={categories || []}
+        allTags={allTags}
         sizeMappings={settings.estimation?.sizeMappings}
         onSubmit={(formData) => { onEditSubtaskFull(editSubtask.taskId, editSubtask.subtask.id, formData); setEditSubtask(null); }}
         onClose={() => setEditSubtask(null)}

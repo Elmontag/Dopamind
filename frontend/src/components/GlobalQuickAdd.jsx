@@ -5,6 +5,7 @@ import { useSettings } from "../context/SettingsContext";
 import { useI18n } from "../i18n/I18nContext";
 import { useQuickAdd } from "../context/QuickAddContext";
 import { X, Check, ChevronRight, ChevronDown, AlertCircle, Folder, Tag, Zap } from "lucide-react";
+import TagInput from "./TagInput";
 
 const PRIORITY_COLORS = {
   high: "bg-danger/10 text-danger dark:bg-danger/20",
@@ -22,9 +23,6 @@ const SIZE_COLORS = {
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   long: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
 };
-function sanitizeTag(input) {
-  return input.trim().replace(/,/g, "");
-}
 
 const STEPS = ["name", "priority", "when", "energy", "duration", "finish"];
 const PRIORITY_KEYS = ["high", "medium", "low"];
@@ -80,6 +78,18 @@ export default function GlobalQuickAdd() {
 
   const sizeMappings = settings.estimation?.sizeMappings || { quick: 10, short: 25, medium: 45, long: 90 };
   const categories = contextCategories || (state.categories || []);
+
+  const allTags = (state.tasks || []).flatMap((tk) => [
+    ...(tk.tags || []),
+    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
+
+  const getCatDisplayName = (cat) => {
+    const key = `tasks.categories.${cat.name}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return cat.name;
+  };
 
   // Smart default: if today has >5 tasks, default to tomorrow
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -189,15 +199,6 @@ export default function GlobalQuickAdd() {
     setFlash(true);
     setTimeout(() => { closeQuickAdd(); reset(); }, 600);
   }, [text, sizeMappings, smartWhenDefault, mode, inheritedCategory, parentTaskId, dispatch, closeQuickAdd, reset]);
-
-  const handleTagKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && detailTagInput.trim()) {
-      e.preventDefault();
-      const tag = sanitizeTag(detailTagInput);
-      if (tag && !detailTags.includes(tag)) setDetailTags([...detailTags, tag]);
-      setDetailTagInput("");
-    }
-  };
 
   // Global keydown: Enter is handled by QuickAddEnterListener (mounted in AppLayout)
   // to open the bubble when no input is focused.
@@ -606,7 +607,7 @@ export default function GlobalQuickAdd() {
                                           }`}
                                         >
                                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${qlc.dot}`} />
-                                          {cat.name}
+                                          {getCatDisplayName(cat)}
                                         </button>
                                       );
                                     })}
@@ -624,13 +625,14 @@ export default function GlobalQuickAdd() {
                                       </button>
                                     </span>
                                   ))}
-                                  <input
-                                    type="text"
+                                  <TagInput
                                     value={detailTagInput}
-                                    onChange={(e) => setDetailTagInput(e.target.value)}
-                                    onKeyDown={handleTagKeyDown}
+                                    onChange={setDetailTagInput}
+                                    onAddTag={(tag) => setDetailTags([...detailTags, tag])}
+                                    existingTags={detailTags}
+                                    allTags={allTags}
                                     placeholder={t("tasks.addTag")}
-                                    className="flex-1 min-w-[80px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                                    className="w-full text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
                                   />
                                 </div>
 

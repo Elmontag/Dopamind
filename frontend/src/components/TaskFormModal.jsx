@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { X, ChevronDown, ChevronRight, AlertCircle, Folder, Tag } from "lucide-react";
+import TagInput from "./TagInput";
 
 const PRIORITY_CONFIG = {
   high: { color: "bg-danger/10 text-danger dark:bg-danger/20" },
@@ -14,9 +15,6 @@ const ENERGY_CONFIG = {
 };
 const WHEN_OPTIONS = ["today", "tomorrow", "dayAfter", "nextWeek", "pickDate"];
 const TIME_OF_DAY_OPTIONS = ["morning", "afternoon", "evening", "exact"];
-function sanitizeTag(input) {
-  return input.trim().replace(/,/g, "");
-}
 
 const SIZE_KEYS = ["quick", "short", "medium", "long"];
 const DEFAULT_SIZE_MAPPINGS = { quick: 10, short: 25, medium: 45, long: 90 };
@@ -27,7 +25,7 @@ const SIZE_COLORS = {
   long: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
-export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title, initialValues, sizeMappings }) {
+export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], allTags = [], title, initialValues, sizeMappings }) {
   const iv = initialValues || {};
   const isEdit = !!initialValues;
   const mappings = sizeMappings || DEFAULT_SIZE_MAPPINGS;
@@ -75,13 +73,11 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
     onClose();
   };
 
-  const handleTagKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
-      e.preventDefault();
-      const tag = sanitizeTag(tagInput);
-      if (tag && !tags.includes(tag)) setTags([...tags, tag]);
-      setTagInput("");
-    }
+  const getCatDisplayName = (cat) => {
+    const key = `tasks.categories.${cat.name}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return cat.name;
   };
 
   return (
@@ -202,7 +198,7 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                       return (
                         <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? fmlc.bg + " " + fmlc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${fmlc.dot}`} />
-                          {cat.name}
+                          {getCatDisplayName(cat)}
                         </button>
                       );
                     })}
@@ -217,7 +213,15 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                       <button type="button" onClick={() => setTags(tags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button>
                     </span>
                   ))}
-                  <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} placeholder={t("tasks.addTag")} className="flex-1 min-w-[80px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30" />
+                  <TagInput
+                    value={tagInput}
+                    onChange={setTagInput}
+                    onAddTag={(tag) => setTags([...tags, tag])}
+                    existingTags={tags}
+                    allTags={allTags}
+                    placeholder={t("tasks.addTag")}
+                    className="w-full text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                  />
                 </div>
               </div>
             )}

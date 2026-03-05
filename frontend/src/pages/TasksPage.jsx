@@ -8,6 +8,7 @@ import { useSettings } from "../context/SettingsContext";
 import { useQuickAdd } from "../context/QuickAddContext";
 import CountdownStart from "../components/CountdownStart";
 import TaskFormModal from "../components/TaskFormModal";
+import TagInput from "../components/TagInput";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -26,18 +27,19 @@ const TIME_OF_DAY_OPTIONS = ["morning", "afternoon", "evening", "exact"];
 
 const LABEL_COLOR_KEYS = Object.keys(LABEL_COLORS);
 
-function sanitizeTag(input) {
-  return input.trim().replace(/,/g, "");
-}
-
 function isTaskOverdue(task) {
   return !!(task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date());
 }
 
-function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings }) {
-  const { dispatch } = useApp();
+function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings, onTagClick }) {
+  const { dispatch, state } = useApp();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
+
+  const allTags = (state.tasks || []).flatMap((tk) => [
+    ...(tk.tags || []),
+    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
 
   const handleEditSubmit = (formData) => {
     dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, ...formData } });
@@ -94,7 +96,17 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           </span>
         )}
         {(subtask.tags || []).map((tag) => (
-          <span key={tag} className={`badge text-[9px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text}`}>{tag}</span>
+          onTagClick ? (
+            <button
+              key={tag}
+              onClick={() => onTagClick(tag)}
+              className={`badge text-[9px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} cursor-pointer hover:opacity-80 transition-opacity`}
+            >
+              {tag}
+            </button>
+          ) : (
+            <span key={tag} className={`badge text-[9px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text}`}>{tag}</span>
+          )
         ))}
       </div>
       {showEditModal && (
@@ -104,6 +116,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           initialValues={subtask}
           inheritedCategory={task?.category}
           categories={categories}
+          allTags={allTags}
           sizeMappings={sizeMappings}
           onSubmit={handleEditSubmit}
           onClose={() => setShowEditModal(false)}
@@ -123,7 +136,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
 }
 
 function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings }) {
-  const { dispatch } = useApp();
+  const { dispatch, state } = useApp();
   const { untagMail } = useMail();
   const { openQuickAdd } = useQuickAdd();
   const priority = PRIORITY_CONFIG[task.priority];
@@ -145,7 +158,19 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
   const [editShowDetails, setEditShowDetails] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
 
+  const allTags = (state.tasks || []).flatMap((tk) => [
+    ...(tk.tags || []),
+    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
+
   const catObj = categories.find((c) => c.id === task.category);
+
+  const getCatDisplayName = (cat) => {
+    const key = `tasks.categories.${cat.name}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return cat.name;
+  };
 
   const subtasks = task.subtasks || [];
   const completedSubtasks = subtasks.filter((s) => s.completed).length;
@@ -178,15 +203,6 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
       },
     });
     setEditing(false);
-  };
-
-  const handleEditTagKeyDown = (e) => {
-    if ((e.key === "Enter" || e.key === ",") && editTagInput.trim()) {
-      e.preventDefault();
-      const tag = sanitizeTag(editTagInput);
-      if (tag && !editTags.includes(tag)) setEditTags([...editTags, tag]);
-      setEditTagInput("");
-    }
   };
 
   if (editing) {
@@ -287,7 +303,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                       return (
                         <button key={cat.id} type="button" onClick={() => setEditCategory(cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${editCategory === cat.id ? lc.bg + " " + lc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lc.dot}`} />
-                          {cat.name}
+                          {getCatDisplayName(cat)}
                         </button>
                       );
                     })}
@@ -297,7 +313,15 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                     {editTags.map((tag) => (
                       <span key={tag} className={`badge text-[10px] ${LABEL_COLORS.gray.bg} ${LABEL_COLORS.gray.text} flex items-center gap-1`}>{tag}<button type="button" onClick={() => setEditTags(editTags.filter((x) => x !== tag))}><X className="w-2.5 h-2.5" /></button></span>
                     ))}
-                    <input type="text" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} onKeyDown={handleEditTagKeyDown} placeholder={t("tasks.addTag")} className="flex-1 min-w-[80px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30" />
+                    <TagInput
+                      value={editTagInput}
+                      onChange={setEditTagInput}
+                      onAddTag={(tag) => setEditTags([...editTags, tag])}
+                      existingTags={editTags}
+                      allTags={allTags}
+                      placeholder={t("tasks.addTag")}
+                      className="w-full text-xs px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    />
                   </div>
                 </div>
               )}
@@ -463,7 +487,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </Link>
           )}
           {subtasks.map((s) => (
-            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} />
+            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} onTagClick={onTagClick} />
           ))}
           {!task.completed && (
             <div className="pl-8 mt-1">
@@ -511,14 +535,21 @@ export default function TasksPage() {
 
   const allTags = useMemo(() => {
     const tagSet = new Set();
-    state.tasks.forEach((tk) => (tk.tags || []).forEach((tag) => tagSet.add(tag)));
+    state.tasks.forEach((tk) => {
+      (tk.tags || []).forEach((tag) => tagSet.add(tag));
+      (tk.subtasks || []).forEach((s) => (s.tags || []).forEach((tag) => tagSet.add(tag)));
+    });
     return [...tagSet].sort();
   }, [state.tasks]);
 
   const filteredTasks = state.tasks.filter((task) => {
     if (filter === "open" && task.completed) return false;
     if (filter === "done" && !task.completed) return false;
-    if (filterTag && !(task.tags || []).includes(filterTag)) return false;
+    if (filterTag) {
+      const inTask = (task.tags || []).includes(filterTag);
+      const inSubtask = (task.subtasks || []).some((s) => (s.tags || []).includes(filterTag));
+      if (!inTask && !inSubtask) return false;
+    }
     if (filterCategory && task.category !== filterCategory) return false;
     return true;
   });
