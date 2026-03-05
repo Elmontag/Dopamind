@@ -9,6 +9,7 @@ import { useQuickAdd } from "../context/QuickAddContext";
 import CountdownStart from "../components/CountdownStart";
 import TaskFormModal from "../components/TaskFormModal";
 import TagInput from "../components/TagInput";
+import { getCatDisplayName } from "../utils/catUtils";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -31,15 +32,10 @@ function isTaskOverdue(task) {
   return !!(task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date());
 }
 
-function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings, onTagClick }) {
-  const { dispatch, state } = useApp();
+function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings, onTagClick, allTags }) {
+  const { dispatch } = useApp();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
-
-  const allTags = (state.tasks || []).flatMap((tk) => [
-    ...(tk.tags || []),
-    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
-  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
 
   const handleEditSubmit = (formData) => {
     dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, ...formData } });
@@ -135,8 +131,8 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
   );
 }
 
-function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings }) {
-  const { dispatch, state } = useApp();
+function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings, allTags }) {
+  const { dispatch } = useApp();
   const { untagMail } = useMail();
   const { openQuickAdd } = useQuickAdd();
   const priority = PRIORITY_CONFIG[task.priority];
@@ -158,19 +154,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
   const [editShowDetails, setEditShowDetails] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
 
-  const allTags = (state.tasks || []).flatMap((tk) => [
-    ...(tk.tags || []),
-    ...(tk.subtasks || []).flatMap((s) => s.tags || []),
-  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
-
   const catObj = categories.find((c) => c.id === task.category);
-
-  const getCatDisplayName = (cat) => {
-    const key = `tasks.categories.${cat.name}`;
-    const translated = t(key);
-    if (translated !== key) return translated;
-    return cat.name;
-  };
 
   const subtasks = task.subtasks || [];
   const completedSubtasks = subtasks.filter((s) => s.completed).length;
@@ -303,7 +287,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                       return (
                         <button key={cat.id} type="button" onClick={() => setEditCategory(cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${editCategory === cat.id ? lc.bg + " " + lc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lc.dot}`} />
-                          {getCatDisplayName(cat)}
+                          {getCatDisplayName(cat, t)}
                         </button>
                       );
                     })}
@@ -487,7 +471,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </Link>
           )}
           {subtasks.map((s) => (
-            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} onTagClick={onTagClick} />
+            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} onTagClick={onTagClick} allTags={allTags} />
           ))}
           {!task.completed && (
             <div className="pl-8 mt-1">
@@ -581,14 +565,6 @@ export default function TasksPage() {
     return counts;
   }, [state.tasks]);
 
-  // Helper: get display name for a category
-  const getCatDisplayName = (cat) => {
-    const key = `tasks.categories.${cat.name}`;
-    const translated = t(key);
-    if (translated !== key) return translated;
-    return cat.name;
-  };
-
   // Handle drag-and-drop of tasks into categories
   const [dragOverCatId, setDragOverCatId] = useState(null);
   const handleCatDragOver = (e, catId) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCatId(catId); };
@@ -615,7 +591,7 @@ export default function TasksPage() {
             return (
               <span className={`badge text-xs flex items-center gap-1 ${flc.bg} ${flc.text}`}>
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${flc.dot}`} />
-                {getCatDisplayName(fc)}
+                {getCatDisplayName(fc, t)}
                 <button onClick={() => setFilterCategory(null)} className="ml-0.5 hover:text-danger"><X className="w-3 h-3" /></button>
               </span>
             );
@@ -709,7 +685,7 @@ export default function TasksPage() {
                         } ${dragOverCatId === cat.id ? "ring-2 ring-accent/40 scale-[1.02]" : ""}`}
                       >
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${blc.dot}`} />
-                        <span className="flex-1 text-left truncate">{getCatDisplayName(cat)}</span>
+                        <span className="flex-1 text-left truncate">{getCatDisplayName(cat, t)}</span>
                         <span className="text-xs font-mono opacity-60">{taskCountByCategory[cat.id] || 0}</span>
                         {managingCategories && (
                           <span className="flex items-center gap-1 opacity-0 group-hover/cat:opacity-100 transition-opacity">
@@ -791,7 +767,7 @@ export default function TasksPage() {
                   className={`badge text-xs ${mlc.bg} ${mlc.text} transition-opacity ${filterCategory === cat.id ? "ring-1 ring-current/40" : "opacity-70 hover:opacity-100"} ${dragOverCatId === cat.id ? "ring-2 ring-accent/40" : ""}`}
                 >
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${mlc.dot} mr-1`} />
-                  {getCatDisplayName(cat)} <span className="ml-0.5 font-mono">{taskCountByCategory[cat.id] || 0}</span>
+                  {getCatDisplayName(cat, t)} <span className="ml-0.5 font-mono">{taskCountByCategory[cat.id] || 0}</span>
                 </button>
               );
             })}
@@ -878,6 +854,7 @@ export default function TasksPage() {
                   onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
                   countdownStartEnabled={countdownStartEnabled}
                   sizeMappings={settings.estimation?.sizeMappings}
+                  allTags={allTags}
                 />
               ))}
             </div>

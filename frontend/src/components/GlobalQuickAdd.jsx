@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
@@ -6,6 +6,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useQuickAdd } from "../context/QuickAddContext";
 import { X, Check, ChevronRight, ChevronDown, AlertCircle, Folder, Tag, Zap } from "lucide-react";
 import TagInput from "./TagInput";
+import { getCatDisplayName } from "../utils/catUtils";
 
 const PRIORITY_COLORS = {
   high: "bg-danger/10 text-danger dark:bg-danger/20",
@@ -79,17 +80,10 @@ export default function GlobalQuickAdd() {
   const sizeMappings = settings.estimation?.sizeMappings || { quick: 10, short: 25, medium: 45, long: 90 };
   const categories = contextCategories || (state.categories || []);
 
-  const allTags = (state.tasks || []).flatMap((tk) => [
+  const allTags = useMemo(() => (state.tasks || []).flatMap((tk) => [
     ...(tk.tags || []),
     ...(tk.subtasks || []).flatMap((s) => s.tags || []),
-  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
-
-  const getCatDisplayName = (cat) => {
-    const key = `tasks.categories.${cat.name}`;
-    const translated = t(key);
-    if (translated !== key) return translated;
-    return cat.name;
-  };
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort(), [state.tasks]);
 
   // Smart default: if today has >5 tasks, default to tomorrow
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -607,7 +601,7 @@ export default function GlobalQuickAdd() {
                                           }`}
                                         >
                                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${qlc.dot}`} />
-                                          {getCatDisplayName(cat)}
+                                          {getCatDisplayName(cat, t)}
                                         </button>
                                       );
                                     })}

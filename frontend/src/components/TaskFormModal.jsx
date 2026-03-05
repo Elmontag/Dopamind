@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { X, ChevronDown, ChevronRight, AlertCircle, Folder, Tag } from "lucide-react";
 import TagInput from "./TagInput";
+import { getCatDisplayName } from "../utils/catUtils";
 
 const PRIORITY_CONFIG = {
   high: { color: "bg-danger/10 text-danger dark:bg-danger/20" },
@@ -71,13 +72,6 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
       tags,
     });
     onClose();
-  };
-
-  const getCatDisplayName = (cat) => {
-    const key = `tasks.categories.${cat.name}`;
-    const translated = t(key);
-    if (translated !== key) return translated;
-    return cat.name;
   };
 
   return (
@@ -198,7 +192,7 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                       return (
                         <button key={cat.id} type="button" onClick={() => setCategory(category === cat.id ? "" : cat.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${category === cat.id ? fmlc.bg + " " + fmlc.text + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${fmlc.dot}`} />
-                          {getCatDisplayName(cat)}
+                          {getCatDisplayName(cat, t)}
                         </button>
                       );
                     })}
