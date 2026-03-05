@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { DAILY_CHALLENGES } from "../context/AppContext";
@@ -104,10 +104,10 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   const workEnd = parseTimeToMin(settings.workSchedule?.end || "18:00");
   const hideParent = settings.timeline?.hideParentWithSubtasks === true;
 
-  const allTags = (tasks || []).flatMap((tk) => [
+  const allTags = useMemo(() => (tasks || []).flatMap((tk) => [
     ...(tk.tags || []),
     ...(tk.subtasks || []).flatMap((s) => s.tags || []),
-  ]).filter((v, i, a) => a.indexOf(v) === i).sort();
+  ]).filter((v, i, a) => a.indexOf(v) === i).sort(), [tasks]);
 
   // Block boundaries clipped to assistance window
   const blocks = [

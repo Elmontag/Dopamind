@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 
 /**
  * TagInput — text input with autocomplete suggestions for tags.
@@ -19,9 +19,11 @@ export default function TagInput({ value, onChange, onAddTag, existingTags = [],
 
   const sanitize = (s) => s.trim().replace(/,/g, "");
 
-  const suggestions = allTags.filter(
-    (t) => t !== value && !existingTags.includes(t) && (!value.trim() || t.toLowerCase().includes(value.trim().toLowerCase()))
-  );
+  const existingSet = useMemo(() => new Set(existingTags), [existingTags]);
+
+  const suggestions = useMemo(() => allTags.filter(
+    (tag) => tag !== value && !existingSet.has(tag) && (!value.trim() || tag.toLowerCase().includes(value.trim().toLowerCase()))
+  ), [allTags, existingSet, value]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Escape") {
@@ -31,7 +33,7 @@ export default function TagInput({ value, onChange, onAddTag, existingTags = [],
     if ((e.key === "Enter" || e.key === ",") && value.trim()) {
       e.preventDefault();
       const tag = sanitize(value);
-      if (tag && !existingTags.includes(tag)) {
+      if (tag && !existingSet.has(tag)) {
         onAddTag(tag);
         onChange("");
       }
@@ -40,7 +42,7 @@ export default function TagInput({ value, onChange, onAddTag, existingTags = [],
   };
 
   const handleSelect = (tag) => {
-    if (!existingTags.includes(tag)) {
+    if (!existingSet.has(tag)) {
       onAddTag(tag);
       onChange("");
     }
