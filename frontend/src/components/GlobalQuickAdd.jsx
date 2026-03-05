@@ -457,7 +457,7 @@ export default function GlobalQuickAdd() {
                                 }`}
                               >
                                 <Zap className="w-3.5 h-3.5" />
-                                Sofort
+                                {t("quickBubble.immediate")}
                               </button>
                               <button
                                 onClick={advance}
@@ -773,7 +773,7 @@ export default function GlobalQuickAdd() {
         {/* Enter hint */}
         {!flash && (
           <p className="text-center text-[9px] text-muted-light dark:text-muted-dark mt-2 opacity-60">
-            Enter ↵{step === 0 && text.trim() ? " · ⌘↵ Sofort" : ""}
+            Enter ↵{step === 0 && text.trim() ? ` · ⌘↵ ${t("quickBubble.immediate")}` : ""}
           </p>
         )}
       </div>

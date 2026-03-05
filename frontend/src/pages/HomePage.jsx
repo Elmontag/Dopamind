@@ -1541,7 +1541,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
     gridSlots.push(min);
   }
 
-  const HEADER_H = 28;
+  const HEADER_H = 44;
 
   return (
     <div className="flex overflow-x-auto select-none">
@@ -1928,7 +1928,7 @@ function MonthPlanView({ t, tasks, getEventsForDate, monthStart, onSelectDay, to
             <button
               key={date}
               onClick={() => onSelectDay(date)}
-              className={`flex flex-col items-center p-1 rounded-lg text-center min-h-[48px] transition-all border ${
+              className={`flex flex-col items-center py-2 px-1 rounded-lg text-center min-h-[48px] transition-all border ${
                 isToday
                   ? "border-accent bg-accent/10"
                   : isPast

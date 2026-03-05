@@ -798,7 +798,8 @@
     "addDetails": "Add details",
     "createTask": "Create task",
     "createSubtask": "Create subtask",
-    "stepFinish": "Finish"
+    "stepFinish": "Finish",
+    "immediate": "Immediately"
   },
   "countdown": {
     "title": "Get ready...",
