@@ -945,7 +945,7 @@ function reducer(state, action) {
     case "ADD_CATEGORY":
     case "ADD_LABEL": {
       const cat = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+        id: action.payload.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 4)),
         name: action.payload.name,
         type: action.payload.type || "area",
         color: resolveCatColorKey(action.payload.color) || "gray",
@@ -1027,7 +1027,8 @@ export function AppProvider({ children }) {
       apiFetch("/tasks").catch(() => null),
       apiFetch("/stats").catch(() => null),
       apiFetch("/achievements").catch(() => null),
-    ]).then(([tasksRes, statsRes, achievementsRes]) => {
+      apiFetch("/categories").catch(() => null),
+    ]).then(([tasksRes, statsRes, achievementsRes, categoriesRes]) => {
       // Use the new granular API if it responded
       if (Array.isArray(tasksRes)) {
         const loadPayload = {};
@@ -1090,6 +1091,24 @@ export function AppProvider({ children }) {
           loadPayload.unlockedAchievements = achievementsRes.map((a) => a.id);
           // Track already synced achievements
           achievementsRes.forEach((a) => syncedAchievements.current.add(a.id));
+        }
+
+        // Categories: use backend data if available; otherwise migrate from localStorage to backend
+        if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
+          loadPayload.categories = categoriesRes;
+        } else {
+          // Backend has no categories yet – keep current (localStorage) categories and save them
+          const localCategories = state.categories && state.categories.length > 0
+            ? state.categories
+            : DEFAULT_CATEGORIES;
+          loadPayload.categories = localCategories;
+          // Migrate to backend so they persist from now on
+          localCategories.forEach((cat, idx) => {
+            apiFetch("/categories", {
+              method: "POST",
+              body: JSON.stringify({ id: cat.id, name: cat.name, type: cat.type || "area", color: cat.color || "gray", sortOrder: idx }),
+            }).catch(() => {});
+          });
         }
 
         dispatch({ type: "LOAD_STATE", payload: loadPayload });
@@ -1290,11 +1309,52 @@ export function AppProvider({ children }) {
         }
         return;
       }
+      case "ADD_CATEGORY":
+      case "ADD_LABEL": {
+        // Pre-generate ID so reducer and API use the same one
+        const catId = Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+        const enhancedAction = { ...action, payload: { ...action.payload, id: catId } };
+        dispatch(enhancedAction);
+        if (token) {
+          const { name, type, color } = action.payload;
+          apiFetch("/categories", {
+            method: "POST",
+            body: JSON.stringify({ id: catId, name, type: type || "area", color: color || "gray", sortOrder: state.categories.length }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "UPDATE_CATEGORY":
+      case "UPDATE_LABEL": {
+        dispatch(action);
+        if (token) {
+          const { id: ucId, name, type, color } = action.payload;
+          const patch = {};
+          if (name !== undefined) patch.name = name;
+          if (type !== undefined) patch.type = type;
+          if (color !== undefined) patch.color = color;
+          if (Object.keys(patch).length > 0) {
+            apiFetch(`/categories/${ucId}`, {
+              method: "PUT",
+              body: JSON.stringify(patch),
+            }).catch(() => {});
+          }
+        }
+        return;
+      }
+      case "DELETE_CATEGORY":
+      case "DELETE_LABEL": {
+        dispatch(action);
+        if (token) {
+          apiFetch(`/categories/${action.payload}`, { method: "DELETE" }).catch(() => {});
+        }
+        return;
+      }
       default:
         dispatch(action);
         break;
     }
-  }, [state.tasks]); // eslint-disable-line
+  }, [state.tasks, state.categories]); // eslint-disable-line
 
   // Sync stats after any state change that might affect them
   useEffect(() => {

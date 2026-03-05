@@ -14,6 +14,7 @@ const taskRoutes = require("./routes/tasks");
 const statsRoutes = require("./routes/stats");
 const achievementRoutes = require("./routes/achievements");
 const focusBlockRoutes = require("./routes/focusBlocks");
+const categoryRoutes = require("./routes/categories");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -71,6 +72,7 @@ app.use("/api/tasks", authenticate, taskRoutes);
 app.use("/api/stats", authenticate, statsRoutes);
 app.use("/api/achievements", authenticate, achievementRoutes);
 app.use("/api/focus-blocks", authenticate, focusBlockRoutes);
+app.use("/api/categories", authenticate, categoryRoutes);
 
 app.get("/api/health", async (_req, res) => {
   const status = {
