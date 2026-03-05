@@ -241,7 +241,10 @@
       "vacation": "Urlaub",
       "childSick": "Kindkrank"
     },
-    "eventLocation": "Ort"
+    "eventLocation": "Ort",
+    "stepTitle": "Name",
+    "stepWhen": "Datum & Uhrzeit",
+    "stepPlace": "Ort & Abschluss"
   },
   "mail": {
     "title": "Posteingang",
@@ -436,7 +439,7 @@
     "masterTag": "Schlüsseltag",
     "features": "Module",
     "featureMail": "E-Mail aktiviert",
-    "featureCalendar": "Kalender aktiviert",
+    "featureCalendar": "Planer aktiviert",
     "featureTimeTracking": "Ressourcenmonitor aktiviert",
     "featureGamification": "Gamification aktiviert",
     "tabAccount": "Konto",
