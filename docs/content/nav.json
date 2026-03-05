@@ -1,0 +1,16 @@
+{
+  "de": [
+    { "id": "vision",      "label": "Vision",       "href": "#vision",      "type": "anchor" },
+    { "id": "features",    "label": "Features",     "href": "#features",    "type": "anchor" },
+    { "id": "screenshots", "label": "Einblicke",    "href": "#screenshots", "type": "anchor" },
+    { "id": "deployment",  "label": "Schnellstart", "href": "#deployment",  "type": "anchor" },
+    { "id": "github",      "label": "GitHub",       "href": "https://github.com/Elmontag/Dopamind", "type": "external" }
+  ],
+  "en": [
+    { "id": "vision",      "label": "Vision",       "href": "#vision",      "type": "anchor" },
+    { "id": "features",    "label": "Features",     "href": "#features",    "type": "anchor" },
+    { "id": "screenshots", "label": "See It",       "href": "#screenshots", "type": "anchor" },
+    { "id": "deployment",  "label": "Quick Start",  "href": "#deployment",  "type": "anchor" },
+    { "id": "github",      "label": "GitHub",       "href": "https://github.com/Elmontag/Dopamind", "type": "external" }
+  ]
+}

@@ -12,6 +12,8 @@ const INTERSECTION_THRESHOLD = 0.12;   // fraction of element visible before ani
 const ANIMATION_DELAY_STEP   = 0.12;   // seconds between hero child animation delays
 
 // ── i18n Translations ──────────────────────────────────────
+// Navigation structure (labels, hrefs, types) is defined in content/nav.json.
+// TODO: load content/nav.json at init and populate #nav-links dynamically.
 const translations = {
   de: {
     'nav.vision':      'Vision',
@@ -20,7 +22,7 @@ const translations = {
     'nav.github':      'GitHub',
     'nav.impressum':   'Impressum',
     'hero.tagline':    'ADHS-freundliches Planungs- & Produktivitätstool mit Gamification.',
-    'hero.subtitle':   'Dopamind hilft Menschen mit ADHS, Entscheidungslähmung zu überwinden – durch priorisierte Aufgaben, zeitblockierte Tagespläne und ein motivierendes Gamification-System.',
+    'hero.subtitle':   'Dopamind hilft Menschen mit ADHS, Entscheidungslähmung zu überwinden – durch priorisierte Aufgaben, strukturierte Tagesblöcke und ein motivierendes Gamification-System.',
     'hero.cta.github': 'Auf GitHub ansehen',
     'hero.cta.start':  'Jetzt starten',
     'vision.label':    'UNSERE MISSION',
@@ -49,7 +51,7 @@ const translations = {
     'nav.github':      'GitHub',
     'nav.impressum':   'Legal',
     'hero.tagline':    'ADHD-friendly planning & productivity tool with gamification.',
-    'hero.subtitle':   'Dopamind helps people with ADHD overcome decision paralysis by prioritizing tasks, suggesting time-blocked schedules, and rewarding progress through a gamification system.',
+    'hero.subtitle':   'Dopamind helps people with ADHD overcome decision paralysis — through prioritized tasks, structured daily blocks, and a motivating gamification system.',
     'hero.cta.github': 'View on GitHub',
     'hero.cta.start':  'Get Started',
     'vision.label':    'OUR MISSION',

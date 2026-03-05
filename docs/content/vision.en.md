@@ -13,7 +13,7 @@ People with ADHD don't struggle with laziness. They struggle with:
 - **Motivation gaps** — Important ≠ Motivating
 - **Sensory overload** — Too much information at once
 
-Dopamind addresses each of these problems with thoughtful, evidence-based solutions.
+Dopamind addresses each of these problems with thoughtful approaches — inspired by behavioral psychology research on ADHD.
 
 ### Our Principles
 
@@ -23,4 +23,4 @@ Dopamind addresses each of these problems with thoughtful, evidence-based soluti
 
 🤝 **Understanding over pressure** — Compassion mode and "Not my day" feature for tough days
 
-🔒 **Privacy first** — Self-hosted, encrypted, your data belongs only to you
+🔒 **Privacy first** — Self-hosted, no data sharing, sensitive credentials stored with AES-256 encryption

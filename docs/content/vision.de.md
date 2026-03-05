@@ -13,7 +13,7 @@ Menschen mit ADHS kämpfen nicht mit Faulheit. Sie kämpfen mit:
 - **Motivationslücken** — Wichtig ≠ Motivierend
 - **Reizüberflutung** — Zu viele Informationen auf einmal
 
-Dopamind adressiert jedes dieser Probleme mit durchdachten, evidenzbasierten Lösungen.
+Dopamind adressiert jedes dieser Probleme mit durchdachten Ansätzen – inspiriert von verhaltenspsychologischen Erkenntnissen über ADHS.
 
 ### Unsere Prinzipien
 
@@ -23,4 +23,4 @@ Dopamind adressiert jedes dieser Probleme mit durchdachten, evidenzbasierten Lö
 
 🤝 **Verständnis statt Druck** — Compassion Mode und „Not my day"-Funktion für schwierige Tage
 
-🔒 **Privatsphäre zuerst** — Self-hosted, verschlüsselt, deine Daten gehören nur dir
+🔒 **Privatsphäre zuerst** — Self-hosted, keine Datenweitergabe, sensible Zugangsdaten AES-256-verschlüsselt
