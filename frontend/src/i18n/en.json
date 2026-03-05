@@ -315,7 +315,10 @@
       "vacation": "Vacation",
       "childSick": "Child Sick"
     },
-    "eventLocation": "Location"
+    "eventLocation": "Location",
+    "stepTitle": "Name",
+    "stepWhen": "Date & Time",
+    "stepPlace": "Location & Done"
   },
   "mail": {
     "title": "Inbox",
@@ -510,7 +513,7 @@
     "masterTag": "Key Tag",
     "features": "Features",
     "featureMail": "Mail enabled",
-    "featureCalendar": "Calendar enabled",
+    "featureCalendar": "Planner enabled",
     "featureTimeTracking": "Resource Monitor enabled",
     "featureGamification": "Gamification enabled",
     "tabAccount": "Account",

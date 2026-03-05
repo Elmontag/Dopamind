@@ -136,20 +136,40 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
 
   const getEventBlock = (ev) => {
     if (!ev.start || ev.allDay) return null;
-    const d = new Date(ev.start);
-    const min = d.getHours() * 60 + d.getMinutes();
+    let min;
+    if (/^\d{1,2}:\d{2}$/.test(ev.start)) {
+      const [h, m] = ev.start.split(":").map(Number);
+      min = h * 60 + m;
+    } else {
+      const d = new Date(ev.start);
+      if (isNaN(d)) return null;
+      min = d.getHours() * 60 + d.getMinutes();
+    }
     return blocks.find((b) => min >= b.start && min < b.end)?.id || null;
   };
 
   const isOverdue = (item) => item.deadline && new Date(item.deadline + "T23:59:59") < new Date();
 
   // Calculate available minutes per block (block duration - calendar event durations)
+  const parseEvTime = (s) => {
+    if (!s) return null;
+    if (/^\d{1,2}:\d{2}$/.test(s)) {
+      const [h, m] = s.split(":").map(Number);
+      return h * 60 + m;
+    }
+    const d = new Date(s);
+    if (isNaN(d)) return null;
+    return d.getHours() * 60 + d.getMinutes();
+  };
   const blockAvailMin = {};
   for (const block of blocks) {
     const blockDur = block.end - block.start;
     const eventDur = events.filter((ev) => !ev.allDay && getEventBlock(ev) === block.id).reduce((sum, ev) => {
       if (!ev.start || !ev.end) return sum;
-      return sum + Math.max(0, (new Date(ev.end) - new Date(ev.start)) / 60000);
+      const startMin = parseEvTime(ev.start);
+      const endMin = parseEvTime(ev.end);
+      if (startMin == null || endMin == null) return sum;
+      return sum + Math.max(0, endMin - startMin);
     }, 0);
     blockAvailMin[block.id] = Math.max(0, blockDur - eventDur);
   }
@@ -271,7 +291,15 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   const BLOCK_COLORS = { morning: "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-700/30", afternoon: "bg-sky-50/50 dark:bg-sky-900/10 border-sky-200/50 dark:border-sky-700/30", evening: "bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-700/30" };
   const BLOCK_HEADER = { morning: "text-amber-700 dark:text-amber-300", afternoon: "text-sky-700 dark:text-sky-300", evening: "text-indigo-700 dark:text-indigo-300" };
   const fmtMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-  const fmtTime = (d) => { const dt = new Date(d); return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`; };
+  const fmtTime = (d) => {
+    if (/^\d{1,2}:\d{2}$/.test(d)) {
+      const [h, m] = d.split(":");
+      return `${h.padStart(2, "0")}:${m}`;
+    }
+    const dt = new Date(d);
+    if (isNaN(dt)) return d;
+    return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  };
 
   return (<>
     <div className="space-y-3">

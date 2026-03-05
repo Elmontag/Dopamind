@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useCalendar } from "../context/CalendarContext";
 import { ChevronLeft, ChevronRight, Plus, X, Pencil, MapPin } from "lucide-react";
+import EventFormStepper from "../components/EventFormStepper";
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
@@ -265,66 +266,16 @@ export default function CalendarPage() {
             </div>
           )}
 
-          {/* Add Event Form */}
+          {/* Add / Edit Event Form */}
           {showForm && (
-            <form onSubmit={handleAddEvent} className="mt-4 pt-4 border-t border-gray-200/50 dark:border-white/5 space-y-3">
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData((f) => ({ ...f, title: e.target.value }))}
-                placeholder={t("calendar.eventTitle")}
-                className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                autoFocus
-              />
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-                placeholder={t("calendar.eventDescription")}
-                className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
-                rows={2}
-              />
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData((f) => ({ ...f, location: e.target.value }))}
-                  placeholder={t("calendar.eventLocation")}
-                  className="flex-1 px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={formData.allDay}
-                  onChange={(e) => setFormData((f) => ({ ...f, allDay: e.target.checked }))}
-                  className="rounded"
-                />
-                {t("calendar.allDay")}
-              </label>
-              {!formData.allDay && (
-                <div className="flex gap-2">
-                  <input
-                    type="time"
-                    value={formData.start}
-                    onChange={(e) => setFormData((f) => ({ ...f, start: e.target.value }))}
-                    className="flex-1 px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                  <input
-                    type="time"
-                    value={formData.end}
-                    onChange={(e) => setFormData((f) => ({ ...f, end: e.target.value }))}
-                    className="flex-1 px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button type="submit" className="btn-primary text-sm flex-1">{t("calendar.save")}</button>
-                <button type="button" onClick={() => { setShowForm(false); setEditingEvent(null); }} className="btn-ghost text-sm">
-                  {t("calendar.cancel")}
-                </button>
-              </div>
-            </form>
+            <EventFormStepper
+              key={editingEvent?.id || "new"}
+              formData={formData}
+              setFormData={setFormData}
+              onSubmit={handleAddEvent}
+              onCancel={() => { setShowForm(false); setEditingEvent(null); }}
+              editing={!!editingEvent}
+            />
           )}
         </div>
       </div>

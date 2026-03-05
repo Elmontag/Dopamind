@@ -4,6 +4,7 @@ import { LABEL_COLORS, resolveCatColorKey } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
 import { useI18n } from "../i18n/I18nContext";
 import { useQuickAdd } from "../context/QuickAddContext";
+import { useCalendar } from "../context/CalendarContext";
 import { X, Check, ChevronRight, ChevronDown, AlertCircle, Folder, Tag, Zap } from "lucide-react";
 import TagInput from "./TagInput";
 import { getCatDisplayName } from "../utils/catUtils";
@@ -47,6 +48,7 @@ export default function GlobalQuickAdd() {
   const { settings } = useSettings();
   const { t } = useI18n();
   const { quickAddOptions, closeQuickAdd } = useQuickAdd();
+  const { getEventsForDate } = useCalendar();
   const open = quickAddOptions !== null;
   const mode = quickAddOptions?.mode || "task";
   const parentTaskId = quickAddOptions?.parentTaskId || null;
@@ -57,6 +59,7 @@ export default function GlobalQuickAdd() {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("medium");
   const [when, setWhen] = useState("today");
+  const [whenTimeOfDay, setWhenTimeOfDay] = useState("");
   const [energy, setEnergy] = useState("medium");
   const [size, setSize] = useState("medium");
   const [flash, setFlash] = useState(false);
@@ -92,11 +95,67 @@ export default function GlobalQuickAdd() {
   ).length;
   const smartWhenDefault = todayTaskCount > 5 ? "tomorrow" : "today";
 
+  // Smart time-of-day: pick least-loaded block for a given resolved date
+  const computeSmartTimeOfDay = useCallback((resolvedDate) => {
+    const parseMin = (s) => {
+      if (!s) return null;
+      const [h, m] = s.split(":").map(Number);
+      return h * 60 + (m || 0);
+    };
+    const parseEvMin = (s) => {
+      if (!s) return null;
+      if (/^\d{1,2}:\d{2}$/.test(s)) return parseMin(s);
+      const d = new Date(s);
+      if (isNaN(d)) return null;
+      return d.getHours() * 60 + d.getMinutes();
+    };
+    const workStartMin = parseMin(settings.workSchedule?.start || "08:00") ?? 480;
+    const workEndMin = parseMin(settings.workSchedule?.end || "18:00") ?? 1080;
+    const blocks = [
+      { id: "morning", start: Math.max(workStartMin, 0), end: Math.min(12 * 60, workEndMin) },
+      { id: "afternoon", start: Math.max(12 * 60, workStartMin), end: Math.min(17 * 60, workEndMin) },
+      { id: "evening", start: Math.max(17 * 60, workStartMin), end: workEndMin },
+    ].filter((b) => b.start < b.end);
+
+    const isToday = resolvedDate === todayStr;
+    const nowMin = isToday ? (new Date().getHours() * 60 + new Date().getMinutes()) : -1;
+
+    const dayEvents = getEventsForDate(resolvedDate).filter((e) => !e.allDay);
+    const dayTasks = (state.tasks || []).filter(
+      (tk) => !tk.completed && (tk.scheduledDate === resolvedDate || (!tk.scheduledDate && isToday))
+    );
+
+    let bestBlock = null;
+    let bestAvail = -Infinity;
+    for (const block of blocks) {
+      if (isToday && block.end <= nowMin) continue;
+      const blockDur = block.end - block.start;
+      const eventMins = dayEvents.reduce((sum, ev) => {
+        const s = parseEvMin(ev.start);
+        const e = parseEvMin(ev.end);
+        if (s == null || e == null) return sum;
+        return sum + Math.max(0, Math.min(e, block.end) - Math.max(s, block.start));
+      }, 0);
+      const taskMins = dayTasks.reduce((sum, tk) => {
+        if (tk.timeOfDay === block.id) return sum + (tk.estimatedMinutes || 45);
+        return sum;
+      }, 0);
+      const avail = blockDur - eventMins - taskMins;
+      if (avail > bestAvail) {
+        bestAvail = avail;
+        bestBlock = block.id;
+      }
+    }
+    return bestBlock || (blocks[0]?.id) || "morning";
+  }, [settings.workSchedule, todayStr, getEventsForDate, state.tasks]);
+
   const reset = useCallback(() => {
+    const resolvedDate = resolveWhen(smartWhenDefault) || todayStr;
     setStep(0);
     setText("");
     setPriority("medium");
     setWhen(smartWhenDefault);
+    setWhenTimeOfDay(computeSmartTimeOfDay(resolvedDate));
     setEnergy("medium");
     setSize("medium");
     setFlash(false);
@@ -109,7 +168,7 @@ export default function GlobalQuickAdd() {
     setDetailTagInput("");
     setDetailShowCustom(false);
     setDetailCustomMinutes(null);
-  }, [smartWhenDefault, inheritedCategory]);
+  }, [smartWhenDefault, inheritedCategory, computeSmartTimeOfDay, todayStr]);
 
   // Reset when quickAddOptions changes (new open event)
   useEffect(() => {
@@ -129,6 +188,12 @@ export default function GlobalQuickAdd() {
     const effectiveMinutes = withDetails && detailShowCustom && detailCustomMinutes
       ? detailCustomMinutes
       : (sizeMappings[size] || 25);
+    // whenTimeOfDay (from step 2) takes precedence over detailTimeOfDay (from details panel)
+    const effectiveTimeOfDay = whenTimeOfDay && whenTimeOfDay !== "exact"
+      ? whenTimeOfDay
+      : (withDetails && detailTimeOfDay && detailTimeOfDay !== "exact" ? detailTimeOfDay : null);
+    const effectiveScheduledTime = (whenTimeOfDay === "exact" || (!whenTimeOfDay && withDetails && detailTimeOfDay === "exact")) && detailScheduledTime
+      ? detailScheduledTime : null;
     return {
       text: text.trim(),
       priority,
@@ -136,13 +201,13 @@ export default function GlobalQuickAdd() {
       estimatedMinutes: effectiveMinutes,
       sizeCategory: withDetails && detailShowCustom ? null : size,
       scheduledDate: resolveWhen(when),
-      timeOfDay: withDetails && detailTimeOfDay && detailTimeOfDay !== "exact" ? detailTimeOfDay : null,
-      scheduledTime: withDetails && detailTimeOfDay === "exact" && detailScheduledTime ? detailScheduledTime : null,
+      timeOfDay: effectiveTimeOfDay,
+      scheduledTime: effectiveScheduledTime,
       deadline: withDetails ? (detailDeadline || null) : null,
       category: mode === "subtask" ? (inheritedCategory || null) : (withDetails ? (detailCategory || null) : null),
       tags: withDetails ? detailTags : [],
     };
-  }, [text, priority, energy, size, when, sizeMappings, detailShowCustom, detailCustomMinutes,
+  }, [text, priority, energy, size, when, whenTimeOfDay, sizeMappings, detailShowCustom, detailCustomMinutes,
       detailTimeOfDay, detailScheduledTime, detailDeadline, detailCategory, detailTags,
       mode, inheritedCategory]);
 
@@ -172,14 +237,15 @@ export default function GlobalQuickAdd() {
   const handleUltraQuick = useCallback(() => {
     if (!text.trim()) return;
     const effectiveMinutes = sizeMappings["medium"] || 45;
+    const resolvedDate = resolveWhen(smartWhenDefault) || todayStr;
     const payload = {
       text: text.trim(),
       priority: "medium",
       energyCost: "medium",
       estimatedMinutes: effectiveMinutes,
       sizeCategory: "medium",
-      scheduledDate: resolveWhen(smartWhenDefault),
-      timeOfDay: null,
+      scheduledDate: resolvedDate,
+      timeOfDay: computeSmartTimeOfDay(resolvedDate),
       scheduledTime: null,
       deadline: null,
       category: mode === "subtask" ? (inheritedCategory || null) : null,
@@ -192,7 +258,7 @@ export default function GlobalQuickAdd() {
     }
     setFlash(true);
     setTimeout(() => { closeQuickAdd(); reset(); }, 600);
-  }, [text, sizeMappings, smartWhenDefault, mode, inheritedCategory, parentTaskId, dispatch, closeQuickAdd, reset]);
+  }, [text, sizeMappings, smartWhenDefault, todayStr, computeSmartTimeOfDay, mode, inheritedCategory, parentTaskId, dispatch, closeQuickAdd, reset]);
 
   // Global keydown: Enter is handled by QuickAddEnterListener (mounted in AppLayout)
   // to open the bubble when no input is focused.
@@ -281,7 +347,9 @@ export default function GlobalQuickAdd() {
   const getSummaryValue = (i) => {
     if (i === 0) return text.trim() || "—";
     if (i === 1) return t(`tasks.priority.${priority}`);
-    if (i === 2) return t(`tasks.whenOptions.${when}`);
+    if (i === 2) return whenTimeOfDay
+      ? `${t(`tasks.whenOptions.${when}`)} · ${t(`tasks.timeOfDayOptions.${whenTimeOfDay}`)}`
+      : t(`tasks.whenOptions.${when}`);
     if (i === 3) return t(`tasks.energy.${energy}`);
     if (i === 4) return `${t(`tasks.size.${size}`)} ~${sizeMappings[size]}${t("common.min")}`;
     return "";
@@ -389,7 +457,7 @@ export default function GlobalQuickAdd() {
                                 }`}
                               >
                                 <Zap className="w-3.5 h-3.5" />
-                                ⚡ Sofort
+                                Sofort
                               </button>
                               <button
                                 onClick={advance}
@@ -438,12 +506,37 @@ export default function GlobalQuickAdd() {
                               {WHEN_KEYS.map((key) => (
                                 <button
                                   key={key}
-                                  onClick={() => { setWhen(key); setStep(3); }}
+                                  onClick={() => {
+                                    const resolved = resolveWhen(key) || todayStr;
+                                    setWhen(key);
+                                    setWhenTimeOfDay(computeSmartTimeOfDay(resolved));
+                                  }}
                                   className={`${btnClass(when === key)} flex-1 min-w-[70px] ${when === key ? "bg-accent/10 text-accent" : "bg-gray-50 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}
                                 >
                                   {t(`tasks.whenOptions.${key}`)}
                                 </button>
                               ))}
+                            </div>
+                            {/* Time-of-day sub-selection */}
+                            <div className="mt-2 pt-2 border-t border-gray-200/40 dark:border-white/10 animate-fade-in">
+                              <div className="text-[9px] text-muted-light dark:text-muted-dark uppercase tracking-wider font-semibold mb-1.5">
+                                {t("tasks.sectionWhen")}
+                              </div>
+                              <div className="flex gap-1.5">
+                                {["morning", "afternoon", "evening"].map((tod) => (
+                                  <button
+                                    key={tod}
+                                    onClick={() => { setWhenTimeOfDay(tod); setStep(3); }}
+                                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                      whenTimeOfDay === tod
+                                        ? "bg-accent/15 text-accent ring-1 ring-accent/30 scale-105"
+                                        : "bg-gray-50 dark:bg-white/5 text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/10"
+                                    }`}
+                                  >
+                                    {t(`tasks.timeOfDayOptions.${tod}`)}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                             <button
                               onClick={advance}
