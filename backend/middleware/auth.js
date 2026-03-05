@@ -1,12 +1,13 @@
 const jwt = require("jsonwebtoken");
 const { getPool } = require("../db/database");
 
-const JWT_SECRET = process.env.JWT_SECRET || require("crypto").randomBytes(32).toString("hex");
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
-
 if (!process.env.JWT_SECRET) {
-  console.warn("WARNING: JWT_SECRET not set. Using random secret – tokens will not survive restarts.");
+  console.error("FATAL: JWT_SECRET environment variable is not set. Server will not start without it.");
+  process.exit(1);
 }
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
 
 function signToken(user) {
   return jwt.sign(

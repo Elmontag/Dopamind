@@ -10,6 +10,10 @@ const setupRoutes = require("./routes/setup");
 const mailRoutes = require("./routes/mail");
 const calendarRoutes = require("./routes/calendar");
 const userDataRoutes = require("./routes/userData");
+const taskRoutes = require("./routes/tasks");
+const statsRoutes = require("./routes/stats");
+const achievementRoutes = require("./routes/achievements");
+const focusBlockRoutes = require("./routes/focusBlocks");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -63,6 +67,10 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/user-data", userDataRoutes);
 app.use("/api/mail", authenticate, mailRoutes);
 app.use("/api/calendar", authenticate, calendarRoutes);
+app.use("/api/tasks", authenticate, taskRoutes);
+app.use("/api/stats", authenticate, statsRoutes);
+app.use("/api/achievements", authenticate, achievementRoutes);
+app.use("/api/focus-blocks", authenticate, focusBlockRoutes);
 
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
