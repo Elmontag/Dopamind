@@ -362,12 +362,12 @@ function reducer(state, action) {
     }
 
     case "ADD_SUBTASK": {
-      const { taskId, text, estimatedMinutes: subMin, scheduledTime: subSchedTime, scheduledDate: subSchedDate, energyCost: subEnergy, timeOfDay: subTimeOfDay } = action.payload;
+      const { taskId, text, estimatedMinutes: subMin, scheduledTime: subSchedTime, scheduledDate: subSchedDate, energyCost: subEnergy, timeOfDay: subTimeOfDay, priority: subPrio, deadline: subDeadline, tags: subTags } = action.payload;
       return {
         ...state,
         tasks: state.tasks.map((t) => {
           if (t.id !== taskId) return t;
-          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null };
+          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null, priority: subPrio || t.priority || "medium", deadline: subDeadline || null, category: t.category || null, tags: subTags || [] };
           const subs = [...(t.subtasks || []), newSub];
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
           return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
@@ -384,6 +384,22 @@ function reducer(state, action) {
           const subs = (t.subtasks || []).map((s) => s.id === usSubId ? { ...s, ...subUpdates } : s);
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
           return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
+        }),
+      };
+    }
+
+    case "REORDER_BLOCK_TASKS": {
+      // payload: { updates: [{ id, blockSortIndex, timeOfDay? }] }
+      const updates = action.payload.updates || [];
+      const updateMap = new Map(updates.map((u) => [u.id, u]));
+      return {
+        ...state,
+        tasks: state.tasks.map((t) => {
+          const u = updateMap.get(t.id);
+          if (!u) return t;
+          const patch = { blockSortIndex: u.blockSortIndex };
+          if (u.timeOfDay !== undefined) patch.timeOfDay = u.timeOfDay;
+          return { ...t, ...patch };
         }),
       };
     }

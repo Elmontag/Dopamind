@@ -5,6 +5,7 @@ import { useApp } from "../context/AppContext";
 import { useMail } from "../context/MailContext";
 import { useSettings } from "../context/SettingsContext";
 import CountdownStart from "../components/CountdownStart";
+import TaskFormModal from "../components/TaskFormModal";
 import { Mail, Calendar, Plus, ChevronDown, ChevronRight, CheckSquare, Square, Trash2, AlertCircle, Pencil, RotateCcw, Check, X, Tag, Clock, Folder, CalendarDays, Settings2, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const PRIORITY_CONFIG = {
@@ -183,8 +184,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
   const { untagMail } = useMail();
   const priority = PRIORITY_CONFIG[task.priority];
   const [expanded, setExpanded] = useState(false);
-  const [subtaskText, setSubtaskText] = useState("");
-  const [subtaskEnergy, setSubtaskEnergy] = useState("");
+  const [showSubtaskModal, setShowSubtaskModal] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const [editPriority, setEditPriority] = useState(task.priority);
@@ -207,12 +207,8 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
   const tags = task.tags || [];
   const isOverdue = isTaskOverdue(task);
 
-  const handleAddSubtask = (e) => {
-    e.preventDefault();
-    if (!subtaskText.trim()) return;
-    dispatch({ type: "ADD_SUBTASK", payload: { taskId: task.id, text: subtaskText.trim(), energyCost: subtaskEnergy || undefined } });
-    setSubtaskText("");
-    setSubtaskEnergy("");
+  const handleAddSubtask = (formData) => {
+    dispatch({ type: "ADD_SUBTASK", payload: { taskId: task.id, ...formData } });
   };
 
   const handleDelete = () => {
@@ -511,28 +507,15 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             <SubtaskItem key={s.id} subtask={s} taskId={task.id} t={t} countdownStartEnabled={countdownStartEnabled} />
           ))}
           {!task.completed && (
-            <form onSubmit={handleAddSubtask} className="pl-8 mt-1 space-y-1">
-              <div className="flex items-center gap-2">
-                <Plus className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                <input
-                  type="text"
-                  value={subtaskText}
-                  onChange={(e) => setSubtaskText(e.target.value)}
-                  placeholder={t("tasks.addSubtask")}
-                  className="flex-1 text-xs px-2 py-1 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-1 focus:ring-accent/30"
-                />
-              </div>
-              {subtaskText.trim() && (
-                <div className="flex items-center gap-1 pl-6 animate-fade-in">
-                  <span className="text-[10px] text-muted-light dark:text-muted-dark mr-1">{t("tasks.energyCost")}:</span>
-                  {Object.entries(ENERGY_CONFIG).map(([key, cfg]) => (
-                    <button key={key} type="button" onClick={() => setSubtaskEnergy(subtaskEnergy === key ? "" : key)} className={`px-2 py-0.5 rounded text-[10px] transition-all ${subtaskEnergy === key ? cfg.color + " ring-1 ring-current/20" : "text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/5"}`}>
-                      {t(`tasks.energy.${key}`)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </form>
+            <div className="pl-8 mt-1">
+              <button onClick={() => setShowSubtaskModal(true)} className="flex items-center gap-1.5 text-xs text-muted-light dark:text-muted-dark hover:text-accent transition-colors py-1">
+                <Plus className="w-3.5 h-3.5" />
+                {t("tasks.addSubtask")}
+              </button>
+            </div>
+          )}
+          {showSubtaskModal && (
+            <TaskFormModal t={t} onSubmit={handleAddSubtask} onClose={() => setShowSubtaskModal(false)} isSubtask inheritedCategory={task.category} categories={categories} />
           )}
         </div>
       )}

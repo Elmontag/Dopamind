@@ -187,6 +187,8 @@
     "quickAddEnergy": "How much energy?",
     "quickAddSkip": "Later",
     "createTask": "Create Task",
+    "createSubtask": "Create Subtask",
+    "subtaskCategoryInherited": "Category (from parent task)",
     "sectionWhat": "What?",
     "sectionWhen": "When?",
     "sectionImportance": "How important?",

@@ -6,6 +6,7 @@ import { useCalendar } from "../context/CalendarContext";
 import { useResourceMonitor } from "../context/ResourceMonitorContext";
 import { useSettings } from "../context/SettingsContext";
 import CountdownStart from "../components/CountdownStart";
+import TaskFormModal from "../components/TaskFormModal";
 import {
   CheckCircle, Calendar, Plus,
   LogIn, LogOut, Coffee, AlertCircle, Clock, ChevronLeft, ChevronRight, Pencil, X, GripVertical, CalendarPlus, List, Trash2,
@@ -162,11 +163,36 @@ function getTimeRangeBounds(settings, workStart, workEnd) {
   };
 }
 
+// --- Task scoring: single source of truth for task ordering across all views ---
+const ENERGY_MATCH_MAP = { low: "low", medium: "medium", high: "high" };
+function computeTaskScore(task, energyLevel, availableMinutes) {
+  let score = 0;
+  const cost = task.energyCost || "medium";
+  const prio = task.priority || "medium";
+  // Overdue: highest urgency
+  if (task.deadline && new Date(task.deadline + "T23:59:59") < new Date()) score += 4;
+  // Energy match: reward tasks matching current energy level
+  if (energyLevel && cost === energyLevel) score += 3;
+  else if (energyLevel && ((energyLevel === "low" && cost === "medium") || (energyLevel === "high" && cost === "medium") || (energyLevel === "medium" && cost !== "medium"))) score += 1;
+  // Priority
+  if (prio === "high") score += 2;
+  else if (prio === "medium") score += 1;
+  // Time fit: task fits in remaining block time
+  const est = task.estimatedMinutes || 25;
+  if (availableMinutes != null && est <= availableMinutes) score += 1;
+  return score;
+}
+
 // --- Block Day View: ADHD-friendly block-based day view ---
 const ENERGY_BADGE = { low: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", high: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300" };
 const PRIORITY_BADGE = { high: "border-l-danger", medium: "border-l-warn", low: "border-l-emerald-400" };
 
-function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, countdownStartEnabled, isTaskOverdue }) {
+function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, onAddSubtask, onMoveTaskBlock, countdownStartEnabled, isTaskOverdue, categories }) {
+  const [subtaskModalTaskId, setSubtaskModalTaskId] = useState(null);
+  const [dragItemId, setDragItemId] = useState(null);
+  const [dragItemType, setDragItemType] = useState(null);
+  const [dragTaskId, setDragTaskId] = useState(null);
+  const [dropTargetBlock, setDropTargetBlock] = useState(null);
   const workStart = parseTimeToMin(settings.workSchedule?.start || "08:00");
   const workEnd = parseTimeToMin(settings.workSchedule?.end || "18:00");
   const hideParent = settings.timeline?.hideParentWithSubtasks === true;
@@ -205,13 +231,24 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
 
   const isOverdue = (item) => item.deadline && new Date(item.deadline + "T23:59:59") < new Date();
 
-  const sortItems = (list) => [...list].sort((a, b) => {
-    const aOD = isOverdue(a) ? 0 : 1;
-    const bOD = isOverdue(b) ? 0 : 1;
-    if (aOD !== bOD) return aOD - bOD;
-    const p = { high: 0, medium: 1, low: 2 };
-    if (energyLevel === "low") return (p[b.priority] ?? 1) - (p[a.priority] ?? 1);
-    return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
+  // Calculate available minutes per block (block duration - calendar event durations)
+  const blockAvailMin = {};
+  for (const block of blocks) {
+    const blockDur = block.end - block.start;
+    const eventDur = events.filter((ev) => !ev.allDay && getEventBlock(ev) === block.id).reduce((sum, ev) => {
+      if (!ev.start || !ev.end) return sum;
+      return sum + Math.max(0, (new Date(ev.end) - new Date(ev.start)) / 60000);
+    }, 0);
+    blockAvailMin[block.id] = Math.max(0, blockDur - eventDur);
+  }
+
+  const sortItems = (list, blockId) => [...list].sort((a, b) => {
+    // Manual sort order takes precedence (for DnD reordering)
+    if (a.blockSortIndex != null && b.blockSortIndex != null) return a.blockSortIndex - b.blockSortIndex;
+    if (a.blockSortIndex != null) return -1;
+    if (b.blockSortIndex != null) return 1;
+    const avail = blockId ? blockAvailMin[blockId] : null;
+    return computeTaskScore(b, energyLevel, avail) - computeTaskScore(a, energyLevel, avail);
   });
 
   // Build all displayable items with block assignment, respecting hideParentWithSubtasks
@@ -237,7 +274,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
     }
   }
 
-  // "Nächster Schritt": always prefer subtasks as the actionable next step
+  // "Nächster Schritt": always prefer subtasks as the actionable next step, scored by computeTaskScore
   const nextStep = (() => {
     if (!isToday) return null;
     const candidates = [];
@@ -251,20 +288,80 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
       }
     }
     if (candidates.length === 0) return null;
+    const avail = currentBlockId ? blockAvailMin[currentBlockId] : null;
     const inBlock = candidates.filter((c) => getItemBlock(c) === currentBlockId);
-    if (energyLevel) { const m = inBlock.find((c) => (c.energyCost || "medium") === energyLevel); if (m) return m; }
-    if (inBlock.length > 0) return sortItems(inBlock)[0];
-    return sortItems(candidates)[0];
+    if (inBlock.length > 0) return [...inBlock].sort((a, b) => computeTaskScore(b, energyLevel, avail) - computeTaskScore(a, energyLevel, avail))[0];
+    return [...candidates].sort((a, b) => computeTaskScore(b, energyLevel, avail) - computeTaskScore(a, energyLevel, avail))[0];
   })();
 
   const handleNextStepComplete = () => { if (!nextStep) return; nextStep.isSubtask ? onToggleSubtask(nextStep.taskId, nextStep.id) : onCompleteTask(nextStep.id); };
+
+  // DnD: collision check — returns { ok, reason }
+  const checkDropAllowed = (itemId, itemType, itemTaskId, targetBlockId) => {
+    const sourceTask = tasks.find((tk) => tk.id === (itemType === "subtask" ? itemTaskId : itemId));
+    if (!sourceTask) return { ok: false, reason: "notFound" };
+    const targetBlock = blocks.find((b) => b.id === targetBlockId);
+    if (!targetBlock) return { ok: false, reason: "noBlock" };
+    // Deadline collision: task deadline falls before target block start
+    if (sourceTask.deadline) {
+      const dlDate = new Date(sourceTask.deadline + "T23:59:59");
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const isDeadlineToday = sourceTask.deadline === today.toISOString().slice(0, 10);
+      if (isDeadlineToday) {
+        // If deadline is today and target block starts after a reasonable cutoff, warn
+        const deadlineMin = 23 * 60 + 59;
+        if (targetBlock.start > deadlineMin) return { ok: false, reason: "deadline" };
+      }
+    }
+    // Calendar load: warn if >80% of block filled by events
+    const avail = blockAvailMin[targetBlockId] || 0;
+    const blockDur = targetBlock.end - targetBlock.start;
+    if (blockDur > 0 && avail / blockDur < 0.2) return { ok: true, reason: "tight" };
+    return { ok: true, reason: null };
+  };
+
+  // DnD handlers
+  const handleDragStart = (e, itemId, itemType, taskId) => {
+    setDragItemId(itemId);
+    setDragItemType(itemType);
+    setDragTaskId(taskId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", itemId);
+  };
+  const handleDragOver = (e, blockId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTargetBlock !== blockId) setDropTargetBlock(blockId);
+  };
+  const handleDragLeave = () => setDropTargetBlock(null);
+  const handleDrop = (e, targetBlockId) => {
+    e.preventDefault();
+    setDropTargetBlock(null);
+    if (!dragItemId || !onMoveTaskBlock) { setDragItemId(null); return; }
+    const check = checkDropAllowed(dragItemId, dragItemType, dragTaskId, targetBlockId);
+    if (!check.ok) { setDragItemId(null); return; }
+    onMoveTaskBlock(dragItemId, dragItemType, dragTaskId, targetBlockId);
+    setDragItemId(null);
+    setDragItemType(null);
+    setDragTaskId(null);
+  };
+  const handleDragEnd = () => { setDragItemId(null); setDragItemType(null); setDragTaskId(null); setDropTargetBlock(null); };
+
+  // Drop zone color based on collision check
+  const getDropZoneClass = (blockId) => {
+    if (dropTargetBlock !== blockId || !dragItemId) return "";
+    const check = checkDropAllowed(dragItemId, dragItemType, dragTaskId, blockId);
+    if (!check.ok) return "ring-2 ring-danger/50 bg-danger/5";
+    if (check.reason === "tight") return "ring-2 ring-warn/50 bg-warn/5";
+    return "ring-2 ring-accent/50 bg-accent/5";
+  };
 
   const BLOCK_COLORS = { morning: "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-700/30", afternoon: "bg-sky-50/50 dark:bg-sky-900/10 border-sky-200/50 dark:border-sky-700/30", evening: "bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-700/30" };
   const BLOCK_HEADER = { morning: "text-amber-700 dark:text-amber-300", afternoon: "text-sky-700 dark:text-sky-300", evening: "text-indigo-700 dark:text-indigo-300" };
   const fmtMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   const fmtTime = (d) => { const dt = new Date(d); return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`; };
 
-  return (
+  return (<>
     <div className="space-y-3">
       {/* Nächster Schritt — always surfaces subtasks when available */}
       {isToday && (
@@ -294,14 +391,20 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
 
       {/* Time blocks — clipped to assistance window */}
       {blocks.map((block) => {
-        const blockItems = sortItems(displayItems.filter((it) => it.block === block.id));
+        const blockItems = sortItems(displayItems.filter((it) => it.block === block.id), block.id);
         const blockCompleted = completedItems.filter((it) => it.block === block.id);
         const blockEvents = events.filter((ev) => !ev.allDay && getEventBlock(ev) === block.id);
         const isCurrent = currentBlockId === block.id;
         const isPast = isToday && nowMin >= block.end;
 
         return (
-          <div key={block.id} className={`rounded-xl border p-3 transition-all ${BLOCK_COLORS[block.id]} ${isCurrent ? "ring-1 ring-accent/30" : ""} ${isPast ? "opacity-60" : ""}`}>
+          <div
+            key={block.id}
+            className={`rounded-xl border p-3 transition-all ${BLOCK_COLORS[block.id]} ${isCurrent ? "ring-1 ring-accent/30" : ""} ${isPast ? "opacity-60" : ""} ${getDropZoneClass(block.id)}`}
+            onDragOver={(e) => handleDragOver(e, block.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, block.id)}
+          >
             <div className="flex items-center justify-between mb-2">
               <h4 className={`text-xs font-bold uppercase tracking-wider ${BLOCK_HEADER[block.id]}`}>
                 {t(`home.blockView.${block.id}`)} {isCurrent && <span className="ml-1.5 text-[9px] font-normal text-accent">●</span>}
@@ -327,7 +430,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
             <div className="space-y-1">
               {blockItems.map((item) => item.type === "subtask" ? (
                 /* Standalone subtask (hideParent ON) — shows parent name as context */
-                <div key={item.id} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"}`}>
+                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "subtask", item.taskId)} onDragEnd={handleDragEnd} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${dragItemId === item.id ? "opacity-40" : ""}`}>
                   <button onClick={() => onToggleSubtask(item.taskId, item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-muted-light dark:text-muted-dark truncate">{item.parentText}</p>
@@ -344,7 +447,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                 </div>
               ) : (
                 /* Parent task (hideParent OFF or no subtasks) — prominent ring when subtasks exist */
-                <div key={item.id} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${item.subtasks?.length > 0 ? "ring-1 ring-accent/10" : ""}`}>
+                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "task", item.taskId)} onDragEnd={handleDragEnd} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${item.subtasks?.length > 0 ? "ring-1 ring-accent/10" : ""} ${dragItemId === item.id ? "opacity-40" : ""}`}>
                   <button onClick={() => onCompleteTask(item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium truncate">{item.text}</p>
@@ -368,6 +471,11 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                   {countdownStartEnabled && onStartTask && (
                     <button onClick={() => onStartTask(item._task || item)} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5">▶</button>
                   )}
+                  {onAddSubtask && (
+                    <button onClick={() => setSubtaskModalTaskId(item.taskId)} className="text-[10px] text-muted-light dark:text-muted-dark hover:text-accent hover:bg-accent/10 px-1 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5" title={t("tasks.addSubtask")}>
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               ))}
               {blockCompleted.length > 0 && (
@@ -385,7 +493,18 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         );
       })}
     </div>
-  );
+    {/* Subtask creation modal */}
+    {subtaskModalTaskId && onAddSubtask && (
+      <TaskFormModal
+        t={t}
+        isSubtask
+        inheritedCategory={tasks.find((tk) => tk.id === subtaskModalTaskId)?.category}
+        categories={categories || []}
+        onSubmit={(formData) => { onAddSubtask(subtaskModalTaskId, formData); setSubtaskModalTaskId(null); }}
+        onClose={() => setSubtaskModalTaskId(null)}
+      />
+    )}
+  </>);
 }
 
 // Module-level utility: compute the earliest allowed start minute for a task based on scheduling settings
@@ -474,9 +593,11 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const ENERGY_LABELS = { high: t("tasks.energy.high"), medium: t("tasks.energy.medium"), low: t("tasks.energy.low") };
   const getEnergyMatch = (task) => {
     const cost = task?.energyCost || "medium";
-    if (!energyLevel) return { label: ENERGY_LABELS[cost] || ENERGY_LABELS.medium, matched: false, cost };
+    const label = ENERGY_LABELS[cost] || ENERGY_LABELS.medium;
+    if (!energyLevel) return { label, matched: false, score: 0, cost };
+    const score = computeTaskScore(task, energyLevel, null);
     const matched = cost === energyLevel;
-    return { label: ENERGY_LABELS[cost] || ENERGY_LABELS.medium, matched, cost };
+    return { label, matched, score, cost };
   };
   const isTimeOnly = (s) => /^\d{1,2}:\d{2}$/.test(s);
   const nowTotal = toMin(nowH, nowM);
@@ -2019,17 +2140,7 @@ export default function HomePage() {
   }
 
   const topTasks = [...dayTasks]
-        .sort((a, b) => {
-          const aOverdue = isTaskOverdue(a) ? 0 : 1;
-          const bOverdue = isTaskOverdue(b) ? 0 : 1;
-          if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-          const p = { high: 0, medium: 1, low: 2 };
-          // Energy-level sort: low energy → prefer low priority tasks first
-          if (state.energyLevel === "low") {
-            return (p[b.priority] ?? 1) - (p[a.priority] ?? 1);
-          }
-          return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
-        });
+        .sort((a, b) => computeTaskScore(b, state.energyLevel, null) - computeTaskScore(a, state.energyLevel, null));
   const hiddenTaskCount = Math.max(0, topTasks.length - MAX_TIMELINE_TASKS);
   const topTasksSliced = topTasks.slice(0, MAX_TIMELINE_TASKS);
 
@@ -2387,8 +2498,17 @@ export default function HomePage() {
               onCompleteTask={(id) => dispatch({ type: "COMPLETE_TASK", payload: id })}
               onToggleSubtask={(taskId, subtaskId) => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId } })}
               onStartTask={(task) => setCountdownTask(task)}
+              onAddSubtask={(taskId, formData) => dispatch({ type: "ADD_SUBTASK", payload: { taskId, ...formData } })}
+              onMoveTaskBlock={(itemId, itemType, taskId, targetBlockId) => {
+                if (itemType === "subtask") {
+                  dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: itemId, timeOfDay: targetBlockId, blockSortIndex: null } });
+                } else {
+                  dispatch({ type: "UPDATE_TASK", payload: { id: itemId, timeOfDay: targetBlockId, blockSortIndex: null } });
+                }
+              }}
               countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
               isTaskOverdue={isTaskOverdue}
+              categories={settings.categories || []}
             />
           </>
         )}
