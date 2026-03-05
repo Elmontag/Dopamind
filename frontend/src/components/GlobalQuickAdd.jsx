@@ -44,7 +44,7 @@ export default function GlobalQuickAdd() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [text, setText] = useState("");
-  const [priority, setPriority] = useState("high");
+  const [priority, setPriority] = useState("medium");
   const [when, setWhen] = useState("today");
   const [energy, setEnergy] = useState("medium");
   const [size, setSize] = useState("medium");
