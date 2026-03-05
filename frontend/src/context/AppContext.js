@@ -74,6 +74,24 @@ export const DEFAULT_CATEGORIES = [
   { id: "creative", name: "creative", emoji: "🎨", color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
 ];
 
+// Compute calibrated size mappings from timeLog data (min 5 data points per category)
+export function computeCalibratedMappings(timeLog, defaultMappings = { quick: 10, short: 25, medium: 45, long: 90 }) {
+  const result = { ...defaultMappings };
+  const stats = {};
+  for (const entry of (timeLog || [])) {
+    if (!entry.sizeCategory || !entry.actualMin) continue;
+    if (!stats[entry.sizeCategory]) stats[entry.sizeCategory] = [];
+    stats[entry.sizeCategory].push(entry.actualMin);
+  }
+  for (const key of ["quick", "short", "medium", "long"]) {
+    const data = stats[key];
+    if (data && data.length >= 5) {
+      result[key] = Math.round(data.reduce((s, v) => s + v, 0) / data.length);
+    }
+  }
+  return { mappings: result, stats };
+}
+
 const initialState = {
   tasks: [],
   categories: DEFAULT_CATEGORIES,
@@ -110,6 +128,7 @@ const initialState = {
   dailyChallenge: null,
   previousWeekStats: null,
   focusLog: [],
+  timeLog: [],
   lastWeeklyReport: null,
   microConfettiQueue: [],
 };
@@ -321,6 +340,7 @@ function reducer(state, action) {
         priority: action.payload.priority || "medium",
         energyCost: action.payload.energyCost || "medium",
         estimatedMinutes: action.payload.estimatedMinutes || 25,
+        sizeCategory: action.payload.sizeCategory || null,
         completed: false,
         createdAt: Date.now(),
         deadline: action.payload.deadline || null,
@@ -362,12 +382,12 @@ function reducer(state, action) {
     }
 
     case "ADD_SUBTASK": {
-      const { taskId, text, estimatedMinutes: subMin, scheduledTime: subSchedTime, scheduledDate: subSchedDate, energyCost: subEnergy, timeOfDay: subTimeOfDay, priority: subPrio, deadline: subDeadline, tags: subTags } = action.payload;
+      const { taskId, text, estimatedMinutes: subMin, scheduledTime: subSchedTime, scheduledDate: subSchedDate, energyCost: subEnergy, timeOfDay: subTimeOfDay, priority: subPrio, deadline: subDeadline, tags: subTags, sizeCategory: subSize } = action.payload;
       return {
         ...state,
         tasks: state.tasks.map((t) => {
           if (t.id !== taskId) return t;
-          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null, priority: subPrio || t.priority || "medium", deadline: subDeadline || null, category: t.category || null, tags: subTags || [] };
+          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null, priority: subPrio || t.priority || "medium", deadline: subDeadline || null, category: t.category || null, tags: subTags || [], sizeCategory: subSize || null };
           const subs = [...(t.subtasks || []), newSub];
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
           return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
@@ -401,6 +421,25 @@ function reducer(state, action) {
           if (u.timeOfDay !== undefined) patch.timeOfDay = u.timeOfDay;
           return { ...t, ...patch };
         }),
+      };
+    }
+
+    case "LOG_TASK_TIME": {
+      // payload: { taskId, subtaskId?, sizeCategory?, estimatedMin, actualMin, startedAt, stoppedAt }
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const prunedLog = (state.timeLog || []).filter((e) => e.date >= ninetyDaysAgo);
+      return {
+        ...state,
+        timeLog: [...prunedLog, { id: Date.now() + Math.random(), date: getTodayStr(), ...action.payload }],
+      };
+    }
+
+    case "UPDATE_TIME_LOG": {
+      // payload: { id, startedAt?, stoppedAt?, actualMin? }
+      const { id: logId, ...logUpdates } = action.payload;
+      return {
+        ...state,
+        timeLog: (state.timeLog || []).map((e) => e.id === logId ? { ...e, ...logUpdates } : e),
       };
     }
 

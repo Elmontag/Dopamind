@@ -188,6 +188,15 @@ const ENERGY_BADGE = { low: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/
 const PRIORITY_BADGE = { high: "border-l-danger", medium: "border-l-warn", low: "border-l-emerald-400" };
 const PRIORITY_BADGE_BG = { high: "bg-danger/10 text-danger", medium: "bg-warn/10 text-amber-700 dark:text-warn", low: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" };
 
+const SIZE_LABEL = { quick: "tasks.size.quick", short: "tasks.size.short", medium: "tasks.size.medium", long: "tasks.size.long" };
+const SIZE_BADGE_COLOR = { quick: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", short: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", long: "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" };
+function DurationBadge({ item, t, className = "" }) {
+  if (item.sizeCategory && SIZE_LABEL[item.sizeCategory]) {
+    return <span className={`${SIZE_BADGE_COLOR[item.sizeCategory] || ""} rounded px-1 ${className}`}>{t(SIZE_LABEL[item.sizeCategory])}</span>;
+  }
+  return <span className={`text-muted-light dark:text-muted-dark ${className}`}>~{item.estimatedMinutes || 25}{t("common.min")}</span>;
+}
+
 function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, onAddSubtask, onMoveTaskBlock, onEditSubtaskFull, countdownStartEnabled, isTaskOverdue, categories }) {
   const [subtaskModalTaskId, setSubtaskModalTaskId] = useState(null);
   const [editSubtask, setEditSubtask] = useState(null); // { taskId, subtask }
@@ -377,12 +386,12 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                 <p className="text-sm font-medium truncate">{nextStep.text}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {nextStep.energyCost && <span className={`text-[10px] px-1.5 py-0.5 rounded ${ENERGY_BADGE[nextStep.energyCost]}`}>{t(`tasks.energy.${nextStep.energyCost}`)}</span>}
-                  <span className="text-[10px] text-muted-light dark:text-muted-dark">~{nextStep.estimatedMinutes || 25}{t("common.min")}</span>
+                  <DurationBadge item={nextStep} t={t} className="text-[10px]" />
                   {nextStep.deadline && <span className={`text-[10px] ${isOverdue(nextStep) ? "text-danger font-medium" : "text-muted-light dark:text-muted-dark"}`}>{t("tasks.hardDeadline")}: {new Date(nextStep.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}</span>}
                 </div>
               </div>
               {countdownStartEnabled && onStartTask && (
-                <button onClick={() => onStartTask(nextStep.isSubtask ? { id: nextStep.id, text: nextStep.text, estimatedMinutes: nextStep.estimatedMinutes } : tasks.find((tk) => tk.id === nextStep.taskId))} className="btn-primary text-xs py-1.5 px-3 flex-shrink-0">{t("home.nextStepStart")}</button>
+                <button onClick={() => onStartTask(nextStep.isSubtask ? { id: nextStep.id, text: nextStep.text, estimatedMinutes: nextStep.estimatedMinutes, sizeCategory: nextStep.sizeCategory } : tasks.find((tk) => tk.id === nextStep.taskId))} className="btn-primary text-xs py-1.5 px-3 flex-shrink-0">{t("home.nextStepStart")}</button>
               )}
             </div>
           ) : (
@@ -440,7 +449,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       {item.priority && <span className={`text-[9px] px-1 py-0.5 rounded ${PRIORITY_BADGE_BG[item.priority] || ""}`}>{t(`tasks.priority.${item.priority}`)}</span>}
                       {item.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[item.energyCost]}`}>{t(`tasks.energy.${item.energyCost}`)}</span>}
-                      <span className="text-[9px] text-muted-light dark:text-muted-dark">~{item.estimatedMinutes || 25}{t("common.min")}</span>
+                      <DurationBadge item={item} t={t} className="text-[9px] px-1 py-0.5" />
                       {item.deadline && <span className={`text-[9px] flex items-center gap-0.5 ${isOverdue(item) ? "text-danger font-medium" : "text-muted-light dark:text-muted-dark"}`}><AlertCircle className="w-2.5 h-2.5" /> {new Date(item.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}</span>}
                       {isOverdue(item) && !item.deadline && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
                     </div>
@@ -452,7 +461,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                       </button>
                     )}
                     {countdownStartEnabled && onStartTask && (
-                      <button onClick={() => onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes })} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors">▶</button>
+                      <button onClick={() => onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes, sizeCategory: item.sizeCategory })} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors">▶</button>
                     )}
                   </div>
                 </div>
@@ -464,7 +473,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                     <p className="text-xs font-medium truncate">{item.text}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       {item.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[item.energyCost]}`}>{t(`tasks.energy.${item.energyCost}`)}</span>}
-                      <span className="text-[9px] text-muted-light dark:text-muted-dark">~{item.estimatedMinutes || 25}{t("common.min")}</span>
+                      <DurationBadge item={item} t={t} className="text-[9px] px-1 py-0.5" />
                       {item.scheduledTime && <span className="text-[9px] text-accent font-mono">{item.scheduledTime}</span>}
                       {isOverdue(item) && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
                     </div>
@@ -518,6 +527,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         isSubtask
         inheritedCategory={tasks.find((tk) => tk.id === subtaskModalTaskId)?.category}
         categories={categories || []}
+        sizeMappings={settings.estimation?.sizeMappings}
         onSubmit={(formData) => { onAddSubtask(subtaskModalTaskId, formData); setSubtaskModalTaskId(null); }}
         onClose={() => setSubtaskModalTaskId(null)}
       />
@@ -530,6 +540,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         initialValues={editSubtask.subtask}
         inheritedCategory={tasks.find((tk) => tk.id === editSubtask.taskId)?.category}
         categories={categories || []}
+        sizeMappings={settings.estimation?.sizeMappings}
         onSubmit={(formData) => { onEditSubtaskFull(editSubtask.taskId, editSubtask.subtask.id, formData); setEditSubtask(null); }}
         onClose={() => setEditSubtask(null)}
       />
@@ -1916,7 +1927,7 @@ function WeekTimelineView({ t, tasks, getEventsForDate, weekStart, onSelectDay, 
                             {/* Start countdown */}
                             {countdownStartEnabled && onStartTask && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes }); }}
+                                onClick={(e) => { e.stopPropagation(); onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes, sizeCategory: item.sizeCategory }); }}
                                 className="w-3 h-3 flex items-center justify-center rounded-sm bg-white/50 hover:bg-accent/30 text-[7px]"
                                 title={t("tasks.start")}
                               >▶</button>
@@ -2175,11 +2186,13 @@ export default function HomePage() {
   const topTasksSliced = topTasks.slice(0, MAX_TIMELINE_TASKS);
 
   const handleQuickAdd = (text, meta = {}) => {
+    const sm = settings.estimation?.sizeMappings || { quick: 10, short: 25, medium: 45, long: 90 };
     dispatch({ type: "ADD_TASK", payload: {
       text,
       priority: meta.priority || "medium",
       energyCost: meta.energyCost || "medium",
-      estimatedMinutes: 25,
+      estimatedMinutes: sm[meta.sizeCategory || "medium"] || 25,
+      sizeCategory: meta.sizeCategory || "medium",
       scheduledDate: meta.scheduledDate || null,
       timeOfDay: meta.timeOfDay || null,
     }});
@@ -2600,6 +2613,7 @@ export default function HomePage() {
           taskId={countdownTask.id}
           taskText={countdownTask.text}
           estimatedMinutes={countdownTask.estimatedMinutes || 25}
+          sizeCategory={countdownTask.sizeCategory}
           onClose={() => setCountdownTask(null)}
         />
       )}

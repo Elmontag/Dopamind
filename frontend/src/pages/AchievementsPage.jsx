@@ -60,6 +60,70 @@ function EnergyHistoryChart({ t, energyLog, period }) {
   );
 }
 
+const SIZE_ORDER = ["quick", "short", "medium", "long"];
+const SIZE_BAR_COLORS = { quick: "bg-emerald-400", short: "bg-blue-400", medium: "bg-amber-400", long: "bg-orange-400" };
+
+function EstimationAccuracySection({ t, timeLog }) {
+  const byCategory = {};
+  const overall = { count: 0, totalDiff: 0, overruns: 0 };
+  for (const entry of (timeLog || [])) {
+    if (!entry.estimatedMin || !entry.actualMin) continue;
+    overall.count++;
+    overall.totalDiff += Math.abs(entry.actualMin - entry.estimatedMin);
+    if (entry.actualMin > entry.estimatedMin) overall.overruns++;
+    if (entry.sizeCategory) {
+      if (!byCategory[entry.sizeCategory]) byCategory[entry.sizeCategory] = { count: 0, totalEst: 0, totalAct: 0 };
+      byCategory[entry.sizeCategory].count++;
+      byCategory[entry.sizeCategory].totalEst += entry.estimatedMin;
+      byCategory[entry.sizeCategory].totalAct += entry.actualMin;
+    }
+  }
+  if (overall.count === 0) return <p className="text-xs text-muted-light dark:text-muted-dark">{t("stats.noEstimationData")}</p>;
+
+  const avgDiff = Math.round(overall.totalDiff / overall.count);
+  const overrunPct = Math.round((overall.overruns / overall.count) * 100);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="text-center">
+          <p className="text-xl font-bold text-accent">{overall.count}</p>
+          <p className="text-[10px] text-muted-light dark:text-muted-dark uppercase">{t("stats.trackedTasks")}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xl font-bold text-warn">±{avgDiff}{t("common.min")}</p>
+          <p className="text-[10px] text-muted-light dark:text-muted-dark uppercase">{t("stats.avgDeviation")}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xl font-bold text-danger">{overrunPct}%</p>
+          <p className="text-[10px] text-muted-light dark:text-muted-dark uppercase">{t("stats.overrunRate")}</p>
+        </div>
+      </div>
+      {/* Per-category breakdown */}
+      <div className="space-y-2">
+        {SIZE_ORDER.filter((k) => byCategory[k]).map((key) => {
+          const cat = byCategory[key];
+          const avgEst = Math.round(cat.totalEst / cat.count);
+          const avgAct = Math.round(cat.totalAct / cat.count);
+          const maxVal = Math.max(avgEst, avgAct, 1);
+          return (
+            <div key={key} className="text-xs">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="font-medium">{t(`tasks.size.${key}`)} ({cat.count}x)</span>
+                <span className="text-muted-light dark:text-muted-dark">{t("stats.estVsAct", { est: avgEst, act: avgAct })}</span>
+              </div>
+              <div className="flex gap-1 h-2">
+                <div className={`${SIZE_BAR_COLORS[key]} rounded opacity-40`} style={{ width: `${(avgEst / maxVal) * 50}%` }} title={`${t("stats.estimated")}: ${avgEst}${t("common.min")}`} />
+                <div className={`${SIZE_BAR_COLORS[key]} rounded`} style={{ width: `${(avgAct / maxVal) * 50}%` }} title={`${t("stats.actual")}: ${avgAct}${t("common.min")}`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BrainReportTab({ t, state, resourceMonitorState, breakPattern }) {
   const [period, setPeriod] = useState("week");
   const [customFrom, setCustomFrom] = useState("");
@@ -208,6 +272,14 @@ function BrainReportTab({ t, state, resourceMonitorState, breakPattern }) {
         <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">{t("stats.energyHistory")}</h3>
         <EnergyHistoryChart t={t} energyLog={period === "custom" ? filteredEnergyLog : state.energyLog} period={period} />
       </div>
+
+      {/* Estimation accuracy */}
+      {(state.timeLog || []).length > 0 && (
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-4">{t("stats.estimationAccuracy")}</h3>
+          <EstimationAccuracySection t={t} timeLog={state.timeLog} />
+        </div>
+      )}
 
       {state.previousWeekStats && (
         <div className="glass-card p-5">

@@ -117,7 +117,16 @@
     "sectionWhen": "Wann?",
     "sectionImportance": "Wie wichtig?",
     "sectionEnergy": "Energiebedarf",
-    "sectionDetails": "Details"
+    "sectionDetails": "Details",
+    "sectionDuration": "Wie lange dauert das?",
+    "size": {
+      "quick": "Schnell",
+      "short": "Kurz",
+      "medium": "Mittel",
+      "long": "Lang"
+    },
+    "sizeCustom": "Genauer angeben",
+    "sizeUsePreset": "Vorgabe verwenden"
   },
   "focus": {
     "title": "Fokus-Block",
@@ -169,7 +178,15 @@
     "energyHistory": "Energieverlauf",
     "noEnergyData": "Noch keine Energiedaten für diesen Zeitraum.",
     "notMyDayTitle": "\"Nicht mein Tag\"",
-    "notMyDayLabel": "Mal aktiviert"
+    "notMyDayLabel": "Mal aktiviert",
+    "estimationAccuracy": "Schätzgenauigkeit",
+    "noEstimationData": "Noch keine Zeitdaten vorhanden.",
+    "trackedTasks": "Aufgaben gemessen",
+    "avgDeviation": "Ø Abweichung",
+    "overrunRate": "Überzogen",
+    "estVsAct": "Ø {est}min geschätzt → {act}min tatsächlich",
+    "estimated": "Geschätzt",
+    "actual": "Tatsächlich"
   },
   "calendar": {
     "title": "Kalender",
@@ -446,6 +463,12 @@
     "pauseSuggestionsEnabled": "Pausenvorschläge",
     "weeklyReportEnabled": "Wochenbericht",
     "hideParentWithSubtasks": "Hauptaufgaben ausblenden wenn Unteraufgaben vorhanden",
+    "estimation": "Zeitschätzung",
+    "estimationDesc": "Passe die Minutenwerte für die Größenkategorien an. Im Autopilot-Modus lernt Dopamind aus deinen tatsächlichen Zeiten.",
+    "estimationAutopilot": "Autopilot (lernende Kalibrierung)",
+    "estimationAutopilotDesc": "Wenn aktiv, passt Dopamind die Minutenwerte automatisch anhand deiner tatsächlichen Arbeitszeiten an (min. 5 Datenpunkte pro Kategorie).",
+    "estimationDataPoints": "Datenpunkte",
+    "estimationUsingDefault": "Standardwert",
     "taskSchedulingRound": "Frühester Terminvorschlag (Rundung)",
     "taskSchedulingRoundDesc": "Ab wann darf eine neue Aufgabe frühestens vorgeschlagen werden?",
     "taskSchedulingRound_halfHour": "Halbe Stunde (xx:00 / xx:30)",
@@ -755,6 +778,10 @@
     "dueTomorrow": "Fällig morgen",
     "viewAll": "Alle Aufgaben anzeigen →",
     "scheduledConflict": "⚠ \"{task}\" kollidiert mit Termin um {time}"
+  },
+  "timer": {
+    "almostDone": "Geschätzte Zeit fast erreicht!",
+    "overrun": "Aufgabe dauert {min} Min. länger als geschätzt"
   },
   "countdown": {
     "title": "Mach dich bereit...",

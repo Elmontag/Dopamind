@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
+import { useApp, computeCalibratedMappings } from "../context/AppContext";
 import { discoverCalendars } from "../services/calendarService";
 import { Check, Sun, Moon, Globe, Filter, Search, Loader2, SlidersHorizontal, Briefcase, Mail, Calendar, Gamepad2, User, AlertTriangle } from "lucide-react";
 
@@ -295,6 +296,8 @@ export default function SettingsPage() {
   const { t, lang, switchLang, availableLanguages } = useI18n();
   const { dark, toggle } = useTheme();
   const { settings, updateSettings } = useSettings();
+  const { state: appState } = useApp();
+  const calibrated = useMemo(() => computeCalibratedMappings(appState.timeLog, settings.estimation?.sizeMappings), [appState.timeLog, settings.estimation?.sizeMappings]);
   const [activeTab, setActiveTab] = useState("general");
 
   const TABS = [
@@ -651,6 +654,46 @@ export default function SettingsPage() {
                 onChange={(v) => updateSettings("timeline", { hideParentWithSubtasks: v })}
                 label={t("settings.hideParentWithSubtasks")}
               />
+            </Section>
+            <Section title={t("settings.estimation")}>
+              <p className="text-xs text-muted-light dark:text-muted-dark mb-3">{t("settings.estimationDesc")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {["quick", "short", "medium", "long"].map((key) => {
+                  const isAutopilot = settings.estimation?.autopilot === true;
+                  const dataCount = calibrated.stats?.[key]?.length || 0;
+                  const calibratedVal = calibrated.mappings[key];
+                  const manualVal = settings.estimation?.sizeMappings?.[key] ?? { quick: 10, short: 25, medium: 45, long: 90 }[key];
+                  return (
+                    <Field key={key} label={t(`tasks.size.${key}`)}>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={480}
+                          step={5}
+                          value={isAutopilot ? calibratedVal : manualVal}
+                          onChange={(v) => updateSettings("estimation", { sizeMappings: { ...(settings.estimation?.sizeMappings || {}), [key]: Number(v) } })}
+                          disabled={isAutopilot}
+                        />
+                        <span className="text-xs text-muted-light dark:text-muted-dark">{t("common.min")}</span>
+                      </div>
+                      {isAutopilot && (
+                        <p className="text-[9px] text-muted-light dark:text-muted-dark mt-0.5">
+                          {dataCount >= 5 ? `${dataCount} ${t("settings.estimationDataPoints")}` : `${dataCount}/5 ${t("settings.estimationDataPoints")} — ${t("settings.estimationUsingDefault")}`}
+                        </p>
+                      )}
+                    </Field>
+                  );
+                })}
+              </div>
+              <div className="mt-3">
+                <Toggle
+                  checked={settings.estimation?.autopilot === true}
+                  onChange={(v) => updateSettings("estimation", { autopilot: v })}
+                  label={t("settings.estimationAutopilot")}
+                />
+                <p className="text-[10px] text-muted-light dark:text-muted-dark mt-1">{t("settings.estimationAutopilotDesc")}</p>
+              </div>
             </Section>
             </>
           )}

@@ -3,7 +3,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { useFocusTimer } from "../context/FocusTimerContext";
 
-export default function CountdownStart({ taskId, taskText, estimatedMinutes = 25, onClose }) {
+export default function CountdownStart({ taskId, taskText, estimatedMinutes = 25, sizeCategory, onClose }) {
   const [count, setCount] = useState(5);
   const [started, setStarted] = useState(false);
   const { dispatch: appDispatch } = useApp();
@@ -18,7 +18,7 @@ export default function CountdownStart({ taskId, taskText, estimatedMinutes = 25
           clearInterval(intervalRef.current);
           setStarted(true);
           appDispatch({ type: "START_FOCUS", payload: { minutes: estimatedMinutes } });
-          timerDispatch({ type: "START_TASK_TIMER", payload: { id: taskId, text: taskText } });
+          timerDispatch({ type: "START_TASK_TIMER", payload: { id: taskId, text: taskText, estimatedMinutes, sizeCategory } });
           setTimeout(onClose, 500);
           return 0;
         }
@@ -26,7 +26,7 @@ export default function CountdownStart({ taskId, taskText, estimatedMinutes = 25
       });
     }, 1000);
     return () => clearInterval(intervalRef.current);
-  }, [appDispatch, timerDispatch, taskId, taskText, estimatedMinutes, onClose]);
+  }, [appDispatch, timerDispatch, taskId, taskText, estimatedMinutes, sizeCategory, onClose]);
 
   const radius = 40;
   const circ = 2 * Math.PI * radius;

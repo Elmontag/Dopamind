@@ -59,7 +59,7 @@ function isTaskOverdue(task) {
   return !!(task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date());
 }
 
-function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories }) {
+function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories, sizeMappings }) {
   const { dispatch } = useApp();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -159,6 +159,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           initialValues={subtask}
           inheritedCategory={task?.category}
           categories={categories}
+          sizeMappings={sizeMappings}
           onSubmit={handleEditSubmit}
           onClose={() => setShowEditModal(false)}
         />
@@ -168,6 +169,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
           taskId={subtask.id}
           taskText={subtask.text}
           estimatedMinutes={subtask.estimatedMinutes || 25}
+          sizeCategory={subtask.sizeCategory}
           onClose={() => setShowCountdown(false)}
         />
       )}
@@ -175,7 +177,7 @@ function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categori
   );
 }
 
-function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled }) {
+function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownStartEnabled, sizeMappings }) {
   const { dispatch } = useApp();
   const { untagMail } = useMail();
   const priority = PRIORITY_CONFIG[task.priority];
@@ -185,7 +187,9 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
   const [editText, setEditText] = useState(task.text);
   const [editPriority, setEditPriority] = useState(task.priority);
   const [editEnergyCost, setEditEnergyCost] = useState(task.energyCost || "medium");
-  const [editMinutes, setEditMinutes] = useState(task.estimatedMinutes);
+  const [editSizeCategory, setEditSizeCategory] = useState(task.sizeCategory || "medium");
+  const [editCustomMinutes, setEditCustomMinutes] = useState(task.sizeCategory ? null : (task.estimatedMinutes || null));
+  const [editShowCustom, setEditShowCustom] = useState(!!(task.estimatedMinutes && !task.sizeCategory && task.estimatedMinutes !== 25));
   const [editDeadline, setEditDeadline] = useState(task.deadline || "");
   const [editTimeOfDay, setEditTimeOfDay] = useState(task.timeOfDay || "");
   const [editScheduledTime, setEditScheduledTime] = useState(task.scheduledTime || "");
@@ -222,7 +226,8 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
         text: editText.trim(),
         priority: editPriority,
         energyCost: editEnergyCost,
-        estimatedMinutes: editMinutes,
+        estimatedMinutes: editShowCustom && editCustomMinutes ? editCustomMinutes : (sizeMappings[editSizeCategory] || 25),
+        sizeCategory: editShowCustom ? null : editSizeCategory,
         deadline: editDeadline || null,
         timeOfDay: editTimeOfDay || null,
         scheduledTime: (editTimeOfDay === "exact" ? editScheduledTime : null) || null,
@@ -312,11 +317,25 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
                     <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.hardDeadline")}</span>
                     <input type="date" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                    <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.estimatedDuration")}</span>
-                    <input type="number" min={5} max={480} step={5} value={editMinutes} onChange={(e) => setEditMinutes(Number(e.target.value))} className="w-16 px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-center text-xs focus:outline-none focus:ring-1 focus:ring-accent/30" />
-                    <span className="text-xs text-muted-light dark:text-muted-dark">{t("common.min")}</span>
+                  {/* Duration (T-shirt sizing) */}
+                  <div>
+                    <span className="text-xs text-muted-light dark:text-muted-dark mb-1 block">{t("tasks.sectionDuration")}</span>
+                    <div className="flex gap-1.5">
+                      {["quick", "short", "medium", "long"].map((key) => (
+                        <button key={key} type="button" onClick={() => { setEditSizeCategory(key); setEditShowCustom(false); }} className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all text-center ${!editShowCustom && editSizeCategory === key ? "bg-accent/10 text-accent ring-1 ring-accent/20" : "bg-gray-50 dark:bg-white/5 text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/10"}`}>
+                          {t(`tasks.size.${key}`)} <span className="opacity-50">~{sizeMappings[key]}{t("common.min")}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => { setEditShowCustom(!editShowCustom); if (!editCustomMinutes) setEditCustomMinutes(sizeMappings[editSizeCategory] || 25); }} className={`mt-1 text-[10px] transition-colors ${editShowCustom ? "text-accent font-medium" : "text-muted-light dark:text-muted-dark hover:text-accent"}`}>
+                      {editShowCustom ? t("tasks.sizeUsePreset") : t("tasks.sizeCustom")}
+                    </button>
+                    {editShowCustom && (
+                      <div className="flex items-center gap-2 mt-1 animate-fade-in">
+                        <input type="range" min={5} max={240} step={5} value={editCustomMinutes || 25} onChange={(e) => setEditCustomMinutes(Number(e.target.value))} className="flex-1 accent-accent" />
+                        <span className="text-xs font-mono text-accent w-12 text-right">{editCustomMinutes || 25}{t("common.min")}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Folder className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
@@ -500,7 +519,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </Link>
           )}
           {subtasks.map((s) => (
-            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} />
+            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} sizeMappings={sizeMappings} />
           ))}
           {!task.completed && (
             <div className="pl-8 mt-1">
@@ -511,7 +530,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </div>
           )}
           {showSubtaskModal && (
-            <TaskFormModal t={t} onSubmit={handleAddSubtask} onClose={() => setShowSubtaskModal(false)} isSubtask inheritedCategory={task.category} categories={categories} />
+            <TaskFormModal t={t} onSubmit={handleAddSubtask} onClose={() => setShowSubtaskModal(false)} isSubtask inheritedCategory={task.category} categories={categories} sizeMappings={sizeMappings} />
           )}
         </div>
       )}
@@ -520,6 +539,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
           taskId={task.id}
           taskText={task.text}
           estimatedMinutes={task.estimatedMinutes || 25}
+          sizeCategory={task.sizeCategory}
           onClose={() => setShowCountdown(false)}
         />
       )}
@@ -532,10 +552,11 @@ export default function TasksPage() {
   const { state, dispatch } = useApp();
   const { settings } = useSettings();
   const countdownStartEnabled = settings.gamification?.countdownStartEnabled !== false;
+  const sizeMappings = settings.estimation?.sizeMappings || { quick: 10, short: 25, medium: 45, long: 90 };
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("medium");
   const [energyCost, setEnergyCost] = useState("medium");
-  const [minutes, setMinutes] = useState(25);
+  const [sizeCategory, setSizeCategory] = useState("medium");
   const [deadline, setDeadline] = useState("");
   const [timeOfDay, setTimeOfDay] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
@@ -589,7 +610,8 @@ export default function TasksPage() {
         text: text.trim(),
         priority,
         energyCost,
-        estimatedMinutes: minutes,
+        estimatedMinutes: sizeMappings[sizeCategory] || 25,
+        sizeCategory,
         deadline: deadline || null,
         timeOfDay: timeOfDay || null,
         scheduledTime: (timeOfDay === "exact" ? scheduledTime : null) || null,
@@ -987,20 +1009,16 @@ export default function TasksPage() {
                               className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
                             />
                           </div>
-                          {/* Duration */}
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                            <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.estimatedDuration")}</span>
-                            <input
-                              type="number"
-                              min={5}
-                              max={480}
-                              step={5}
-                              value={minutes}
-                              onChange={(e) => setMinutes(Number(e.target.value))}
-                              className="w-16 px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-center text-xs focus:outline-none focus:ring-1 focus:ring-accent/30"
-                            />
-                            <span className="text-xs text-muted-light dark:text-muted-dark">{t("common.min")}</span>
+                          {/* Duration (T-shirt sizing) */}
+                          <div>
+                            <span className="text-xs text-muted-light dark:text-muted-dark mb-1 block">{t("tasks.sectionDuration")}</span>
+                            <div className="flex gap-1.5">
+                              {["quick", "short", "medium", "long"].map((key) => (
+                                <button key={key} type="button" onClick={() => setSizeCategory(key)} className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all text-center ${sizeCategory === key ? "bg-accent/10 text-accent ring-1 ring-accent/20" : "bg-gray-50 dark:bg-white/5 text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/10"}`}>
+                                  {t(`tasks.size.${key}`)} <span className="opacity-50">~{sizeMappings[key]}{t("common.min")}</span>
+                                </button>
+                              ))}
+                            </div>
                           </div>
                           {/* Category */}
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1125,6 +1143,7 @@ export default function TasksPage() {
                   onTagClick={(tag) => setFilterTag((prev) => (prev === tag ? null : tag))}
                   onCategoryClick={(cat) => setFilterCategory((prev) => (prev === cat ? null : cat))}
                   countdownStartEnabled={countdownStartEnabled}
+                  sizeMappings={settings.estimation?.sizeMappings}
                 />
               ))}
             </div>

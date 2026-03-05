@@ -194,7 +194,16 @@
     "sectionWhen": "When?",
     "sectionImportance": "How important?",
     "sectionEnergy": "Energy Needed",
-    "sectionDetails": "Details"
+    "sectionDetails": "Details",
+    "sectionDuration": "How long will this take?",
+    "size": {
+      "quick": "Quick",
+      "short": "Short",
+      "medium": "Medium",
+      "long": "Long"
+    },
+    "sizeCustom": "Set exact time",
+    "sizeUsePreset": "Use preset"
   },
   "focus": {
     "title": "Focus Block",
@@ -246,7 +255,15 @@
     "energyHistory": "Energy History",
     "noEnergyData": "No energy data for this period yet.",
     "notMyDayTitle": "\"Not My Day\"",
-    "notMyDayLabel": "times activated"
+    "notMyDayLabel": "times activated",
+    "estimationAccuracy": "Estimation Accuracy",
+    "noEstimationData": "No time tracking data yet.",
+    "trackedTasks": "tasks tracked",
+    "avgDeviation": "avg deviation",
+    "overrunRate": "overrun rate",
+    "estVsAct": "avg {est}min estimated → {act}min actual",
+    "estimated": "Estimated",
+    "actual": "Actual"
   },
   "calendar": {
     "title": "Calendar",
@@ -523,6 +540,12 @@
     "pauseSuggestionsEnabled": "Pause Suggestions",
     "weeklyReportEnabled": "Weekly Report",
     "hideParentWithSubtasks": "Hide parent tasks when subtasks are present",
+    "estimation": "Time Estimation",
+    "estimationDesc": "Customize minute values for size categories. In autopilot mode, Dopamind learns from your actual times.",
+    "estimationAutopilot": "Autopilot (learning calibration)",
+    "estimationAutopilotDesc": "When active, Dopamind automatically adjusts minute values based on your actual task times (min. 5 data points per category).",
+    "estimationDataPoints": "data points",
+    "estimationUsingDefault": "using default",
     "taskSchedulingRound": "Earliest task scheduling (rounding)",
     "taskSchedulingRoundDesc": "How early can a newly created task be suggested in the day plan?",
     "taskSchedulingRound_halfHour": "Half hour (xx:00 / xx:30)",
@@ -755,6 +778,10 @@
     "dueTomorrow": "Due tomorrow",
     "viewAll": "View all tasks →",
     "scheduledConflict": "⚠ \"{task}\" conflicts with event at {time}"
+  },
+  "timer": {
+    "almostDone": "Almost at estimated time!",
+    "overrun": "Task running {min} min over estimate"
   },
   "countdown": {
     "title": "Get ready...",

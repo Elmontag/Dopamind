@@ -55,6 +55,10 @@ const defaultSettings = {
     customTimeStart: "06:00",
     customTimeEnd: "22:00",
   },
+  estimation: {
+    sizeMappings: { quick: 10, short: 25, medium: 45, long: 90 },
+    autopilot: false,
+  },
 };
 
 // Break pattern presets

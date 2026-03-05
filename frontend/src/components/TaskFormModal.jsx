@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, ChevronDown, ChevronRight, AlertCircle, Clock, Folder, Tag } from "lucide-react";
+import { X, ChevronDown, ChevronRight, AlertCircle, Folder, Tag } from "lucide-react";
 
 const PRIORITY_CONFIG = {
   high: { color: "bg-danger/10 text-danger dark:bg-danger/20" },
@@ -32,9 +32,19 @@ function sanitizeTag(input) {
   return input.trim().replace(/,/g, "");
 }
 
-export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title, initialValues }) {
+const SIZE_KEYS = ["quick", "short", "medium", "long"];
+const DEFAULT_SIZE_MAPPINGS = { quick: 10, short: 25, medium: 45, long: 90 };
+const SIZE_COLORS = {
+  quick: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  short: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  long: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+};
+
+export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title, initialValues, sizeMappings }) {
   const iv = initialValues || {};
   const isEdit = !!initialValues;
+  const mappings = sizeMappings || DEFAULT_SIZE_MAPPINGS;
   const [text, setText] = useState(iv.text || "");
   const [priority, setPriority] = useState(iv.priority || "medium");
   const [energyCost, setEnergyCost] = useState(iv.energyCost || "medium");
@@ -42,11 +52,15 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
   const [timeOfDay, setTimeOfDay] = useState(iv.timeOfDay || (iv.scheduledTime ? "exact" : ""));
   const [scheduledTime, setScheduledTime] = useState(iv.scheduledTime || "");
   const [deadline, setDeadline] = useState(iv.deadline || "");
-  const [minutes, setMinutes] = useState(iv.estimatedMinutes || 25);
+  const [sizeCategory, setSizeCategory] = useState(iv.sizeCategory || "medium");
+  const [customMinutes, setCustomMinutes] = useState(iv.sizeCategory ? null : (iv.estimatedMinutes || null));
+  const [showCustom, setShowCustom] = useState(!!(iv.estimatedMinutes && !iv.sizeCategory && iv.estimatedMinutes !== 25));
   const [category, setCategory] = useState(inheritedCategory || iv.category || "");
   const [tags, setTags] = useState(iv.tags || []);
   const [tagInput, setTagInput] = useState("");
   const [showDetails, setShowDetails] = useState(isEdit && !!(iv.deadline || iv.tags?.length));
+
+  const effectiveMinutes = showCustom && customMinutes ? customMinutes : (mappings[sizeCategory] || 25);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -63,7 +77,8 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
       text: text.trim(),
       priority,
       energyCost,
-      estimatedMinutes: minutes,
+      estimatedMinutes: effectiveMinutes,
+      sizeCategory: showCustom ? null : sizeCategory,
       scheduledDate: scheduledDate ? resolveDate(scheduledDate) : null,
       timeOfDay: timeOfDay && timeOfDay !== "exact" ? timeOfDay : null,
       scheduledTime: timeOfDay === "exact" && scheduledTime ? scheduledTime : null,
@@ -150,6 +165,28 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
             </div>
           </div>
 
+          {/* Duration (T-shirt sizing) */}
+          <div>
+            <label className="text-[10px] font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-1.5 block">{t("tasks.sectionDuration")}</label>
+            <div className="flex gap-1.5">
+              {SIZE_KEYS.map((key) => (
+                <button key={key} type="button" onClick={() => { setSizeCategory(key); setShowCustom(false); }} className={`flex-1 px-2 py-2 rounded-xl text-xs font-medium transition-all text-center ${!showCustom && sizeCategory === key ? SIZE_COLORS[key] + " ring-1 ring-current/20" : "bg-gray-50 dark:bg-white/5 text-muted-light dark:text-muted-dark hover:bg-gray-100 dark:hover:bg-white/10"}`}>
+                  <span className="block">{t(`tasks.size.${key}`)}</span>
+                  <span className="block text-[9px] opacity-60 mt-0.5">~{mappings[key]}{t("common.min")}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => { setShowCustom(!showCustom); if (!customMinutes) setCustomMinutes(mappings[sizeCategory] || 25); }} className={`mt-1.5 text-[10px] transition-colors ${showCustom ? "text-accent font-medium" : "text-muted-light dark:text-muted-dark hover:text-accent"}`}>
+              {showCustom ? t("tasks.sizeUsePreset") : t("tasks.sizeCustom")}
+            </button>
+            {showCustom && (
+              <div className="flex items-center gap-2 mt-1.5 animate-fade-in">
+                <input type="range" min={5} max={240} step={5} value={customMinutes || 25} onChange={(e) => setCustomMinutes(Number(e.target.value))} className="flex-1 accent-accent" />
+                <span className="text-xs font-mono text-accent w-12 text-right">{customMinutes || 25}{t("common.min")}</span>
+              </div>
+            )}
+          </div>
+
           {/* Details (collapsible) */}
           <div>
             <button type="button" onClick={() => setShowDetails(!showDetails)} className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-light dark:text-muted-dark uppercase tracking-wider mb-1.5">
@@ -162,12 +199,6 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
                   <AlertCircle className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
                   <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.hardDeadline")}</span>
                   <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-xs focus:outline-none focus:ring-1 focus:ring-accent/30" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-light dark:text-muted-dark flex-shrink-0" />
-                  <span className="text-xs text-muted-light dark:text-muted-dark">{t("tasks.estimatedDuration")}</span>
-                  <input type="number" min={5} max={480} step={5} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="w-16 px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-center text-xs focus:outline-none focus:ring-1 focus:ring-accent/30" />
-                  <span className="text-xs text-muted-light dark:text-muted-dark">{t("common.min")}</span>
                 </div>
                 {/* Category — inherited for subtasks, selectable for tasks */}
                 {isSubtask && inheritedCategory ? (
