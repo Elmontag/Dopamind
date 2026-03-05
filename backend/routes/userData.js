@@ -9,6 +9,59 @@ router.use(authenticate);
 
 const VALID_TYPES = ["settings", "app_state", "time_tracking", "resource_monitor"];
 
+// Schema validators per data type – return an error string or null if valid
+function validateData(type, data) {
+  if (typeof data !== "object" || Array.isArray(data) || data === null) {
+    return "Data must be an object";
+  }
+
+  if (type === "settings") {
+    const allowed = ["imap", "smtp", "caldav", "general", "notifications", "theme",
+      "language", "estimation", "scheduling", "gamification", "focusTimer", "ui",
+      "assistanceWindow", "breakPattern", "workSchedule", "features", "timeWarnings",
+      "timeline", "timezone", "mail"];
+    const keys = Object.keys(data);
+    for (const key of keys) {
+      if (!allowed.includes(key)) {
+        return `Unknown settings key: ${key}`;
+      }
+    }
+    // Validate nested password fields are strings if present
+    for (const section of ["imap", "smtp", "caldav"]) {
+      if (data[section] !== undefined) {
+        if (typeof data[section] !== "object" || Array.isArray(data[section])) {
+          return `settings.${section} must be an object`;
+        }
+        if (data[section].password !== undefined && typeof data[section].password !== "string") {
+          return `settings.${section}.password must be a string`;
+        }
+      }
+    }
+    return null;
+  }
+
+  if (type === "resource_monitor") {
+    const allowed = ["activitySessions", "todaySession", "absenceMode", "absenceHistory",
+      "pendingTriage", "legacyEntries"];
+    const keys = Object.keys(data);
+    for (const key of keys) {
+      if (!allowed.includes(key)) {
+        return `Unknown resource_monitor key: ${key}`;
+      }
+    }
+    if (data.activitySessions !== undefined && !Array.isArray(data.activitySessions)) {
+      return "resource_monitor.activitySessions must be an array";
+    }
+    if (data.absenceHistory !== undefined && !Array.isArray(data.absenceHistory)) {
+      return "resource_monitor.absenceHistory must be an array";
+    }
+    return null;
+  }
+
+  // app_state and time_tracking: accept any object (legacy JSONB blobs)
+  return null;
+}
+
 // GET /api/user-data/:type
 router.get("/:type", async (req, res) => {
   try {
@@ -50,6 +103,11 @@ router.put("/:type", async (req, res) => {
     const { data } = req.body;
     if (data === undefined || data === null) {
       return res.status(400).json({ error: "Data is required" });
+    }
+
+    const validationError = validateData(type, data);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
 
     let toStore = data;

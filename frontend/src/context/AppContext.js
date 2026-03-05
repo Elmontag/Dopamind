@@ -335,7 +335,7 @@ function reducer(state, action) {
   switch (action.type) {
     case "ADD_TASK": {
       const task = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: action.payload.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         text: action.payload.text,
         priority: action.payload.priority || "medium",
         energyCost: action.payload.energyCost || "medium",
@@ -387,7 +387,7 @@ function reducer(state, action) {
         ...state,
         tasks: state.tasks.map((t) => {
           if (t.id !== taskId) return t;
-          const newSub = { id: Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null, priority: subPrio || t.priority || "medium", deadline: subDeadline || null, category: t.category || null, tags: subTags || [], sizeCategory: subSize || null };
+          const newSub = { id: action.payload.id || Date.now().toString(36), text, completed: false, estimatedMinutes: subMin || 0, scheduledTime: subSchedTime || null, scheduledDate: subSchedDate || null, energyCost: subEnergy || t.energyCost || "medium", timeOfDay: subTimeOfDay || null, priority: subPrio || t.priority || "medium", deadline: subDeadline || null, category: t.category || null, tags: subTags || [], sizeCategory: subSize || null };
           const subs = [...(t.subtasks || []), newSub];
           const subTotal = subs.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
           return { ...t, subtasks: subs, estimatedMinutes: subTotal > 0 ? subTotal : t.estimatedMinutes };
@@ -969,44 +969,301 @@ export function AppProvider({ children }) {
     } catch {}
     return init;
   });
-  const saveTimer = useRef(null);
+  const statsTimer = useRef(null);
   const didLoad = useRef(false);
+  // Track which achievement IDs have been synced to avoid duplicate POSTs
+  const syncedAchievements = useRef(new Set());
 
-  // Load state from backend on mount
+  // Load state from backend on mount — prefer new granular endpoints, fall back to legacy blob
   useEffect(() => {
     if (didLoad.current) return;
     didLoad.current = true;
     const token = localStorage.getItem("dopamind-token");
     if (!token) return;
-    apiFetch("/user-data/app_state")
-      .then((res) => {
-        if (res.data && Object.keys(res.data).length > 0) {
-          dispatch({ type: "LOAD_STATE", payload: res.data });
+
+    Promise.all([
+      apiFetch("/tasks").catch(() => null),
+      apiFetch("/stats").catch(() => null),
+      apiFetch("/achievements").catch(() => null),
+    ]).then(([tasksRes, statsRes, achievementsRes]) => {
+      // Use the new granular API if it responded
+      if (Array.isArray(tasksRes)) {
+        const loadPayload = {};
+
+        // If API returned tasks, use them. If API returned empty but localStorage has tasks,
+        // keep localStorage tasks (handles offline-first / pre-migration scenarios).
+        const localTasks = state.tasks;
+        if (tasksRes.length > 0 || localTasks.length === 0) {
+          // Map tasks from API shape back to app state shape
+          loadPayload.tasks = tasksRes.map((t) => ({
+            id: t.id,
+            text: t.text,
+            priority: t.priority || "medium",
+            energyCost: t.energyCost || "medium",
+            estimatedMinutes: t.estimatedMinutes || 0,
+            sizeCategory: t.sizeCategory || null,
+            completed: t.completed || false,
+            completedAt: t.completedAt || null,
+            createdAt: t.createdAt || Date.now(),
+            deadline: t.deadline || null,
+            timeOfDay: t.timeOfDay || null,
+            scheduledTime: t.scheduledTime || null,
+            scheduledDate: t.scheduledDate || null,
+            category: t.category || null,
+            mailRef: t.mailRef || null,
+            blockSortIndex: t.blockSortIndex || undefined,
+            tags: t.tags || [],
+            subtasks: (t.subtasks || []).map((s) => ({
+              id: s.id,
+              text: s.text,
+              completed: s.completed || false,
+              completedAt: s.completedAt || null,
+              estimatedMinutes: s.estimatedMinutes || 0,
+              scheduledTime: s.scheduledTime || null,
+              scheduledDate: s.scheduledDate || null,
+              energyCost: s.energyCost || t.energyCost || "medium",
+              timeOfDay: s.timeOfDay || null,
+              priority: s.priority || t.priority || "medium",
+              deadline: s.deadline || null,
+              category: s.category || t.category || null,
+              tags: s.tags || [],
+              sizeCategory: s.sizeCategory || null,
+            })),
+          }));
         }
-      })
-      .catch(() => {});
+
+        if (statsRes && typeof statsRes.xp === "number") {
+          loadPayload.xp = statsRes.xp;
+          loadPayload.level = statsRes.level || 1;
+          loadPayload.currentStreakDays = statsRes.currentStreakDays || 0;
+          loadPayload.longestStreakDays = statsRes.longestStreak || 0;
+          loadPayload.completedToday = statsRes.completedToday || 0;
+          loadPayload.completedThisWeek = statsRes.completedThisWeek || 0;
+          loadPayload.completedThisMonth = statsRes.completedThisMonth || 0;
+          loadPayload.completedThisYear = statsRes.completedThisYear || 0;
+          loadPayload.lastActiveDate = statsRes.lastCompletedDate || null;
+        }
+
+        if (achievementsRes && Array.isArray(achievementsRes)) {
+          loadPayload.unlockedAchievements = achievementsRes.map((a) => a.id);
+          // Track already synced achievements
+          achievementsRes.forEach((a) => syncedAchievements.current.add(a.id));
+        }
+
+        dispatch({ type: "LOAD_STATE", payload: loadPayload });
+      } else {
+        // Fall back to legacy blob endpoint
+        apiFetch("/user-data/app_state")
+          .then((res) => {
+            if (res.data && Object.keys(res.data).length > 0) {
+              dispatch({ type: "LOAD_STATE", payload: res.data });
+              if (Array.isArray(res.data.unlockedAchievements)) {
+                res.data.unlockedAchievements.forEach((id) => syncedAchievements.current.add(id));
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    });
   }, []);
 
   useEffect(() => {
     dispatch({ type: "RESET_DAILY" });
   }, []);
 
-  // Persist to localStorage + debounced backend sync
+  // Persist to localStorage on every state change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const token = localStorage.getItem("dopamind-token");
-      if (!token) return;
-      apiFetch("/user-data/app_state", {
-        method: "PUT",
-        body: JSON.stringify({ data: state }),
-      }).catch(() => {});
-    }, 1000);
   }, [state]);
 
+  // Debounced stats sync – only syncs numeric stats, not tasks (those use direct API calls)
+  const syncStats = useCallback((newState) => {
+    if (statsTimer.current) clearTimeout(statsTimer.current);
+    statsTimer.current = setTimeout(() => {
+      const token = localStorage.getItem("dopamind-token");
+      if (!token) return;
+      apiFetch("/stats", {
+        method: "PATCH",
+        body: JSON.stringify({
+          xp: newState.xp,
+          level: newState.level,
+          currentStreakDays: newState.currentStreakDays,
+          longestStreak: newState.longestStreakDays,
+          completedToday: newState.completedToday,
+          completedThisWeek: newState.completedThisWeek,
+          completedThisMonth: newState.completedThisMonth,
+          completedThisYear: newState.completedThisYear,
+          lastCompletedDate: newState.lastActiveDate || null,
+        }),
+      }).catch(() => {});
+    }, 2000);
+  }, []);
+
+  // Sync newly unlocked achievements to backend
+  useEffect(() => {
+    const token = localStorage.getItem("dopamind-token");
+    if (!token || !Array.isArray(state.unlockedAchievements)) return;
+    for (const achId of state.unlockedAchievements) {
+      if (!syncedAchievements.current.has(achId)) {
+        syncedAchievements.current.add(achId);
+        apiFetch("/achievements", {
+          method: "POST",
+          body: JSON.stringify({ id: achId }),
+        }).catch(() => {});
+      }
+    }
+  }, [state.unlockedAchievements]);
+
+  // Wrapped dispatch: dispatches locally + fires granular API calls as side effects
+  const apiDispatch = useCallback((action) => {
+    const token = localStorage.getItem("dopamind-token");
+
+    switch (action.type) {
+      case "ADD_TASK": {
+        // Pre-generate ID so reducer and API use the same one
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const enhancedAction = { ...action, payload: { ...action.payload, id } };
+        dispatch(enhancedAction);
+        if (token) {
+          const { text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
+            timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags } = action.payload;
+          apiFetch("/tasks", {
+            method: "POST",
+            body: JSON.stringify({
+              id, text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
+              timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags: tags || [],
+            }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "COMPLETE_TASK": {
+        dispatch(action);
+        if (token) {
+          apiFetch(`/tasks/${action.payload}`, {
+            method: "PATCH",
+            body: JSON.stringify({ completed: true, completedAt: new Date().toISOString() }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "REOPEN_TASK": {
+        dispatch(action);
+        if (token) {
+          apiFetch(`/tasks/${action.payload}`, {
+            method: "PATCH",
+            body: JSON.stringify({ completed: false, completedAt: null }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "DELETE_TASK": {
+        dispatch(action);
+        if (token) {
+          apiFetch(`/tasks/${action.payload}`, { method: "DELETE" }).catch(() => {});
+        }
+        return;
+      }
+      case "UPDATE_TASK": {
+        dispatch(action);
+        if (token) {
+          const { id: taskId, text, priority, energyCost, estimatedMinutes, sizeCategory,
+            deadline, timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags,
+            blockSortIndex, completed, completedAt } = action.payload;
+          const patch = {};
+          if (text !== undefined) patch.text = text;
+          if (priority !== undefined) patch.priority = priority;
+          if (energyCost !== undefined) patch.energyCost = energyCost;
+          if (estimatedMinutes !== undefined) patch.estimatedMinutes = estimatedMinutes;
+          if (sizeCategory !== undefined) patch.sizeCategory = sizeCategory;
+          if (deadline !== undefined) patch.deadline = deadline;
+          if (timeOfDay !== undefined) patch.timeOfDay = timeOfDay;
+          if (scheduledTime !== undefined) patch.scheduledTime = scheduledTime;
+          if (scheduledDate !== undefined) patch.scheduledDate = scheduledDate;
+          if (category !== undefined) patch.category = category;
+          if (mailRef !== undefined) patch.mailRef = mailRef;
+          if (tags !== undefined) patch.tags = tags;
+          if (blockSortIndex !== undefined) patch.blockSortIndex = blockSortIndex;
+          if (completed !== undefined) patch.completed = completed;
+          if (completedAt !== undefined) patch.completedAt = completedAt;
+          if (Object.keys(patch).length > 0) {
+            apiFetch(`/tasks/${taskId}`, {
+              method: "PATCH",
+              body: JSON.stringify(patch),
+            }).catch(() => {});
+          }
+        }
+        return;
+      }
+      case "ADD_SUBTASK": {
+        // Pre-generate ID so reducer and API use the same one
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const enhancedAction = { ...action, payload: { ...action.payload, id } };
+        dispatch(enhancedAction);
+        if (token) {
+          const { taskId, text, estimatedMinutes, scheduledTime, scheduledDate,
+            energyCost, timeOfDay, priority, deadline, category, tags, sizeCategory } = action.payload;
+          apiFetch(`/tasks/${taskId}/subtasks`, {
+            method: "POST",
+            body: JSON.stringify({
+              id, text, estimatedMinutes, scheduledTime, scheduledDate,
+              energyCost, timeOfDay, priority, deadline, category, tags: tags || [], sizeCategory,
+            }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "TOGGLE_SUBTASK": {
+        const { taskId, subtaskId } = action.payload;
+        // Read current state before dispatch to know the current value
+        const task = state.tasks.find((t) => t.id === taskId);
+        const sub = task && (task.subtasks || []).find((s) => s.id === subtaskId);
+        dispatch(action);
+        if (token && sub) {
+          apiFetch(`/tasks/${taskId}/subtasks/${subtaskId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ completed: !sub.completed }),
+          }).catch(() => {});
+        }
+        return;
+      }
+      case "UPDATE_SUBTASK": {
+        dispatch(action);
+        if (token) {
+          const { taskId: usId, subtaskId: usSubId, ...subUpdates } = action.payload;
+          if (Object.keys(subUpdates).length > 0) {
+            apiFetch(`/tasks/${usId}/subtasks/${usSubId}`, {
+              method: "PATCH",
+              body: JSON.stringify(subUpdates),
+            }).catch(() => {});
+          }
+        }
+        return;
+      }
+      case "DELETE_SUBTASK": {
+        dispatch(action);
+        if (token) {
+          const { taskId: dtId, subtaskId: dsId } = action.payload;
+          apiFetch(`/tasks/${dtId}/subtasks/${dsId}`, { method: "DELETE" }).catch(() => {});
+        }
+        return;
+      }
+      default:
+        dispatch(action);
+        break;
+    }
+  }, [state.tasks]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync stats after any state change that might affect them
+  useEffect(() => {
+    const token = localStorage.getItem("dopamind-token");
+    if (!token) return;
+    syncStats(state);
+  }, [state.xp, state.level, state.currentStreakDays, state.completedToday,
+    state.completedThisWeek, state.completedThisMonth, state.completedThisYear]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <AppContext.Provider value={{ state, dispatch, xpForLevel, xpForNextLevel }}>
+    <AppContext.Provider value={{ state, dispatch: apiDispatch, xpForLevel, xpForNextLevel }}>
       {children}
     </AppContext.Provider>
   );

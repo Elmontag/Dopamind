@@ -6,16 +6,14 @@ const IV_LENGTH = 12;
 function getEncryptionKey() {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
-    console.warn("WARNING: ENCRYPTION_KEY not set. Sensitive data will be stored without encryption.");
-    return null;
+    console.error("FATAL: ENCRYPTION_KEY environment variable is not set. Server will not start without it.");
+    process.exit(1);
   }
   return crypto.createHash("sha256").update(key).digest();
 }
 
 function encrypt(text) {
   const key = getEncryptionKey();
-  if (!key) return text;
-
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
@@ -26,8 +24,6 @@ function encrypt(text) {
 
 function decrypt(ciphertext) {
   const key = getEncryptionKey();
-  if (!key) return ciphertext;
-
   const parts = ciphertext.split(":");
   if (parts.length !== 3) return ciphertext; // Not encrypted
 

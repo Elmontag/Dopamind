@@ -48,6 +48,9 @@ services:
       - CORS_ORIGIN=http://localhost:3000,http://localhost
       - NODE_TLS_REJECT_UNAUTHORIZED=0
       - DATABASE_URL=${DATABASE_URL:-postgresql://dopamind:dopamind_dev@postgres:5432/dopamind}
+      # Required secrets – override these in production via a .env file or secret manager
+      - JWT_SECRET=${JWT_SECRET:-dopamind-dev-jwt-secret-change-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dopamind-dev-enc-key-change-in-production}
     depends_on:
       postgres:
         condition: service_healthy
