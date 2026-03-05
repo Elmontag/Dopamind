@@ -3,7 +3,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
 import { DAILY_CHALLENGES } from "../context/AppContext";
 import { useCalendar } from "../context/CalendarContext";
-import { useTimeTracking } from "../context/TimeTrackingContext";
+import { useResourceMonitor } from "../context/ResourceMonitorContext";
 import { useSettings } from "../context/SettingsContext";
 import CountdownStart from "../components/CountdownStart";
 import {
@@ -12,56 +12,27 @@ import {
 } from "lucide-react";
 
 
-function ClockWidget({ t }) {
-  const { state, dispatch, getSessionMinutes, isOnBreak } = useTimeTracking();
-  const isClockedIn = !!state.currentSession;
+function AbsenceStatusWidget({ t }) {
+  const { state, dispatch, isAbsent, isSick, isOnVacation } = useResourceMonitor();
 
-  const formatTime = (min) => {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
-
-  if (!isClockedIn) {
-    return (
-      <button
-        onClick={() => dispatch({ type: "CLOCK_IN" })}
-        className="glass-card p-4 w-full flex items-center gap-3 hover:bg-accent/5 transition-colors group"
-      >
-        <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center group-hover:bg-success group-hover:text-white transition-colors">
-          <LogIn className="w-5 h-5 text-success group-hover:text-white" />
-        </div>
-        <div className="text-left">
-          <p className="text-sm font-semibold">{t("timeTracking.clockIn")}</p>
-          <p className="text-[10px] text-muted-light dark:text-muted-dark">{t("timeTracking.workHours")}</p>
-        </div>
-      </button>
-    );
-  }
+  if (!isAbsent) return null;
 
   return (
-    <div className="glass-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          <span className="text-sm font-medium">{t("timeTracking.currentSession")}</span>
-        </div>
-        <span className="text-lg font-bold font-mono text-accent">{formatTime(getSessionMinutes())}</span>
+    <div className={`glass-card p-4 flex items-center gap-3 ${isSick ? "border-l-4 border-danger" : "border-l-4 border-accent"}`}>
+      <span className="text-2xl">{isSick ? "🤒" : "🏖️"}</span>
+      <div className="flex-1">
+        <p className="text-sm font-medium">
+          {isSick
+            ? t("absence.sickActive")
+            : t("absence.vacationActive").replace("{endDate}", state.absenceMode?.endDate || "")}
+        </p>
       </div>
-      <div className="flex gap-2">
-        {isOnBreak ? (
-          <button onClick={() => dispatch({ type: "END_BREAK" })} className="btn-ghost text-sm flex items-center gap-1.5 flex-1 justify-center">
-            <LogIn className="w-3.5 h-3.5" /> {t("timeTracking.endBreak")}
-          </button>
-        ) : (
-          <button onClick={() => dispatch({ type: "START_BREAK" })} className="btn-ghost text-sm flex items-center gap-1.5 flex-1 justify-center">
-            <Coffee className="w-3.5 h-3.5" /> {t("timeTracking.break")}
-          </button>
-        )}
-        <button onClick={() => dispatch({ type: "CLOCK_OUT" })} className="btn-ghost text-sm flex items-center gap-1.5 flex-1 justify-center text-danger hover:bg-danger/10">
-          <LogOut className="w-3.5 h-3.5" /> {t("timeTracking.clockOut")}
-        </button>
-      </div>
+      <button
+        onClick={() => dispatch({ type: "DEACTIVATE_ABSENCE" })}
+        className="btn-ghost text-sm flex items-center gap-1.5"
+      >
+        {isSick ? t("absence.deactivate") : t("absence.vacationEarlyReturn")}
+      </button>
     </div>
   );
 }
@@ -134,8 +105,7 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   const workStartM = parseInt(settings.workSchedule.start.split(":")[1] || "0", 10);
   const workEndH = parseInt(settings.workSchedule.end.split(":")[0], 10);
   const workEndM = parseInt(settings.workSchedule.end.split(":")[1] || "0", 10);
-  const breakMin = settings.workSchedule.breakMinutes;
-  const timeTrackingEnabled = settings.features?.timeTrackingEnabled !== false;
+  const timeTrackingEnabled = settings.features?.resourceMonitorEnabled !== false;
   const [currentTime, setCurrentTime] = useState(new Date());
   const [confirmedPushIds, setConfirmedPushIds] = useState(() => new Set());
   useEffect(() => {
@@ -233,37 +203,57 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
     claimRange(evStartMin, evStartMin + dur);
   }
 
-  // 2. Break (Requirement 6: respect removed breaks and custom break times)
+  // 2. Breaks (multiple breaks based on breakPattern)
   const breakRemoved = (removedBreaks || []).includes(viewDate);
-  if (breakMin > 0 && !breakRemoved) {
-    let breakStart;
-    const customBreakTime = breakTimeOverrides?.[viewDate];
-    if (customBreakTime) {
-      const [bh, bm] = customBreakTime.split(":").map(Number);
-      breakStart = toMin(bh, bm || 0);
-    } else {
-      const midMin = Math.floor((workStart + workEnd) / 2);
-      breakStart = midMin;
-      for (let offset = 0; offset < (workEnd - workStart) / 2; offset += STEP) {
-        if (isRangeFree(midMin - offset, midMin - offset + breakMin)) { breakStart = midMin - offset; break; }
-        if (isRangeFree(midMin + offset, midMin + offset + breakMin)) { breakStart = midMin + offset; break; }
+  const breakInterval = settings.breakPattern?.intervalMinutes || 90;
+  const breakDur = settings.breakPattern?.durationMinutes || 15;
+  if (breakDur > 0 && !breakRemoved) {
+    // Generate multiple break slots: one after each interval from work start
+    const breakSlots = [];
+    let cursor = workStart + breakInterval;
+    let breakIdx = 0;
+    while (cursor + breakDur <= workEnd) {
+      const customBreakTime = breakTimeOverrides?.[`${viewDate}-${breakIdx}`] || breakTimeOverrides?.[viewDate];
+      let breakStart;
+      if (customBreakTime && breakIdx === 0) {
+        const [bh, bm] = customBreakTime.split(":").map(Number);
+        breakStart = toMin(bh, bm || 0);
+      } else {
+        breakStart = cursor;
+        // Try to find a free slot near the desired position
+        for (let offset = 0; offset < breakInterval / 2; offset += STEP) {
+          if (isRangeFree(cursor - offset, cursor - offset + breakDur)) { breakStart = cursor - offset; break; }
+          if (isRangeFree(cursor + offset, cursor + offset + breakDur)) { breakStart = cursor + offset; break; }
+        }
       }
+      // Match with actual activity breaks retrospectively (by time proximity)
+      let matchedBreak = null;
+      if (timeTrackingBreaks && timeTrackingBreaks.length > 0) {
+        const breakMid = breakStart + breakDur / 2;
+        matchedBreak = timeTrackingBreaks.reduce((best, b) => {
+          const bStart = new Date(b.start);
+          const bMid = bStart.getHours() * 60 + bStart.getMinutes() + ((b.end ? new Date(b.end) - bStart : 0) / 120000);
+          const dist = Math.abs(bMid - breakMid);
+          if (!best || dist < best.dist) return { ...b, dist };
+          return best;
+        }, null);
+        if (matchedBreak && matchedBreak.dist > 60) matchedBreak = null;
+      }
+      breakSlots.push({ breakStart, breakDur, matchedBreak, idx: breakIdx });
+      breakIdx++;
+      cursor = breakStart + breakDur + breakInterval;
     }
-    // Match with actual time tracking breaks retrospectively (by time proximity)
-    let matchedBreak = null;
-    if (timeTrackingBreaks && timeTrackingBreaks.length > 0) {
-      const breakMid = breakStart + breakMin / 2;
-      matchedBreak = timeTrackingBreaks.reduce((best, b) => {
-        const bStart = new Date(b.start);
-        const bMid = bStart.getHours() * 60 + bStart.getMinutes() + ((b.end ? new Date(b.end) - bStart : 0) / 120000);
-        const dist = Math.abs(bMid - breakMid);
-        if (!best || dist < best.dist) return { ...b, dist };
-        return best;
-      }, null);
-      if (matchedBreak && matchedBreak.dist > 120) matchedBreak = null; // Only match within 2 hours
+    for (const slot of breakSlots) {
+      entries.push({
+        key: `break-${slot.idx}`,
+        type: "break",
+        startMin: slot.breakStart,
+        durationMin: slot.breakDur,
+        label: `${slot.breakDur}${t("common.min")} ${t("timeTracking.break")}`,
+        matchedBreak: slot.matchedBreak,
+      });
+      claimRange(slot.breakStart, slot.breakStart + slot.breakDur);
     }
-    entries.push({ key: "break", type: "break", startMin: breakStart, durationMin: breakMin, label: `${breakMin}${t("common.min")} ${t("timeTracking.break")}`, matchedBreak });
-    claimRange(breakStart, breakStart + breakMin);
   }
 
   // 3. Tasks
@@ -382,7 +372,8 @@ function UnifiedDayTimeline({ t, events, tasks, settings, onCompleteTask, onTogg
   // --- Time-pressure warnings ---
   const tw = settings.timeWarnings || {};
   const totalTaskMin = entries.filter((e) => e.type === "task" || e.type === "subtask" || e.type === "task-parent").reduce((sum, e) => sum + e.durationMin, 0);
-  const totalFreeMin = (workEnd - workStart) - breakMin - entries.filter((e) => e.type === "event").reduce((sum, e) => sum + e.durationMin, 0) - totalTaskMin;
+  const totalBreakMin = entries.filter((e) => e.type === "break").reduce((sum, e) => sum + e.durationMin, 0);
+  const totalFreeMin = (workEnd - workStart) - totalBreakMin - entries.filter((e) => e.type === "event").reduce((sum, e) => sum + e.durationMin, 0) - totalTaskMin;
   let warningLevel = null;
   if (tw.enabled !== false && isToday) {
     const c1 = tw.criticalThreshold1 ?? 15; const c2 = tw.criticalThreshold2 ?? 0;
@@ -1685,7 +1676,7 @@ export default function HomePage() {
   const features = settings.features || {};
   const gridInterval = settings.timeline?.gridInterval || 30;
   const { updateSettings } = useSettings();
-  const { state: ttState } = useTimeTracking();
+  const { state: rmState } = useResourceMonitor();
 
   // Requirement 6: Break removal and repositioning state (per-day)
   const [removedBreaks, setRemovedBreaks] = useState(() => {
@@ -1708,11 +1699,27 @@ export default function HomePage() {
       return next;
     });
   };
-  // Get time tracking breaks for the viewed day (for retrospective matching)
-  const viewDayTTBreaks = (ttState.entries || [])
-    .filter((e) => e.date === viewDate)
-    .flatMap((e) => e.breaks || [])
-    .filter((b) => b.start && b.end);
+  // Get activity breaks for the viewed day (for retrospective matching)
+  const viewDayTTBreaks = (() => {
+    const sessions = rmState.activitySessions || [];
+    const todaySess = rmState.todaySession;
+    const dayBreaks = sessions
+      .filter((s) => s.date === viewDate)
+      .flatMap((s) => s.impliedBreaks || [])
+      .filter((b) => b.start && b.end);
+    if (todaySess && todaySess.date === viewDate) {
+      dayBreaks.push(...(todaySess.impliedBreaks || []).filter((b) => b.start && b.end));
+    }
+    // Also include legacy entries if available
+    if (rmState.legacyEntries) {
+      const legacyBreaks = rmState.legacyEntries
+        .filter((e) => e.date === viewDate)
+        .flatMap((e) => e.breaks || [])
+        .filter((b) => b.start && b.end);
+      dayBreaks.push(...legacyBreaks);
+    }
+    return dayBreaks;
+  })();
 
   const handleRescheduleNextDay = (taskId) => {
     const tomorrow = shiftDate(todayStr, +1);
@@ -1844,8 +1851,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Clock widget (only when time tracking is enabled) */}
-      {features.timeTrackingEnabled !== false && <ClockWidget t={t} />}
+      {/* Absence status widget (only when resource monitor is enabled) */}
+      {features.resourceMonitorEnabled !== false && <AbsenceStatusWidget t={t} />}
 
       {/* Unified Day/Week/Month Timeline */}
       <div className="glass-card p-5">

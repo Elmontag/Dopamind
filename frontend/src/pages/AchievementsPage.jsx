@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useApp } from "../context/AppContext";
+import { useResourceMonitor } from "../context/ResourceMonitorContext";
+import { useSettings } from "../context/SettingsContext";
 import AchievementsPanel from "../components/AchievementsPanel";
 import { Download, Trophy, BarChart2, Brain, TrendingUp } from "lucide-react";
 
@@ -58,7 +60,7 @@ function EnergyHistoryChart({ t, energyLog, period }) {
   );
 }
 
-function BrainReportTab({ t, state }) {
+function BrainReportTab({ t, state, resourceMonitorState, breakPattern }) {
   const [period, setPeriod] = useState("week");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -92,6 +94,9 @@ function BrainReportTab({ t, state }) {
       previousWeek: state.previousWeekStats || null,
       focusLog: (state.focusLog || []).slice(-30),
       energyLog: state.energyLog || [],
+      activitySessions: (resourceMonitorState?.activitySessions || []).slice(-30),
+      absenceHistory: resourceMonitorState?.absenceHistory || [],
+      breakPattern: breakPattern || null,
       exportedBy: "Dopamind Brain Report",
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
@@ -298,6 +303,8 @@ const TABS = [
 export default function AchievementsPage() {
   const { t } = useI18n();
   const { state } = useApp();
+  const { state: rmState } = useResourceMonitor();
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState("report");
 
   return (
@@ -321,7 +328,7 @@ export default function AchievementsPage() {
         ))}
       </div>
 
-      {activeTab === "report" && <BrainReportTab t={t} state={state} />}
+      {activeTab === "report" && <BrainReportTab t={t} state={state} resourceMonitorState={rmState} breakPattern={settings.breakPattern} />}
       {activeTab === "achievements" && <AchievementsPanel />}
       {activeTab === "xp" && <XpHistoryTab t={t} state={state} />}
       {activeTab === "statistics" && <StatsTab t={t} state={state} />}
