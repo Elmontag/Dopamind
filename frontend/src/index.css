@@ -68,12 +68,27 @@
 }
 
 /* Touch drag visual feedback */
+
+/* Original element while dragging — dimmed placeholder showing the item's origin */
 .touch-dragging {
-  opacity: 0.7;
-  transform: scale(1.03);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  z-index: 9999;
+  opacity: 0.35;
+  transform: scale(0.97);
   pointer-events: none;
+}
+
+/* Floating clone that follows the finger during a touch drag */
+#touch-drag-ghost {
+  pointer-events: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Drop-zone highlight — applied programmatically while hovering.
+   Uses the app's accent color (#6C63FF from tailwind.config.js). */
+.touch-drop-active {
+  outline: 2px dashed rgba(108, 99, 255, 0.55) !important;
+  outline-offset: 2px;
+  background-color: rgba(108, 99, 255, 0.07) !important;
 }
 
 /* Prevent text selection during drag on touch */

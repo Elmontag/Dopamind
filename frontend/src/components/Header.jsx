@@ -3,7 +3,7 @@ import { useApp, getLevelTitle } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
-import { Sun, Moon, Settings, Trophy, LogOut, User } from "lucide-react";
+import { Sun, Moon, Settings, Trophy, LogOut, User, Flame, Zap, BatteryLow } from "lucide-react";
 import { Link } from "react-router-dom";
 import XpBar from "./XpBar";
 import NotificationBell from "./NotificationBell";
@@ -64,7 +64,7 @@ export default function Header() {
             <div className="relative" ref={energyRef}>
               <button
                 onClick={() => setShowEnergyPicker((v) => !v)}
-                className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`hidden sm:flex items-center justify-center w-9 h-9 rounded-xl transition-colors ${
                   state.energyLevel === "high" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50" :
                   state.energyLevel === "low" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50" :
                   state.energyLevel ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50" :
@@ -72,8 +72,9 @@ export default function Header() {
                 }`}
                 title={t("home.energyEdit")}
               >
-                {state.energyLevel === "high" ? "🚀" : state.energyLevel === "low" ? "🔋" : state.energyLevel ? "⚡" : "⚡"}
-                <span>{state.energyLevel ? t(`home.energyActive.${state.energyLevel}`) : t("home.energyCheckin")}</span>
+                {state.energyLevel === "high" ? <Flame className="w-4 h-4" /> :
+                 state.energyLevel === "low" ? <BatteryLow className="w-4 h-4" /> :
+                 <Zap className="w-4 h-4" />}
               </button>
               {showEnergyPicker && (
                 <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-lg p-2 flex flex-col gap-1 min-w-[140px]">
@@ -87,7 +88,7 @@ export default function Header() {
                           : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      {level === "high" ? "🚀" : level === "low" ? "🔋" : "⚡"}
+                      {level === "high" ? <Flame className="w-3.5 h-3.5" /> : level === "low" ? <BatteryLow className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
                       {t(`home.energy.${level}`)}
                     </button>
                   ))}

@@ -55,16 +55,9 @@ export default function WeekSummaryView({ t, tasks, getEventsForDate, weekStart,
               <span className={`text-xs font-mono ${isToday ? "text-accent font-bold" : ""}`}>{dayNum}</span>
             </div>
 
-            {/* Compact counts row — no emojis, no text */}
-            <div className="flex items-center gap-1 mb-1 flex-wrap">
-              {pendingTasks.length > 0 && <span className="text-xs font-bold">{pendingTasks.length}</span>}
-              {completedTasks.length > 0 && <span className="text-[10px] text-success font-medium">✓</span>}
-              {events.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />}
-            </div>
-
-            {/* Energy color dots only */}
+            {/* Energy color dots only — no count numbers to avoid confusion with date */}
             {pendingTasks.length > 0 && (
-              <div className="flex gap-0.5 flex-wrap">
+              <div className="flex gap-0.5 flex-wrap mt-1">
                 {Object.entries(energyCounts).filter(([, c]) => c > 0).map(([level, count]) => (
                   <div key={level} className="flex gap-px">
                     {Array.from({ length: Math.min(count, 3) }).map((_, j) => (
