@@ -529,9 +529,9 @@
     "energyCost": "Energiebedarf",
     "energyCheckin": "Wie ist deine Energie heute?",
     "energy": {
-      "low": "🔋 Niedrig",
-      "normal": "🌀 Normal",
-      "high": "⚡ Hoch"
+      "low": "Niedrig",
+      "normal": "Normal",
+      "high": "Hoch"
     },
     "energyActive": {
       "low": "Niedriger Energie-Modus – leichtere Aufgaben zuerst",

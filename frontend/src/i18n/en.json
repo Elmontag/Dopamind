@@ -47,9 +47,9 @@
     "energyCost": "Energy demand",
     "energyCheckin": "How is your energy today?",
     "energy": {
-      "low": "🔋 Low",
-      "normal": "🌀 Normal",
-      "high": "⚡ High"
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High"
     },
     "energyActive": {
       "low": "Low energy mode – easier tasks first",
