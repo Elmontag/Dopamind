@@ -169,104 +169,121 @@ const PRIORITY_BADGE = { high: "border-l-danger", medium: "border-l-warn", low: 
 function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, countdownStartEnabled, isTaskOverdue }) {
   const workStart = parseTimeToMin(settings.workSchedule?.start || "08:00");
   const workEnd = parseTimeToMin(settings.workSchedule?.end || "18:00");
+  const hideParent = settings.timeline?.hideParentWithSubtasks === true;
 
-  // Block boundaries
+  // Block boundaries clipped to assistance window
   const blocks = [
-    { id: "morning", start: workStart, end: 12 * 60 },
-    { id: "afternoon", start: 12 * 60, end: 17 * 60 },
-    { id: "evening", start: 17 * 60, end: Math.max(workEnd, 22 * 60) },
-  ];
+    { id: "morning", start: Math.max(workStart, 0), end: Math.min(12 * 60, workEnd) },
+    { id: "afternoon", start: Math.max(12 * 60, workStart), end: Math.min(17 * 60, workEnd) },
+    { id: "evening", start: Math.max(17 * 60, workStart), end: workEnd },
+  ].filter((b) => b.start < b.end);
 
-  // Current time block
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const currentBlockId = isToday ? (blocks.find((b) => nowMin >= b.start && nowMin < b.end)?.id || "morning") : null;
+  const currentBlockId = isToday ? (blocks.find((b) => nowMin >= b.start && nowMin < b.end)?.id || blocks[0]?.id || null) : null;
 
-  // Assign tasks to blocks
-  const getTaskBlock = (task) => {
-    if (task.timeOfDay === "morning") return "morning";
-    if (task.timeOfDay === "afternoon") return "afternoon";
-    if (task.timeOfDay === "evening") return "evening";
-    if (task.scheduledTime) {
-      const [h] = task.scheduledTime.split(":").map(Number);
-      const min = h * 60;
-      if (min < 12 * 60) return "morning";
-      if (min < 17 * 60) return "afternoon";
-      return "evening";
+  // Block assignment respecting clipped boundaries
+  const blockIds = blocks.map((b) => b.id);
+  const getItemBlock = (item) => {
+    if (item.timeOfDay && blockIds.includes(item.timeOfDay)) return item.timeOfDay;
+    if (item.timeOfDay) return blocks[0]?.id || "morning";
+    if (item.scheduledTime) {
+      const [h, m] = item.scheduledTime.split(":").map(Number);
+      const min = h * 60 + (m || 0);
+      const block = blocks.find((b) => min >= b.start && min < b.end);
+      return block?.id || blocks[blocks.length - 1]?.id || "morning";
     }
-    return currentBlockId || "morning";
+    return currentBlockId || blocks[0]?.id || "morning";
   };
 
-  // Assign events to blocks
   const getEventBlock = (ev) => {
     if (!ev.start || ev.allDay) return null;
-    const startDate = new Date(ev.start);
-    const min = startDate.getHours() * 60 + startDate.getMinutes();
-    if (min < 12 * 60) return "morning";
-    if (min < 17 * 60) return "afternoon";
-    return "evening";
+    const d = new Date(ev.start);
+    const min = d.getHours() * 60 + d.getMinutes();
+    return blocks.find((b) => min >= b.start && min < b.end)?.id || null;
   };
 
-  // Sort within block: overdue first, then by priority, energy match
-  const sortTasks = (taskList) => [...taskList].sort((a, b) => {
-    const aOD = isTaskOverdue(a) ? 0 : 1;
-    const bOD = isTaskOverdue(b) ? 0 : 1;
+  const isOverdue = (item) => item.deadline && new Date(item.deadline + "T23:59:59") < new Date();
+
+  const sortItems = (list) => [...list].sort((a, b) => {
+    const aOD = isOverdue(a) ? 0 : 1;
+    const bOD = isOverdue(b) ? 0 : 1;
     if (aOD !== bOD) return aOD - bOD;
     const p = { high: 0, medium: 1, low: 2 };
     if (energyLevel === "low") return (p[b.priority] ?? 1) - (p[a.priority] ?? 1);
     return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
   });
 
-  // "Next Step" logic: find best task for right now
-  const allUncompleted = tasks.filter((tk) => !tk.completed);
-  const nextStep = (() => {
-    if (!isToday || allUncompleted.length === 0) return null;
-    // Prefer task in current block that matches energy
-    const currentBlockTasks = allUncompleted.filter((tk) => getTaskBlock(tk) === currentBlockId);
-    if (energyLevel) {
-      const matched = currentBlockTasks.find((tk) => (tk.energyCost || "medium") === energyLevel);
-      if (matched) return matched;
+  // Build all displayable items with block assignment, respecting hideParentWithSubtasks
+  const displayItems = [];
+  const completedItems = [];
+  for (const task of tasks) {
+    const subs = task.subtasks || [];
+    const incompleteSubs = subs.filter((s) => !s.completed);
+    if (task.completed) {
+      completedItems.push({ id: task.id, text: task.text, block: getItemBlock(task) });
+      continue;
     }
-    if (currentBlockTasks.length > 0) return sortTasks(currentBlockTasks)[0];
-    // Fallback: highest priority uncompleted
-    return sortTasks(allUncompleted)[0];
+    if (hideParent && incompleteSubs.length > 0) {
+      for (const sub of incompleteSubs) {
+        const item = { type: "subtask", id: sub.id, taskId: task.id, text: sub.text, parentText: task.text, priority: task.priority, energyCost: sub.energyCost || task.energyCost, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes, deadline: task.deadline, scheduledTime: sub.scheduledTime || task.scheduledTime, timeOfDay: sub.timeOfDay || task.timeOfDay };
+        item.block = getItemBlock(item);
+        displayItems.push(item);
+      }
+    } else {
+      const item = { type: "task", id: task.id, taskId: task.id, text: task.text, priority: task.priority, energyCost: task.energyCost, estimatedMinutes: task.estimatedMinutes, deadline: task.deadline, scheduledTime: task.scheduledTime, timeOfDay: task.timeOfDay, subtasks: incompleteSubs, _task: task };
+      item.block = getItemBlock(item);
+      displayItems.push(item);
+    }
+  }
+
+  // "Nächster Schritt": always prefer subtasks as the actionable next step
+  const nextStep = (() => {
+    if (!isToday) return null;
+    const candidates = [];
+    for (const task of tasks) {
+      if (task.completed) continue;
+      const subs = (task.subtasks || []).filter((s) => !s.completed);
+      if (subs.length > 0) {
+        for (const sub of subs) candidates.push({ id: sub.id, taskId: task.id, isSubtask: true, text: sub.text, parentText: task.text, priority: task.priority, energyCost: sub.energyCost || task.energyCost, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes, deadline: task.deadline, timeOfDay: sub.timeOfDay || task.timeOfDay, scheduledTime: sub.scheduledTime || task.scheduledTime });
+      } else {
+        candidates.push({ id: task.id, taskId: task.id, isSubtask: false, text: task.text, priority: task.priority, energyCost: task.energyCost, estimatedMinutes: task.estimatedMinutes, deadline: task.deadline, timeOfDay: task.timeOfDay, scheduledTime: task.scheduledTime });
+      }
+    }
+    if (candidates.length === 0) return null;
+    const inBlock = candidates.filter((c) => getItemBlock(c) === currentBlockId);
+    if (energyLevel) { const m = inBlock.find((c) => (c.energyCost || "medium") === energyLevel); if (m) return m; }
+    if (inBlock.length > 0) return sortItems(inBlock)[0];
+    return sortItems(candidates)[0];
   })();
 
-  const BLOCK_COLORS = {
-    morning: "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-700/30",
-    afternoon: "bg-sky-50/50 dark:bg-sky-900/10 border-sky-200/50 dark:border-sky-700/30",
-    evening: "bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-700/30",
-  };
-  const BLOCK_HEADER = {
-    morning: "text-amber-700 dark:text-amber-300",
-    afternoon: "text-sky-700 dark:text-sky-300",
-    evening: "text-indigo-700 dark:text-indigo-300",
-  };
+  const handleNextStepComplete = () => { if (!nextStep) return; nextStep.isSubtask ? onToggleSubtask(nextStep.taskId, nextStep.id) : onCompleteTask(nextStep.id); };
 
-  const fmtTime = (d) => {
-    const date = new Date(d);
-    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  };
+  const BLOCK_COLORS = { morning: "bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-700/30", afternoon: "bg-sky-50/50 dark:bg-sky-900/10 border-sky-200/50 dark:border-sky-700/30", evening: "bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-700/30" };
+  const BLOCK_HEADER = { morning: "text-amber-700 dark:text-amber-300", afternoon: "text-sky-700 dark:text-sky-300", evening: "text-indigo-700 dark:text-indigo-300" };
+  const fmtMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const fmtTime = (d) => { const dt = new Date(d); return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`; };
 
   return (
     <div className="space-y-3">
-      {/* Next Step highlight */}
+      {/* Nächster Schritt — always surfaces subtasks when available */}
       {isToday && (
         <div className="rounded-xl bg-accent/5 border border-accent/20 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-accent mb-2">{t("home.nextStep")}</p>
           {nextStep ? (
             <div className="flex items-center gap-3">
-              <button onClick={() => onCompleteTask(nextStep.id)} className="w-6 h-6 rounded-full border-2 border-accent/40 hover:bg-accent/10 flex-shrink-0 transition-colors" />
+              <button onClick={handleNextStepComplete} className="w-6 h-6 rounded-full border-2 border-accent/40 hover:bg-accent/10 flex-shrink-0 transition-colors" />
               <div className="flex-1 min-w-0">
+                {nextStep.isSubtask && <p className="text-[10px] text-muted-light dark:text-muted-dark truncate">{nextStep.parentText}</p>}
                 <p className="text-sm font-medium truncate">{nextStep.text}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {nextStep.energyCost && <span className={`text-[10px] px-1.5 py-0.5 rounded ${ENERGY_BADGE[nextStep.energyCost]}`}>{t(`tasks.energy.${nextStep.energyCost}`)}</span>}
                   <span className="text-[10px] text-muted-light dark:text-muted-dark">~{nextStep.estimatedMinutes || 25}{t("common.min")}</span>
-                  {nextStep.deadline && <span className={`text-[10px] ${isTaskOverdue(nextStep) ? "text-danger font-medium" : "text-muted-light dark:text-muted-dark"}`}>{t("tasks.hardDeadline")}: {new Date(nextStep.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}</span>}
+                  {nextStep.deadline && <span className={`text-[10px] ${isOverdue(nextStep) ? "text-danger font-medium" : "text-muted-light dark:text-muted-dark"}`}>{t("tasks.hardDeadline")}: {new Date(nextStep.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}</span>}
                 </div>
               </div>
               {countdownStartEnabled && onStartTask && (
-                <button onClick={() => onStartTask(nextStep)} className="btn-primary text-xs py-1.5 px-3 flex-shrink-0">{t("home.nextStepStart")}</button>
+                <button onClick={() => onStartTask(nextStep.isSubtask ? { id: nextStep.id, text: nextStep.text, estimatedMinutes: nextStep.estimatedMinutes } : tasks.find((tk) => tk.id === nextStep.taskId))} className="btn-primary text-xs py-1.5 px-3 flex-shrink-0">{t("home.nextStepStart")}</button>
               )}
             </div>
           ) : (
@@ -275,27 +292,23 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         </div>
       )}
 
-      {/* Time blocks */}
+      {/* Time blocks — clipped to assistance window */}
       {blocks.map((block) => {
-        const blockTasks = sortTasks(tasks.filter((tk) => !tk.completed && getTaskBlock(tk) === block.id));
-        const completedTasks = tasks.filter((tk) => tk.completed && getTaskBlock(tk) === block.id);
+        const blockItems = sortItems(displayItems.filter((it) => it.block === block.id));
+        const blockCompleted = completedItems.filter((it) => it.block === block.id);
         const blockEvents = events.filter((ev) => !ev.allDay && getEventBlock(ev) === block.id);
         const isCurrent = currentBlockId === block.id;
-        const isPastBlock = isToday && nowMin >= block.end;
+        const isPast = isToday && nowMin >= block.end;
 
         return (
-          <div key={block.id} className={`rounded-xl border p-3 transition-all ${BLOCK_COLORS[block.id]} ${isCurrent ? "ring-1 ring-accent/30" : ""} ${isPastBlock ? "opacity-60" : ""}`}>
+          <div key={block.id} className={`rounded-xl border p-3 transition-all ${BLOCK_COLORS[block.id]} ${isCurrent ? "ring-1 ring-accent/30" : ""} ${isPast ? "opacity-60" : ""}`}>
             <div className="flex items-center justify-between mb-2">
               <h4 className={`text-xs font-bold uppercase tracking-wider ${BLOCK_HEADER[block.id]}`}>
-                {t(`home.blockView.${block.id}`)}
-                {isCurrent && <span className="ml-1.5 text-[9px] font-normal text-accent">●</span>}
+                {t(`home.blockView.${block.id}`)} {isCurrent && <span className="ml-1.5 text-[9px] font-normal text-accent">●</span>}
               </h4>
-              <span className="text-[10px] text-muted-light dark:text-muted-dark">
-                {String(Math.floor(block.start / 60)).padStart(2, "0")}:00 – {String(Math.floor(block.end / 60)).padStart(2, "0")}:00
-              </span>
+              <span className="text-[10px] text-muted-light dark:text-muted-dark">{fmtMin(block.start)} – {fmtMin(block.end)}</span>
             </div>
 
-            {/* Calendar events */}
             {blockEvents.length > 0 && (
               <div className="space-y-1 mb-2">
                 {blockEvents.map((ev, i) => (
@@ -308,28 +321,44 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
               </div>
             )}
 
-            {/* Tasks */}
-            {blockTasks.length === 0 && blockEvents.length === 0 && (
+            {blockItems.length === 0 && blockEvents.length === 0 && (
               <p className="text-xs text-muted-light dark:text-muted-dark py-2">{t("home.blockView.noTasks")}</p>
             )}
             <div className="space-y-1">
-              {blockTasks.map((task) => (
-                <div key={task.id} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 ${PRIORITY_BADGE[task.priority] || "border-l-gray-300"}`}>
-                  <button onClick={() => onCompleteTask(task.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
+              {blockItems.map((item) => item.type === "subtask" ? (
+                /* Standalone subtask (hideParent ON) — shows parent name as context */
+                <div key={item.id} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"}`}>
+                  <button onClick={() => onToggleSubtask(item.taskId, item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{task.text}</p>
+                    <p className="text-[10px] text-muted-light dark:text-muted-dark truncate">{item.parentText}</p>
+                    <p className="text-xs font-medium truncate">{item.text}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {task.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[task.energyCost]}`}>{t(`tasks.energy.${task.energyCost}`)}</span>}
-                      <span className="text-[9px] text-muted-light dark:text-muted-dark">~{task.estimatedMinutes || 25}{t("common.min")}</span>
-                      {task.scheduledTime && <span className="text-[9px] text-accent font-mono">{task.scheduledTime}</span>}
-                      {isTaskOverdue(task) && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
+                      {item.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[item.energyCost]}`}>{t(`tasks.energy.${item.energyCost}`)}</span>}
+                      <span className="text-[9px] text-muted-light dark:text-muted-dark">~{item.estimatedMinutes || 25}{t("common.min")}</span>
+                      {isOverdue(item) && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
                     </div>
-                    {/* Subtasks */}
-                    {(task.subtasks || []).filter((s) => !s.completed).length > 0 && (
+                  </div>
+                  {countdownStartEnabled && onStartTask && (
+                    <button onClick={() => onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes })} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5">▶</button>
+                  )}
+                </div>
+              ) : (
+                /* Parent task (hideParent OFF or no subtasks) — prominent ring when subtasks exist */
+                <div key={item.id} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${item.subtasks?.length > 0 ? "ring-1 ring-accent/10" : ""}`}>
+                  <button onClick={() => onCompleteTask(item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{item.text}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {item.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[item.energyCost]}`}>{t(`tasks.energy.${item.energyCost}`)}</span>}
+                      <span className="text-[9px] text-muted-light dark:text-muted-dark">~{item.estimatedMinutes || 25}{t("common.min")}</span>
+                      {item.scheduledTime && <span className="text-[9px] text-accent font-mono">{item.scheduledTime}</span>}
+                      {isOverdue(item) && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
+                    </div>
+                    {item.subtasks?.length > 0 && (
                       <div className="mt-1 space-y-0.5">
-                        {(task.subtasks || []).filter((s) => !s.completed).map((sub) => (
+                        {item.subtasks.map((sub) => (
                           <div key={sub.id} className="flex items-center gap-1.5 pl-2">
-                            <button onClick={() => onToggleSubtask(task.id, sub.id)} className="w-3 h-3 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0" />
+                            <button onClick={() => onToggleSubtask(item.taskId, sub.id)} className="w-3 h-3 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0" />
                             <span className="text-[10px] text-muted-light dark:text-muted-dark truncate">{sub.text}</span>
                           </div>
                         ))}
@@ -337,17 +366,16 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                     )}
                   </div>
                   {countdownStartEnabled && onStartTask && (
-                    <button onClick={() => onStartTask(task)} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5">▶</button>
+                    <button onClick={() => onStartTask(item._task || item)} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5">▶</button>
                   )}
                 </div>
               ))}
-              {/* Completed in this block */}
-              {completedTasks.length > 0 && (
+              {blockCompleted.length > 0 && (
                 <div className="mt-1 pt-1 border-t border-gray-200/50 dark:border-white/5">
-                  {completedTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-2 px-2 py-0.5 opacity-50">
+                  {blockCompleted.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 px-2 py-0.5 opacity-50">
                       <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
-                      <span className="text-[10px] line-through truncate">{task.text}</span>
+                      <span className="text-[10px] line-through truncate">{item.text}</span>
                     </div>
                   ))}
                 </div>
