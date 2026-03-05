@@ -25,7 +25,7 @@ export default function WeekSummaryView({ t, tasks, getEventsForDate, weekStart,
   };
 
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="overflow-x-auto -mx-1 px-1 py-1">
       <div className="grid grid-cols-7 gap-1.5 min-w-[320px]">
       {days.map((date, i) => {
         const dayTasks = getTasksForDay(date);
