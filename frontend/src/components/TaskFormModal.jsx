@@ -32,19 +32,21 @@ function sanitizeTag(input) {
   return input.trim().replace(/,/g, "");
 }
 
-export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title }) {
-  const [text, setText] = useState("");
-  const [priority, setPriority] = useState("medium");
-  const [energyCost, setEnergyCost] = useState("medium");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [timeOfDay, setTimeOfDay] = useState("");
-  const [scheduledTime, setScheduledTime] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [minutes, setMinutes] = useState(25);
-  const [category, setCategory] = useState(inheritedCategory || "");
-  const [tags, setTags] = useState([]);
+export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inheritedCategory, categories = [], title, initialValues }) {
+  const iv = initialValues || {};
+  const isEdit = !!initialValues;
+  const [text, setText] = useState(iv.text || "");
+  const [priority, setPriority] = useState(iv.priority || "medium");
+  const [energyCost, setEnergyCost] = useState(iv.energyCost || "medium");
+  const [scheduledDate, setScheduledDate] = useState(iv.scheduledDate || "");
+  const [timeOfDay, setTimeOfDay] = useState(iv.timeOfDay || (iv.scheduledTime ? "exact" : ""));
+  const [scheduledTime, setScheduledTime] = useState(iv.scheduledTime || "");
+  const [deadline, setDeadline] = useState(iv.deadline || "");
+  const [minutes, setMinutes] = useState(iv.estimatedMinutes || 25);
+  const [category, setCategory] = useState(inheritedCategory || iv.category || "");
+  const [tags, setTags] = useState(iv.tags || []);
   const [tagInput, setTagInput] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(isEdit && !!(iv.deadline || iv.tags?.length));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card p-6 max-w-lg w-full mx-4 space-y-4 max-h-[90vh] overflow-y-auto animate-fade-in">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">{title || (isSubtask ? t("tasks.createSubtask") : t("tasks.createTask"))}</h3>
+          <h3 className="text-base font-semibold">{title || (isEdit ? (isSubtask ? t("tasks.editSubtask") : t("common.edit")) : (isSubtask ? t("tasks.createSubtask") : t("tasks.createTask")))}</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/10">
             <X className="w-4 h-4" />
           </button>
@@ -200,7 +202,7 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
           </div>
 
           <button type="submit" className="btn-primary text-sm w-full">
-            {isSubtask ? t("tasks.createSubtask") : t("tasks.createTask")}
+            {isEdit ? t("common.save") : (isSubtask ? t("tasks.createSubtask") : t("tasks.createTask"))}
           </button>
         </form>
       </div>

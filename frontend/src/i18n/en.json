@@ -188,6 +188,7 @@
     "quickAddSkip": "Later",
     "createTask": "Create Task",
     "createSubtask": "Create Subtask",
+    "editSubtask": "Edit Subtask",
     "subtaskCategoryInherited": "Category (from parent task)",
     "sectionWhat": "What?",
     "sectionWhen": "When?",

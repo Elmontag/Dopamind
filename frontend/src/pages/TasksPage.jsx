@@ -59,24 +59,20 @@ function isTaskOverdue(task) {
   return !!(task.deadline && !task.completed && new Date(task.deadline + "T23:59:59") < new Date());
 }
 
-function SubtaskItem({ subtask, taskId, t, countdownStartEnabled }) {
+function SubtaskItem({ subtask, taskId, task, t, countdownStartEnabled, categories }) {
   const { dispatch } = useApp();
-  const [editingMin, setEditingMin] = useState(false);
-  const [minVal, setMinVal] = useState(subtask.estimatedMinutes || 0);
-  const [editingSchedule, setEditingSchedule] = useState(false);
-  const [schedTime, setSchedTime] = useState(subtask.scheduledTime || "");
-  const [schedDate, setSchedDate] = useState(subtask.scheduledDate || "");
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
-  const saveMinutes = () => {
-    dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, estimatedMinutes: minVal } });
-    setEditingMin(false);
+
+  const handleEditSubmit = (formData) => {
+    dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, ...formData } });
   };
-  const saveSchedule = () => {
-    dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId: subtask.id, scheduledTime: schedTime || null, scheduledDate: schedDate || null } });
-    setEditingSchedule(false);
-  };
+
+  const isOverdue = subtask.deadline && new Date(subtask.deadline + "T23:59:59") < new Date();
+  const priCfg = PRIORITY_CONFIG[subtask.priority];
+
   return (
-    <div className="py-1 pl-8">
+    <div className="py-1 pl-8 group/sub">
       <div className="flex items-center gap-2">
         <button
           onClick={() => dispatch({ type: "TOGGLE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
@@ -96,76 +92,76 @@ function SubtaskItem({ subtask, taskId, t, countdownStartEnabled }) {
         <span className={`text-xs flex-1 ${subtask.completed ? "line-through text-muted-light dark:text-muted-dark" : ""}`}>
           {subtask.text}
         </span>
-        {editingMin ? (
-          <input
-            type="number"
-            min={0}
-            max={480}
-            step={5}
-            value={minVal}
-            autoFocus
-            onChange={(e) => setMinVal(Number(e.target.value))}
-            onBlur={saveMinutes}
-            onKeyDown={(e) => { if (e.key === "Enter") saveMinutes(); }}
-            className="w-12 px-1 py-0.5 rounded text-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-center focus:outline-none focus:ring-1 focus:ring-accent/30"
-          />
-        ) : (
-          <button
-            onClick={() => setEditingMin(true)}
-            className="text-[10px] text-muted-light dark:text-muted-dark hover:text-accent transition-colors font-mono px-1"
-            title={t("tasks.subtaskMinutes")}
-          >
-            {subtask.estimatedMinutes ? `${subtask.estimatedMinutes}${t("common.min")}` : `+${t("common.min")}`}
-          </button>
-        )}
         <button
-          onClick={() => setEditingSchedule(!editingSchedule)}
-          className={`text-[10px] transition-colors font-mono px-1 ${subtask.scheduledTime || subtask.scheduledDate ? "text-accent" : "text-muted-light dark:text-muted-dark hover:text-accent"}`}
-          title={t("tasks.scheduledTime")}
+          onClick={() => setShowEditModal(true)}
+          className="opacity-0 group-hover/sub:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-accent hover:bg-accent/10 transition-all"
+          title={t("tasks.editSubtask")}
         >
-          <Clock className="w-3 h-3 inline" />
-          {subtask.scheduledTime && <span className="ml-0.5">{subtask.scheduledTime}</span>}
+          <Pencil className="w-3 h-3" />
         </button>
         <button
           onClick={() => dispatch({ type: "DELETE_SUBTASK", payload: { taskId, subtaskId: subtask.id } })}
-          className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-danger transition-all"
+          className="opacity-0 group-hover/sub:opacity-100 w-5 h-5 rounded flex items-center justify-center text-muted-light hover:text-danger transition-all"
         >
           <Trash2 className="w-3 h-3" />
         </button>
       </div>
-      {editingSchedule && (
-        <div className="flex items-center gap-2 mt-1 ml-6">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-muted-light dark:text-muted-dark" />
-            <input
-              type="time"
-              value={schedTime}
-              onChange={(e) => setSchedTime(e.target.value)}
-              className="px-1.5 py-0.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-[10px] focus:outline-none focus:ring-1 focus:ring-accent/30"
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <CalendarDays className="w-3 h-3 text-muted-light dark:text-muted-dark" />
-            <input
-              type="date"
-              value={schedDate}
-              onChange={(e) => setSchedDate(e.target.value)}
-              className="px-1.5 py-0.5 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-[10px] focus:outline-none focus:ring-1 focus:ring-accent/30"
-            />
-          </div>
-          <button
-            onClick={saveSchedule}
-            className="text-accent text-[10px] font-medium hover:underline"
-          >
-            <Check className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => setEditingSchedule(false)}
-            className="text-muted-light text-[10px] hover:text-danger"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
+      {/* Badges row */}
+      <div className="flex items-center gap-1.5 mt-0.5 ml-6 flex-wrap">
+        {priCfg && (
+          <span className={`badge text-[9px] ${priCfg.color}`}>
+            <span className={`w-1 h-1 rounded-full ${priCfg.dot} mr-0.5`} />
+            {t(`tasks.priority.${subtask.priority}`)}
+          </span>
+        )}
+        {subtask.energyCost && (
+          <span className={`badge text-[9px] ${ENERGY_CONFIG[subtask.energyCost]?.color || "bg-gray-100 text-gray-700"}`}>
+            {t(`tasks.energy.${subtask.energyCost}`)}
+          </span>
+        )}
+        {subtask.estimatedMinutes > 0 && (
+          <span className="text-[9px] text-muted-light dark:text-muted-dark font-mono">
+            ~{subtask.estimatedMinutes}{t("common.min")}
+          </span>
+        )}
+        {subtask.timeOfDay && subtask.timeOfDay !== "exact" && (
+          <span className="badge text-[9px] bg-accent/10 text-accent">
+            {t(`tasks.timeOfDayOptions.${subtask.timeOfDay}`)}
+          </span>
+        )}
+        {subtask.scheduledTime && (
+          <span className="badge text-[9px] bg-accent/10 text-accent flex items-center gap-0.5">
+            <Clock className="w-2.5 h-2.5" />
+            {subtask.scheduledTime}
+          </span>
+        )}
+        {subtask.scheduledDate && (
+          <span className="badge text-[9px] bg-accent/10 text-accent flex items-center gap-0.5">
+            <CalendarDays className="w-2.5 h-2.5" />
+            {new Date(subtask.scheduledDate + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
+          </span>
+        )}
+        {subtask.deadline && (
+          <span className={`badge text-[9px] flex items-center gap-0.5 ${isOverdue ? "bg-danger/10 text-danger" : "bg-gray-100 dark:bg-white/5 text-muted-light dark:text-muted-dark"}`}>
+            {isOverdue && <AlertCircle className="w-2.5 h-2.5" />}
+            <Calendar className="w-2.5 h-2.5" />
+            {new Date(subtask.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
+          </span>
+        )}
+        {(subtask.tags || []).map((tag) => (
+          <span key={tag} className={`badge text-[9px] ${getTagColor(tag)}`}>{tag}</span>
+        ))}
+      </div>
+      {showEditModal && (
+        <TaskFormModal
+          t={t}
+          isSubtask
+          initialValues={subtask}
+          inheritedCategory={task?.category}
+          categories={categories}
+          onSubmit={handleEditSubmit}
+          onClose={() => setShowEditModal(false)}
+        />
       )}
       {showCountdown && (
         <CountdownStart
@@ -504,7 +500,7 @@ function TaskItem({ task, t, onTagClick, onCategoryClick, categories, countdownS
             </Link>
           )}
           {subtasks.map((s) => (
-            <SubtaskItem key={s.id} subtask={s} taskId={task.id} t={t} countdownStartEnabled={countdownStartEnabled} />
+            <SubtaskItem key={s.id} subtask={s} taskId={task.id} task={task} t={t} countdownStartEnabled={countdownStartEnabled} categories={categories} />
           ))}
           {!task.completed && (
             <div className="pl-8 mt-1">

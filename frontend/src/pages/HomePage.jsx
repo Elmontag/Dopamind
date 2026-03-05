@@ -186,9 +186,11 @@ function computeTaskScore(task, energyLevel, availableMinutes) {
 // --- Block Day View: ADHD-friendly block-based day view ---
 const ENERGY_BADGE = { low: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", high: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300" };
 const PRIORITY_BADGE = { high: "border-l-danger", medium: "border-l-warn", low: "border-l-emerald-400" };
+const PRIORITY_BADGE_BG = { high: "bg-danger/10 text-danger", medium: "bg-warn/10 text-amber-700 dark:text-warn", low: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" };
 
-function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, onAddSubtask, onMoveTaskBlock, countdownStartEnabled, isTaskOverdue, categories }) {
+function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onCompleteTask, onToggleSubtask, onStartTask, onAddSubtask, onMoveTaskBlock, onEditSubtaskFull, countdownStartEnabled, isTaskOverdue, categories }) {
   const [subtaskModalTaskId, setSubtaskModalTaskId] = useState(null);
+  const [editSubtask, setEditSubtask] = useState(null); // { taskId, subtask }
   const [dragItemId, setDragItemId] = useState(null);
   const [dragItemType, setDragItemType] = useState(null);
   const [dragTaskId, setDragTaskId] = useState(null);
@@ -263,7 +265,7 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
     }
     if (hideParent && incompleteSubs.length > 0) {
       for (const sub of incompleteSubs) {
-        const item = { type: "subtask", id: sub.id, taskId: task.id, text: sub.text, parentText: task.text, priority: task.priority, energyCost: sub.energyCost || task.energyCost, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes, deadline: task.deadline, scheduledTime: sub.scheduledTime || task.scheduledTime, timeOfDay: sub.timeOfDay || task.timeOfDay };
+        const item = { type: "subtask", id: sub.id, taskId: task.id, text: sub.text, parentText: task.text, priority: sub.priority || task.priority, energyCost: sub.energyCost || task.energyCost, estimatedMinutes: sub.estimatedMinutes || task.estimatedMinutes, deadline: sub.deadline || task.deadline, scheduledTime: sub.scheduledTime || task.scheduledTime, timeOfDay: sub.timeOfDay || task.timeOfDay, _subtask: sub };
         item.block = getItemBlock(item);
         displayItems.push(item);
       }
@@ -430,20 +432,29 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
             <div className="space-y-1">
               {blockItems.map((item) => item.type === "subtask" ? (
                 /* Standalone subtask (hideParent ON) — shows parent name as context */
-                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "subtask", item.taskId)} onDragEnd={handleDragEnd} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${dragItemId === item.id ? "opacity-40" : ""}`}>
+                <div key={item.id} draggable onDragStart={(e) => handleDragStart(e, item.id, "subtask", item.taskId)} onDragEnd={handleDragEnd} className={`group/item flex items-start gap-2 px-2 py-1.5 rounded-lg bg-white/60 dark:bg-white/5 border-l-2 cursor-grab active:cursor-grabbing ${PRIORITY_BADGE[item.priority] || "border-l-gray-300"} ${dragItemId === item.id ? "opacity-40" : ""}`}>
                   <button onClick={() => onToggleSubtask(item.taskId, item.id)} className="w-4 h-4 mt-0.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-accent/10 flex-shrink-0 transition-colors" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] text-muted-light dark:text-muted-dark truncate">{item.parentText}</p>
                     <p className="text-xs font-medium truncate">{item.text}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {item.priority && <span className={`text-[9px] px-1 py-0.5 rounded ${PRIORITY_BADGE_BG[item.priority] || ""}`}>{t(`tasks.priority.${item.priority}`)}</span>}
                       {item.energyCost && <span className={`text-[9px] px-1 py-0.5 rounded ${ENERGY_BADGE[item.energyCost]}`}>{t(`tasks.energy.${item.energyCost}`)}</span>}
                       <span className="text-[9px] text-muted-light dark:text-muted-dark">~{item.estimatedMinutes || 25}{t("common.min")}</span>
-                      {isOverdue(item) && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
+                      {item.deadline && <span className={`text-[9px] flex items-center gap-0.5 ${isOverdue(item) ? "text-danger font-medium" : "text-muted-light dark:text-muted-dark"}`}><AlertCircle className="w-2.5 h-2.5" /> {new Date(item.deadline + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}</span>}
+                      {isOverdue(item) && !item.deadline && <span className="text-[9px] text-danger font-medium flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> {t("tasks.overdue")}</span>}
                     </div>
                   </div>
-                  {countdownStartEnabled && onStartTask && (
-                    <button onClick={() => onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes })} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors flex-shrink-0 mt-0.5">▶</button>
-                  )}
+                  <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                    {onEditSubtaskFull && (
+                      <button onClick={() => setEditSubtask({ taskId: item.taskId, subtask: item._subtask || item })} className="opacity-0 group-hover/item:opacity-100 text-[10px] text-muted-light hover:text-accent hover:bg-accent/10 px-1 py-0.5 rounded transition-all">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
+                    {countdownStartEnabled && onStartTask && (
+                      <button onClick={() => onStartTask({ id: item.id, text: item.text, estimatedMinutes: item.estimatedMinutes })} className="text-[10px] text-accent hover:bg-accent/10 px-1.5 py-0.5 rounded transition-colors">▶</button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 /* Parent task (hideParent OFF or no subtasks) — prominent ring when subtasks exist */
@@ -460,9 +471,16 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
                     {item.subtasks?.length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {item.subtasks.map((sub) => (
-                          <div key={sub.id} className="flex items-center gap-1.5 pl-2">
+                          <div key={sub.id} className="group/nsub flex items-center gap-1.5 pl-2">
                             <button onClick={() => onToggleSubtask(item.taskId, sub.id)} className="w-3 h-3 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0" />
-                            <span className="text-[10px] text-muted-light dark:text-muted-dark truncate">{sub.text}</span>
+                            <span className="text-[10px] text-muted-light dark:text-muted-dark truncate flex-1">{sub.text}</span>
+                            {sub.energyCost && <span className={`text-[8px] px-0.5 py-0 rounded ${ENERGY_BADGE[sub.energyCost]}`}>{t(`tasks.energy.${sub.energyCost}`)}</span>}
+                            {sub.priority && sub.priority !== item.priority && <span className={`text-[8px] px-0.5 py-0 rounded ${PRIORITY_BADGE_BG[sub.priority] || ""}`}>{t(`tasks.priority.${sub.priority}`)}</span>}
+                            {onEditSubtaskFull && (
+                              <button onClick={() => setEditSubtask({ taskId: item.taskId, subtask: sub })} className="opacity-0 group-hover/nsub:opacity-100 w-3 h-3 text-muted-light hover:text-accent transition-all">
+                                <Pencil className="w-2.5 h-2.5" />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -502,6 +520,18 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
         categories={categories || []}
         onSubmit={(formData) => { onAddSubtask(subtaskModalTaskId, formData); setSubtaskModalTaskId(null); }}
         onClose={() => setSubtaskModalTaskId(null)}
+      />
+    )}
+    {/* Subtask edit modal */}
+    {editSubtask && onEditSubtaskFull && (
+      <TaskFormModal
+        t={t}
+        isSubtask
+        initialValues={editSubtask.subtask}
+        inheritedCategory={tasks.find((tk) => tk.id === editSubtask.taskId)?.category}
+        categories={categories || []}
+        onSubmit={(formData) => { onEditSubtaskFull(editSubtask.taskId, editSubtask.subtask.id, formData); setEditSubtask(null); }}
+        onClose={() => setEditSubtask(null)}
       />
     )}
   </>);
@@ -2506,6 +2536,7 @@ export default function HomePage() {
                   dispatch({ type: "UPDATE_TASK", payload: { id: itemId, timeOfDay: targetBlockId, blockSortIndex: null } });
                 }
               }}
+              onEditSubtaskFull={(taskId, subtaskId, formData) => dispatch({ type: "UPDATE_SUBTASK", payload: { taskId, subtaskId, ...formData } })}
               countdownStartEnabled={settings.gamification?.countdownStartEnabled !== false}
               isTaskOverdue={isTaskOverdue}
               categories={settings.categories || []}
