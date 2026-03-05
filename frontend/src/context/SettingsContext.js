@@ -59,6 +59,7 @@ const defaultSettings = {
     sizeMappings: { quick: 10, short: 25, medium: 45, long: 90 },
     autopilot: false,
   },
+  timezone: "auto",
 };
 
 // Break pattern presets
@@ -159,7 +160,9 @@ export function SettingsProvider({ children }) {
 
   const updateSettings = useCallback((section, values) => {
     setSettings((prev) => {
-      const next = { ...prev, [section]: { ...prev[section], ...values } };
+      const next = typeof values === "object" && values !== null
+        ? { ...prev, [section]: { ...prev[section], ...values } }
+        : { ...prev, [section]: values };
       const migrated = migrateSettings(next);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       persistToBackend(migrated);

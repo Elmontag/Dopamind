@@ -379,6 +379,19 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </Field>
+
+              <Field label={t("settings.timezone")}>
+                <select
+                  value={settings.timezone || "auto"}
+                  onChange={(e) => updateSettings("timezone", e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-sm bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:ring-2 focus:ring-accent/30 outline-none"
+                >
+                  <option value="auto">{t("settings.timezoneAuto")} ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
+                  {["Europe/Berlin", "Europe/Vienna", "Europe/Zurich", "Europe/London", "Europe/Paris", "Europe/Amsterdam", "Europe/Rome", "Europe/Madrid", "Europe/Warsaw", "Europe/Istanbul", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo", "Asia/Tokyo", "Asia/Shanghai", "Asia/Kolkata", "Asia/Dubai", "Australia/Sydney", "Pacific/Auckland"].map((tz) => (
+                    <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              </Field>
             </Section>
 
             <Section title={t("settings.features")}>

@@ -448,6 +448,8 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "themeSystem": "System",
+    "timezone": "Timezone",
+    "timezoneAuto": "Automatic (Browser)",
     "notifications": "Notifications",
     "imap": "Email (IMAP)",
     "imapHost": "IMAP Server",

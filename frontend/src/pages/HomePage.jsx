@@ -1431,13 +1431,14 @@ function toLocalDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// Helper: get ISO week's Monday
+// Helper: get ISO week's Monday (pure UTC to avoid timezone drift)
 function getWeekMonday(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.getDay();
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  dt.setUTCDate(dt.getUTCDate() + diff);
+  return dt.toISOString().slice(0, 10);
 }
 
 function shiftDateBy(dateStr, delta) {
@@ -2008,7 +2009,7 @@ export default function HomePage() {
   const { getEventsForDate } = useCalendar();
   const { settings } = useSettings();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = toLocalDateStr(new Date());
   const [viewDate, setViewDate] = useState(todayStr);
   const isToday = viewDate === todayStr;
   const isPast = viewDate < todayStr;
