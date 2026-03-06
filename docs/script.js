@@ -97,6 +97,9 @@ function applyTheme(theme) {
       : '<i data-lucide="sun"></i>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
+
+  // Update hero background image for new theme
+  initHeroBg();
 }
 
 function applyLang(lang) {
@@ -281,6 +284,54 @@ function initSmoothScroll() {
   });
 }
 
+// ── Hero Background Image ──────────────────────────────────
+// Checks for hero_dm / hero_bm images in screenshots/ and applies
+// them as a blurred, edge-faded background. Falls back silently to
+// the CSS gradient if no image is found.
+function imageExists(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload  = () => resolve(url);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function resolveHeroBgUrl(theme) {
+  const name = theme === 'light' ? 'hero_bm' : 'hero_dm';
+  const exts  = ['jpg', 'png', 'webp'];
+  for (const ext of exts) {
+    const url = await imageExists(`screenshots/${name}.${ext}`);
+    if (url) return url;
+  }
+  return null;
+}
+
+async function initHeroBg() {
+  const hero  = document.getElementById('hero');
+  const bgDiv = hero && hero.querySelector('.hero-bg');
+  if (!hero || !bgDiv) return;
+
+  const url = await resolveHeroBgUrl(currentTheme);
+
+  if (url) {
+    // Create or update the <img> inside .hero-bg
+    let img = bgDiv.querySelector('img');
+    if (!img) {
+      img = document.createElement('img');
+      img.alt = '';
+      img.setAttribute('aria-hidden', 'true');
+      bgDiv.appendChild(img);
+    }
+    img.src = url;
+    hero.classList.add('hero-has-bg');
+  } else {
+    // No image – remove any existing one and glass-canvas class
+    bgDiv.innerHTML = '';
+    hero.classList.remove('hero-has-bg');
+  }
+}
+
 // ── Hero Animation ─────────────────────────────────────────
 function initHeroAnimation() {
   const hero = document.getElementById('hero');
@@ -351,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSmoothScroll();
   initScrollAnimations();
   initHeroAnimation();
+  initHeroBg();
   initImpressumModal();
 
   // Initialise Lucide icons
