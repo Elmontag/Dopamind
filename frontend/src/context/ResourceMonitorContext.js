@@ -233,7 +233,7 @@ export function ResourceMonitorProvider({ children }) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const token = localStorage.getItem("dopamind-token");
-      if (!token) return;
+      if (!token || !navigator.onLine) return; // Skip when offline – localStorage is source of truth
       apiFetch("/user-data/resource_monitor", {
         method: "PUT",
         body: JSON.stringify({ data: state }),
@@ -271,6 +271,20 @@ export function ResourceMonitorProvider({ children }) {
       }).catch((err) => console.warn("Failed to sync focus block:", err));
     }
   }, []);
+
+  // Sync localStorage → backend when coming back online (last-write-wins)
+  useEffect(() => {
+    const handleOnline = () => {
+      const token = localStorage.getItem("dopamind-token");
+      if (!token) return;
+      apiFetch("/user-data/resource_monitor", {
+        method: "PUT",
+        body: JSON.stringify({ data: state }),
+      }).catch(() => {});
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [state]);
 
   const isAbsent = !!state.absenceMode;
   const isSick = state.absenceMode?.type === "sick";

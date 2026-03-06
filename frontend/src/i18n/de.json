@@ -887,5 +887,19 @@
     "retry": "Erneut prüfen",
     "databaseOk": "Datenbank verbunden",
     "databaseError": "Datenbankverbindung fehlgeschlagen"
+  },
+  "sync": {
+    "conflictTitle": "Synchronisationskonflikt",
+    "conflictSubtitle": "Konflikt {current} von {total} – Welche Version soll behalten werden?",
+    "localVersion": "Offline-Version (PWA)",
+    "serverVersion": "Web-Version (Server)",
+    "keepThis": "Diese Version behalten",
+    "alreadyExists": "Bereits auf dem Server vorhanden",
+    "syncing": "Synchronisiere...",
+    "syncComplete": "Synchronisation abgeschlossen",
+    "syncFailed": "Synchronisation fehlgeschlagen",
+    "offlineMailDisabled": "Mail ist offline nicht verfügbar",
+    "offlineCalendarSaved": "Termin wird bei Reconnect hochgeladen",
+    "calendarCollision": "Termin existiert bereits auf dem Server"
   }
 }

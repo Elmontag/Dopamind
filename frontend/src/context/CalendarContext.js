@@ -1,7 +1,9 @@
 import { createContext, useContext, useReducer, useCallback, useEffect } from "react";
 import * as calendarService from "../services/calendarService";
+import { addOfflineCalendarEvent, getOfflineCalendarEvents } from "../services/offlineQueue";
 
 const CalendarContext = createContext();
+const CACHE_KEY = "dopamind-calendar-cache";
 
 const initialState = {
   events: [],
@@ -46,10 +48,26 @@ export function CalendarProvider({ children }) {
   const fetchEvents = useCallback(async (start, end) => {
     dispatch({ type: "SET_LOADING", payload: true });
     try {
+      if (!navigator.onLine) {
+        // Offline: load from cache + offline events
+        const cached = getCachedEvents();
+        const offlineEvents = getOfflineCalendarEvents();
+        dispatch({ type: "SET_EVENTS", payload: [...cached, ...offlineEvents] });
+        return;
+      }
       const events = await calendarService.fetchEvents(start, end);
       dispatch({ type: "SET_EVENTS", payload: events });
+      // Cache for offline use
+      cacheEvents(events);
     } catch (err) {
-      dispatch({ type: "SET_ERROR", payload: err.message });
+      // On network error, fall back to cache
+      const cached = getCachedEvents();
+      const offlineEvents = getOfflineCalendarEvents();
+      if (cached.length > 0 || offlineEvents.length > 0) {
+        dispatch({ type: "SET_EVENTS", payload: [...cached, ...offlineEvents] });
+      } else {
+        dispatch({ type: "SET_ERROR", payload: err.message });
+      }
     }
   }, []);
 
@@ -59,16 +77,32 @@ export function CalendarProvider({ children }) {
   }, [fetchEvents]);
 
   const addEvent = useCallback(async (event) => {
+    if (!navigator.onLine) {
+      // Offline: store locally for later upload
+      const updatedOffline = addOfflineCalendarEvent(event);
+      const offlineEvent = updatedOffline[updatedOffline.length - 1];
+      dispatch({ type: "ADD_EVENT", payload: offlineEvent });
+      return offlineEvent;
+    }
     try {
       const created = await calendarService.createEvent(event);
       dispatch({ type: "ADD_EVENT", payload: created });
       return created;
     } catch (err) {
-      dispatch({ type: "SET_ERROR", payload: err.message });
+      // Network error during create → save offline
+      const updatedOffline = addOfflineCalendarEvent(event);
+      const offlineEvent = updatedOffline[updatedOffline.length - 1];
+      dispatch({ type: "ADD_EVENT", payload: offlineEvent });
+      return offlineEvent;
     }
   }, []);
 
   const updateEvent = useCallback(async (event) => {
+    if (!navigator.onLine) {
+      // Offline: update locally only, no offline queue for CalDAV updates
+      dispatch({ type: "UPDATE_EVENT", payload: event });
+      return;
+    }
     try {
       await calendarService.updateEvent(event);
       dispatch({ type: "UPDATE_EVENT", payload: event });
@@ -78,6 +112,11 @@ export function CalendarProvider({ children }) {
   }, []);
 
   const deleteEvent = useCallback(async (id) => {
+    if (!navigator.onLine) {
+      // Offline: remove from local view only
+      dispatch({ type: "DELETE_EVENT", payload: id });
+      return;
+    }
     try {
       await calendarService.deleteEvent(id);
       dispatch({ type: "DELETE_EVENT", payload: id });
@@ -101,3 +140,19 @@ export function CalendarProvider({ children }) {
 }
 
 export const useCalendar = () => useContext(CalendarContext);
+
+// --- Cache helpers ---
+
+function cacheEvents(events) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(events));
+  } catch {}
+}
+
+function getCachedEvents() {
+  try {
+    return JSON.parse(localStorage.getItem(CACHE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}

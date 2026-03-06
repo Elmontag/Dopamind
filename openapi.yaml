@@ -1,0 +1,2717 @@
+openapi: 3.0.3
+info:
+  title: Dopamind API
+  version: "1.0.0"
+  description: >
+    Dopamind is a productivity application with task management, calendar (CalDAV),
+    mail (IMAP/SMTP), focus tracking, achievements, statistics, and user administration.
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Server health check
+  - name: Setup
+    description: Initial admin setup (public)
+  - name: Auth
+    description: Authentication and account management
+  - name: Admin
+    description: Admin user and settings management (requires admin role)
+  - name: Tasks
+    description: Task and subtask CRUD
+  - name: Categories
+    description: Category management
+  - name: Calendar
+    description: Calendar events (CalDAV or local fallback)
+  - name: Mail
+    description: Email via IMAP/SMTP
+  - name: Stats
+    description: User statistics and gamification
+  - name: Achievements
+    description: Achievement tracking
+  - name: FocusBlocks
+    description: Focus session logging
+  - name: UserData
+    description: Arbitrary user data blobs (settings, app state, etc.)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    XMailConfig:
+      name: X-Mail-Config
+      in: header
+      required: true
+      description: >
+        Base64-encoded JSON object with IMAP/SMTP connection details.
+        Decoded shape: { host, port, user, password, tls, smtp: { host, port, user, password } }
+      schema:
+        type: string
+    XCalDAVConfig:
+      name: X-CalDAV-Config
+      in: header
+      required: false
+      description: >
+        Base64-encoded JSON object with CalDAV connection details.
+        Decoded shape: { url, user, password, calendarUrl }
+      schema:
+        type: string
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    # --- Auth / User ---
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        emailVerified:
+          type: boolean
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/AuthUser"
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        emailVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- Admin ---
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        emailVerified:
+          type: boolean
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastLogin:
+          type: string
+          format: date-time
+          nullable: true
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        detail:
+          type: string
+        ip:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        user_email:
+          type: string
+          nullable: true
+
+    AdminSettings:
+      type: object
+      properties:
+        registrationEnabled:
+          type: boolean
+
+    # --- Tasks ---
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+        scheduledTime:
+          type: string
+          nullable: true
+        estimatedMinutes:
+          type: number
+        energyCost:
+          type: string
+          enum: [low, medium, high]
+        sortOrder:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        subtasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subtask"
+        # Metadata fields (optional, spread into response)
+        timeOfDay:
+          type: string
+          nullable: true
+        scheduledDate:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        mailRef:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        sizeCategory:
+          type: string
+          nullable: true
+        blockSortIndex:
+          type: number
+          nullable: true
+
+    Subtask:
+      type: object
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        text:
+          type: string
+        completed:
+          type: boolean
+        estimatedMinutes:
+          type: number
+        sortOrder:
+          type: number
+
+    # --- Categories ---
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          default: area
+        color:
+          type: string
+          default: gray
+        sortOrder:
+          type: number
+
+    # --- Calendar ---
+
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        date:
+          type: string
+          format: date
+        start:
+          type: string
+          nullable: true
+          description: "HH:MM format"
+        end:
+          type: string
+          nullable: true
+          description: "HH:MM format"
+        allDay:
+          type: boolean
+
+    CalDAVCalendar:
+      type: object
+      properties:
+        url:
+          type: string
+        name:
+          type: string
+        ctag:
+          type: string
+          nullable: true
+
+    # --- Mail ---
+
+    MailSummary:
+      type: object
+      properties:
+        uid:
+          type: integer
+        subject:
+          type: string
+        from:
+          type: string
+        fromName:
+          type: string
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        seen:
+          type: boolean
+        flagged:
+          type: boolean
+        preview:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    MailMessage:
+      type: object
+      properties:
+        uid:
+          type: integer
+        subject:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        cc:
+          type: string
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        body:
+          type: string
+        html:
+          type: string
+
+    # --- Stats ---
+
+    Stats:
+      type: object
+      properties:
+        xp:
+          type: number
+        level:
+          type: number
+        currentStreakDays:
+          type: number
+        longestStreak:
+          type: number
+        completedToday:
+          type: number
+        completedThisWeek:
+          type: number
+        completedThisMonth:
+          type: number
+        completedThisYear:
+          type: number
+        lastCompletedDate:
+          type: string
+          format: date
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- Achievements ---
+
+    Achievement:
+      type: object
+      properties:
+        id:
+          type: string
+        unlockedAt:
+          type: string
+          format: date-time
+
+    # --- Focus Blocks ---
+
+    FocusBlock:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          nullable: true
+        durationMinutes:
+          type: number
+        type:
+          type: string
+          default: focus
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- User Data ---
+
+    UserData:
+      type: object
+      properties:
+        data:
+          type: object
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- Health ---
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        database:
+          type: boolean
+        security:
+          type: object
+          properties:
+            jwtSecret:
+              type: boolean
+            encryptionKey:
+              type: boolean
+
+    # --- Setup ---
+
+    SetupStatus:
+      type: object
+      properties:
+        needsSetup:
+          type: boolean
+        registrationEnabled:
+          type: boolean
+
+paths:
+  # ===================== HEALTH =====================
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ===================== SETUP =====================
+  /api/setup/status:
+    get:
+      tags: [Setup]
+      summary: Check if initial setup is needed
+      operationId: getSetupStatus
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/setup/complete:
+    post:
+      tags: [Setup]
+      summary: Create the initial admin account
+      operationId: completeSetup
+      description: Only works when no admin user exists yet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                  maxLength: 100
+                password:
+                  type: string
+                  minLength: 8
+                  description: Must contain uppercase, lowercase, and a digit
+      responses:
+        "201":
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Setup already completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== AUTH =====================
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                  maxLength: 100
+                password:
+                  type: string
+                  minLength: 8
+                  description: Must contain uppercase, lowercase, and a digit
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Registration is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Account is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      operationId: getMe
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/profile:
+    put:
+      tags: [Auth]
+      summary: Update user profile
+      operationId: updateProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password
+      operationId: changePassword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: Must contain uppercase, lowercase, and a digit
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Current password incorrect or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify email address with token
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/account:
+    delete:
+      tags: [Auth]
+      summary: Delete own account
+      operationId: deleteAccount
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid password or cannot delete last admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== ADMIN =====================
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List all users (paginated)
+      operationId: adminListUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by email or name (case-insensitive)
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Admin]
+      summary: Create a new user
+      operationId: adminCreateUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                  maxLength: 100
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [user, admin]
+                  default: user
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get a specific user
+      operationId: adminGetUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags: [Admin]
+      summary: Update a user
+      operationId: adminUpdateUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [user, admin]
+                active:
+                  type: boolean
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: Validation error or cannot remove last admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Admin]
+      summary: Delete a user
+      operationId: adminDeleteUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Cannot delete own account or last admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/admin/audit-log:
+    get:
+      tags: [Admin]
+      summary: View audit log (paginated)
+      operationId: adminGetAuditLog
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Paginated audit log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLogEntry"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/admin/settings:
+    get:
+      tags: [Admin]
+      summary: Get admin settings
+      operationId: adminGetSettings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Admin settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettings"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags: [Admin]
+      summary: Update admin settings
+      operationId: adminUpdateSettings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [registrationEnabled]
+              properties:
+                registrationEnabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettings"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== TASKS =====================
+  /api/tasks:
+    get:
+      tags: [Tasks]
+      summary: List all tasks with subtasks
+      operationId: listTasks
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Array of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      operationId: createTask
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                id:
+                  type: string
+                  description: Optional client-generated ID
+                text:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+                deadline:
+                  type: string
+                  format: date-time
+                  nullable: true
+                scheduledTime:
+                  type: string
+                  nullable: true
+                estimatedMinutes:
+                  type: number
+                  default: 0
+                energyCost:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+                sortOrder:
+                  type: number
+                  default: 0
+                # Metadata fields
+                timeOfDay:
+                  type: string
+                scheduledDate:
+                  type: string
+                category:
+                  type: string
+                mailRef:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                sizeCategory:
+                  type: string
+                blockSortIndex:
+                  type: number
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/reorder:
+    put:
+      tags: [Tasks]
+      summary: Reorder tasks by updating sort orders
+      operationId: reorderTasks
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, sortOrder]
+                    properties:
+                      id:
+                        type: string
+                      sortOrder:
+                        type: number
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid updates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}:
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      operationId: updateTask
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                completed:
+                  type: boolean
+                completedAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+                deadline:
+                  type: string
+                  format: date-time
+                  nullable: true
+                scheduledTime:
+                  type: string
+                  nullable: true
+                estimatedMinutes:
+                  type: number
+                energyCost:
+                  type: string
+                  enum: [low, medium, high]
+                sortOrder:
+                  type: number
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: For optimistic locking; if provided, update only succeeds when server value matches
+                # Metadata fields
+                timeOfDay:
+                  type: string
+                scheduledDate:
+                  type: string
+                category:
+                  type: string
+                mailRef:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                sizeCategory:
+                  type: string
+                blockSortIndex:
+                  type: number
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Optimistic locking conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      operationId: deleteTask
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{id}/subtasks:
+    post:
+      tags: [Tasks]
+      summary: Create a subtask
+      operationId: createSubtask
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Parent task ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                id:
+                  type: string
+                  description: Optional client-generated ID
+                text:
+                  type: string
+                estimatedMinutes:
+                  type: number
+                  default: 0
+                sortOrder:
+                  type: number
+                  default: 0
+      responses:
+        "201":
+          description: Subtask created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subtask"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Parent task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/tasks/{taskId}/subtasks/{subtaskId}:
+    patch:
+      tags: [Tasks]
+      summary: Update a subtask
+      operationId: updateSubtask
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: subtaskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                completed:
+                  type: boolean
+                estimatedMinutes:
+                  type: number
+                sortOrder:
+                  type: number
+      responses:
+        "200":
+          description: Updated subtask
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subtask"
+        "400":
+          description: No fields to update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Task or subtask not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Tasks]
+      summary: Delete a subtask
+      operationId: deleteSubtask
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: subtaskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subtask deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Task or subtask not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== CATEGORIES =====================
+  /api/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      operationId: listCategories
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Array of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Categories]
+      summary: Create or upsert a category
+      operationId: createCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                id:
+                  type: string
+                  description: Optional client-generated ID
+                name:
+                  type: string
+                type:
+                  type: string
+                  default: area
+                color:
+                  type: string
+                  default: gray
+                sortOrder:
+                  type: number
+                  default: 0
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/categories/{id}:
+    put:
+      tags: [Categories]
+      summary: Update a category
+      operationId: updateCategory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                color:
+                  type: string
+                sortOrder:
+                  type: number
+      responses:
+        "200":
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: No fields to update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      operationId: deleteCategory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Category deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== CALENDAR =====================
+  /api/calendar:
+    get:
+      tags: [Calendar]
+      summary: List calendar events
+      operationId: listCalendarEvents
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter events from this date (YYYY-MM-DD)
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter events up to this date (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Array of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+        "500":
+          description: CalDAV or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Calendar]
+      summary: Create a calendar event
+      operationId: createCalendarEvent
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, date]
+              properties:
+                id:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                location:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                start:
+                  type: string
+                  description: "HH:MM"
+                end:
+                  type: string
+                  description: "HH:MM"
+                allDay:
+                  type: boolean
+                  default: false
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "500":
+          description: CalDAV or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/calendar/discover:
+    post:
+      tags: [Calendar]
+      summary: Discover available CalDAV calendars
+      operationId: discoverCalendars
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+      responses:
+        "200":
+          description: List of discovered calendars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalDAVCalendar"
+        "400":
+          description: CalDAV URL not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: CalDAV error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/calendar/test:
+    post:
+      tags: [Calendar]
+      summary: Test CalDAV connection
+      operationId: testCalDAV
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+      responses:
+        "200":
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: CalDAV not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Connection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/calendar/{id}:
+    put:
+      tags: [Calendar]
+      summary: Update a calendar event
+      operationId: updateCalendarEvent
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                location:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                start:
+                  type: string
+                end:
+                  type: string
+                allDay:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+        "404":
+          description: Event not found (local fallback only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: CalDAV or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Calendar]
+      summary: Delete a calendar event
+      operationId: deleteCalendarEvent
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XCalDAVConfig"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "500":
+          description: CalDAV or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== MAIL =====================
+  /api/mail:
+    get:
+      tags: [Mail]
+      summary: List mail messages (from IMAP)
+      operationId: listMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: folder
+          in: query
+          schema:
+            type: string
+            default: INBOX
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter by Dopamind tag
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Mail list with total count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mails:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MailSummary"
+                  total:
+                    type: integer
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/send:
+    post:
+      tags: [Mail]
+      summary: Send an email via SMTP
+      operationId: sendMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, subject]
+              properties:
+                to:
+                  type: string
+                cc:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+      responses:
+        "200":
+          description: Email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: SMTP not configured or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: SMTP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/test:
+    post:
+      tags: [Mail]
+      summary: Test IMAP connection
+      operationId: testMailConnection
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+      responses:
+        "200":
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Connection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/{uid}:
+    get:
+      tags: [Mail]
+      summary: Get a full mail message
+      operationId: getMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: folder
+          in: query
+          schema:
+            type: string
+            default: INBOX
+      responses:
+        "200":
+          description: Full message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailMessage"
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Mail]
+      summary: Delete a mail message
+      operationId: deleteMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/{uid}/seen:
+    put:
+      tags: [Mail]
+      summary: Mark a message as seen
+      operationId: markMailSeen
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked as seen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/{uid}/archive:
+    put:
+      tags: [Mail]
+      summary: Archive a message
+      operationId: archiveMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Mail not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/{uid}/tag:
+    put:
+      tags: [Mail]
+      summary: Add a Dopamind tag to a message
+      operationId: tagMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag]
+              properties:
+                tag:
+                  type: string
+      responses:
+        "200":
+          description: Tag added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tag:
+                    type: string
+        "400":
+          description: Mail not configured or tag missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/mail/{uid}/untag:
+    put:
+      tags: [Mail]
+      summary: Remove a Dopamind tag from a message
+      operationId: untagMail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XMailConfig"
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag]
+              properties:
+                tag:
+                  type: string
+      responses:
+        "200":
+          description: Tag removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Mail not configured or tag missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: IMAP error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== STATS =====================
+  /api/stats:
+    get:
+      tags: [Stats]
+      summary: Get user statistics
+      operationId: getStats
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      tags: [Stats]
+      summary: Update user statistics
+      operationId: updateStats
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                xp:
+                  type: number
+                  minimum: 0
+                level:
+                  type: number
+                  minimum: 0
+                currentStreakDays:
+                  type: number
+                  minimum: 0
+                longestStreak:
+                  type: number
+                  minimum: 0
+                completedToday:
+                  type: number
+                  minimum: 0
+                completedThisWeek:
+                  type: number
+                  minimum: 0
+                completedThisMonth:
+                  type: number
+                  minimum: 0
+                completedThisYear:
+                  type: number
+                  minimum: 0
+                lastCompletedDate:
+                  type: string
+                  format: date
+                  nullable: true
+                updatedAt:
+                  type: string
+                  format: date-time
+                  description: For optimistic locking; if provided, update only succeeds when server value matches
+      responses:
+        "200":
+          description: Updated stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        "400":
+          description: Validation error or no fields to update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Optimistic locking conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== ACHIEVEMENTS =====================
+  /api/achievements:
+    get:
+      tags: [Achievements]
+      summary: List unlocked achievements
+      operationId: listAchievements
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Array of achievements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Achievements]
+      summary: Unlock an achievement
+      operationId: unlockAchievement
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+      responses:
+        "201":
+          description: Achievement unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Achievement"
+        "400":
+          description: Missing or invalid id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== FOCUS BLOCKS =====================
+  /api/focus-blocks:
+    get:
+      tags: [FocusBlocks]
+      summary: List focus blocks
+      operationId: listFocusBlocks
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter by date (YYYY-MM-DD). If omitted, returns latest 100.
+      responses:
+        "200":
+          description: Array of focus blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FocusBlock"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [FocusBlocks]
+      summary: Log a focus block
+      operationId: createFocusBlock
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, durationMinutes]
+              properties:
+                date:
+                  type: string
+                  format: date
+                startTime:
+                  type: string
+                  nullable: true
+                  description: "HH:MM format"
+                durationMinutes:
+                  type: number
+                  minimum: 1
+                type:
+                  type: string
+                  default: focus
+      responses:
+        "201":
+          description: Focus block created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FocusBlock"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ===================== USER DATA =====================
+  /api/user-data/{type}:
+    get:
+      tags: [UserData]
+      summary: Get user data blob by type
+      operationId: getUserData
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [settings, app_state, time_tracking, resource_monitor]
+      responses:
+        "200":
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserData"
+        "400":
+          description: Invalid data type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags: [UserData]
+      summary: Save user data blob by type
+      operationId: saveUserData
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [settings, app_state, time_tracking, resource_monitor]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  description: >
+                    Arbitrary JSON object. For "settings" type, sensitive fields
+                    (imap/smtp/caldav passwords) are encrypted at rest.
+      responses:
+        "200":
+          description: Data saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  updatedAt:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid data type or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

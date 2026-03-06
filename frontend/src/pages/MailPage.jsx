@@ -3,9 +3,10 @@ import { useI18n } from "../i18n/I18nContext";
 import { useMail } from "../context/MailContext";
 import { useApp } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
+import useOnlineStatus from "../hooks/useOnlineStatus";
 import {
   Mail, Reply, Trash2, Archive, Tag, Send, X, ChevronLeft, ChevronRight, Loader,
-  Inbox, FileText, AlertCircle, CheckSquare, Clock, Star, Filter, Link, Square, CheckSquare2, ListPlus, Search,
+  Inbox, FileText, AlertCircle, CheckSquare, Clock, Star, Filter, Link, Square, CheckSquare2, ListPlus, Search, WifiOff,
 } from "lucide-react";
 
 const TAG_COLORS = {
@@ -121,7 +122,21 @@ function MailDetail({ mail, t, onReply, onDelete, onArchive, onTag, onUntag, onC
 
 export default function MailPage() {
   const { t } = useI18n();
+  const isOnline = useOnlineStatus();
   const { settings, isMailConfigured } = useSettings();
+
+  // Mail is completely disabled when offline
+  if (!isOnline) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <WifiOff className="w-12 h-12 text-muted-light dark:text-muted-dark mb-4" />
+        <h2 className="text-lg font-semibold mb-2">{t("sync.offlineMailDisabled")}</h2>
+        <p className="text-sm text-muted-light dark:text-muted-dark max-w-xs">
+          {t("common.offline") || "Du bist offline. Mail benötigt eine aktive Internetverbindung."}
+        </p>
+      </div>
+    );
+  }
   const { state, fetchMails, selectMail, deleteMail, archiveMail, tagMail, untagMail, sendMail, startCompose, startReply, dispatch } = useMail();
   const { dispatch: appDispatch } = useApp();
   const [activeFolder, setActiveFolder] = useState("INBOX");

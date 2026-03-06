@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import useOnlineStatus from "./hooks/useOnlineStatus";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { AppProvider } from "./context/AppContext";
+import { AppProvider, useApp } from "./context/AppContext";
 import { I18nProvider } from "./i18n/I18nContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { ResourceMonitorProvider } from "./context/ResourceMonitorContext";
@@ -20,6 +20,9 @@ import TaskTimerWidget from "./components/TaskTimerWidget";
 import GlobalQuickAdd, { QuickAddEnterListener } from "./components/GlobalQuickAdd";
 import TriageModal from "./components/TriageModal";
 import ActivityBridge from "./components/ActivityBridge";
+import ConflictDialog from "./components/ConflictDialog";
+import { markOfflineSince, getOfflineSince, clearOfflineSince } from "./services/offlineQueue";
+import { performFullSync } from "./services/syncEngine";
 import HomePage from "./pages/HomePage";
 import TasksPage from "./pages/TasksPage";
 import PlannerPage from "./pages/PlannerPage";
@@ -103,6 +106,105 @@ function OfflineBanner() {
   );
 }
 
+// Prevents pull-to-refresh when offline (overscroll-behavior)
+function OfflinePullGuard() {
+  const isOnline = useOnlineStatus();
+
+  useEffect(() => {
+    if (!isOnline) {
+      document.documentElement.style.overscrollBehavior = "none";
+    } else {
+      document.documentElement.style.overscrollBehavior = "";
+    }
+    return () => {
+      document.documentElement.style.overscrollBehavior = "";
+    };
+  }, [isOnline]);
+
+  return null;
+}
+
+// Tracks offline-since timestamp and triggers sync on reconnect
+function SyncOrchestrator() {
+  const isOnline = useOnlineStatus();
+  const { state, dispatch } = useApp();
+  const [conflicts, setConflicts] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const wasOffline = useRef(false);
+
+  // Track when we go offline
+  useEffect(() => {
+    if (!isOnline) {
+      markOfflineSince();
+      wasOffline.current = true;
+    }
+  }, [isOnline]);
+
+  // Auto-sync when coming back online
+  useEffect(() => {
+    if (!isOnline || !wasOffline.current || syncing) return;
+    wasOffline.current = false;
+
+    const offlineSince = getOfflineSince();
+    if (!offlineSince) return;
+
+    setSyncing(true);
+    performFullSync(state.tasks, state.categories, offlineSince)
+      .then((result) => {
+        if (result.conflicts && result.conflicts.length > 0) {
+          setConflicts(result.conflicts);
+        }
+
+        // Apply merged stats to local state if available (MERGE_STATE preserves tasks/categories)
+        if (result.mergedStats) {
+          dispatch({
+            type: "MERGE_STATE",
+            payload: {
+              xp: result.mergedStats.xp,
+              level: result.mergedStats.level,
+              completedToday: result.mergedStats.completedToday,
+              completedThisWeek: result.mergedStats.completedThisWeek,
+              completedThisMonth: result.mergedStats.completedThisMonth,
+              completedThisYear: result.mergedStats.completedThisYear,
+              focusMinutesToday: result.mergedStats.focusMinutesToday,
+              focusMinutesThisWeek: result.mergedStats.focusMinutesThisWeek,
+              focusMinutesThisMonth: result.mergedStats.focusMinutesThisMonth,
+              totalFocusMinutes: result.mergedStats.totalFocusMinutes,
+              focusBlocksToday: result.mergedStats.focusBlocksToday,
+              focusBlocksThisWeek: result.mergedStats.focusBlocksThisWeek,
+            },
+          });
+        }
+
+        clearOfflineSince();
+      })
+      .catch(() => {
+        // Sync failed – keep offline-since marker for next attempt
+      })
+      .finally(() => setSyncing(false));
+  }, [isOnline]); // eslint-disable-line
+
+  const handleConflictsResolved = useCallback((resolutions) => {
+    // Apply resolutions to local state
+    for (const { conflict, choice, result } of resolutions) {
+      if (conflict.entityType === "task" && result) {
+        dispatch({ type: "UPDATE_TASK", payload: { id: result.id || conflict.entityId, ...result } });
+      } else if (conflict.entityType === "category" && result) {
+        dispatch({ type: "UPDATE_CATEGORY", payload: result });
+      }
+    }
+    setConflicts(null);
+  }, [dispatch]);
+
+  return (
+    <>
+      {conflicts && conflicts.length > 0 && (
+        <ConflictDialog conflicts={conflicts} onResolved={handleConflictsResolved} />
+      )}
+    </>
+  );
+}
+
 function AppLayout() {
   const mainRef = useRef(null);
   return (
@@ -143,6 +245,8 @@ function AppLayout() {
                     <QuickAddEnterListener />
                     <TriageModal />
                     <ActivityBridge />
+                    <SyncOrchestrator />
+                    <OfflinePullGuard />
                   </div>
                 </QuickAddProvider>
               </FocusTimerProvider>

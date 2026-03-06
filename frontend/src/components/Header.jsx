@@ -3,6 +3,7 @@ import { useApp, getLevelTitle } from "../context/AppContext";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
+import useOnlineStatus from "../hooks/useOnlineStatus";
 import { Sun, Moon, Settings, Trophy, LogOut, User, Flame, Zap, BatteryLow } from "lucide-react";
 import { Link } from "react-router-dom";
 import XpBar from "./XpBar";
@@ -14,6 +15,7 @@ export default function Header() {
   const { state, dispatch } = useApp();
   const { t, lang } = useI18n();
   const { settings } = useSettings();
+  const isOnline = useOnlineStatus();
   const { user, logout } = useAuth();
   const levelTitle = getLevelTitle(state.level, lang);
   const features = settings.features || {};
@@ -118,8 +120,13 @@ export default function Header() {
               </div>
               <button
                 onClick={logout}
-                className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-light dark:text-muted-dark hover:text-danger transition-colors"
-                title={t("auth.logout")}
+                disabled={!isOnline}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                  isOnline
+                    ? "hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-light dark:text-muted-dark hover:text-danger"
+                    : "opacity-30 cursor-not-allowed text-muted-light dark:text-muted-dark"
+                }`}
+                title={isOnline ? t("auth.logout") : "Logout offline nicht verfügbar"}
               >
                 <LogOut className="w-4 h-4" />
               </button>

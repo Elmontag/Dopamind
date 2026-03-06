@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "../services/api";
+import { enqueue, addGamificationDelta } from "../services/offlineQueue";
 import dailyChallengesData from "../data/dailyChallenges.json";
 
 const AppContext = createContext();
@@ -836,6 +837,9 @@ function reducer(state, action) {
     case "LOAD_STATE":
       return { ...initialState, ...action.payload };
 
+    case "MERGE_STATE":
+      return { ...state, ...action.payload };
+
     case "RESET_DAILY": {
       const today = getTodayStr();
       if (state.lastActiveDate === today) return state;
@@ -1216,13 +1220,32 @@ export function AppProvider({ children }) {
     for (const achId of state.unlockedAchievements) {
       if (!syncedAchievements.current.has(achId)) {
         syncedAchievements.current.add(achId);
-        apiFetch("/achievements", {
-          method: "POST",
-          body: JSON.stringify({ id: achId }),
-        }).catch(() => {});
+        if (navigator.onLine) {
+          apiFetch("/achievements", {
+            method: "POST",
+            body: JSON.stringify({ id: achId }),
+          }).catch(() => {
+            addGamificationDelta("newAchievements", achId);
+          });
+        } else {
+          addGamificationDelta("newAchievements", achId);
+        }
       }
     }
   }, [state.unlockedAchievements]);
+
+  // Offline-aware API call: tries fetch, queues on network failure
+  const offlineAwareApi = useCallback((path, options, entityType, entityId) => {
+    apiFetch(path, options).catch((err) => {
+      // Queue on network errors (not on 4xx/5xx which indicate server-side issues)
+      const isNetworkError = !err.message || (!err.message.startsWith("HTTP ") && !err.message.includes("401"));
+      if (isNetworkError) {
+        let body;
+        try { body = options.body ? JSON.parse(options.body) : undefined; } catch { body = undefined; }
+        enqueue({ entityType, entityId, method: options.method || "GET", path, body });
+      }
+    });
+  }, []);
 
   // Wrapped dispatch: dispatches locally + fires granular API calls as side effects
   const apiDispatch = useCallback((action) => {
@@ -1237,40 +1260,47 @@ export function AppProvider({ children }) {
         if (token) {
           const { text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
             timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags } = action.payload;
-          apiFetch("/tasks", {
+          offlineAwareApi("/tasks", {
             method: "POST",
             body: JSON.stringify({
               id, text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
               timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags: tags || [],
             }),
-          }).catch(() => {});
+          }, "task", id);
         }
         return;
       }
       case "COMPLETE_TASK": {
         dispatch(action);
         if (token) {
-          apiFetch(`/tasks/${action.payload}`, {
+          offlineAwareApi(`/tasks/${action.payload}`, {
             method: "PATCH",
             body: JSON.stringify({ completed: true, completedAt: new Date().toISOString() }),
-          }).catch(() => {});
+          }, "task", action.payload);
+          // Track gamification delta for offline merge
+          if (!navigator.onLine) {
+            addGamificationDelta("completedToday", 1);
+            addGamificationDelta("completedThisWeek", 1);
+            addGamificationDelta("completedThisMonth", 1);
+            addGamificationDelta("completedThisYear", 1);
+          }
         }
         return;
       }
       case "REOPEN_TASK": {
         dispatch(action);
         if (token) {
-          apiFetch(`/tasks/${action.payload}`, {
+          offlineAwareApi(`/tasks/${action.payload}`, {
             method: "PATCH",
             body: JSON.stringify({ completed: false, completedAt: null }),
-          }).catch(() => {});
+          }, "task", action.payload);
         }
         return;
       }
       case "DELETE_TASK": {
         dispatch(action);
         if (token) {
-          apiFetch(`/tasks/${action.payload}`, { method: "DELETE" }).catch(() => {});
+          offlineAwareApi(`/tasks/${action.payload}`, { method: "DELETE" }, "task", action.payload);
         }
         return;
       }
@@ -1297,10 +1327,10 @@ export function AppProvider({ children }) {
           if (completed !== undefined) patch.completed = completed;
           if (completedAt !== undefined) patch.completedAt = completedAt;
           if (Object.keys(patch).length > 0) {
-            apiFetch(`/tasks/${taskId}`, {
+            offlineAwareApi(`/tasks/${taskId}`, {
               method: "PATCH",
               body: JSON.stringify(patch),
-            }).catch(() => {});
+            }, "task", taskId);
           }
         }
         return;
@@ -1313,13 +1343,13 @@ export function AppProvider({ children }) {
         if (token) {
           const { taskId, text, estimatedMinutes, scheduledTime, scheduledDate,
             energyCost, timeOfDay, priority, deadline, category, tags, sizeCategory } = action.payload;
-          apiFetch(`/tasks/${taskId}/subtasks`, {
+          offlineAwareApi(`/tasks/${taskId}/subtasks`, {
             method: "POST",
             body: JSON.stringify({
               id, text, estimatedMinutes, scheduledTime, scheduledDate,
               energyCost, timeOfDay, priority, deadline, category, tags: tags || [], sizeCategory,
             }),
-          }).catch(() => {});
+          }, "subtask", id);
         }
         return;
       }
@@ -1330,10 +1360,10 @@ export function AppProvider({ children }) {
         const sub = task && (task.subtasks || []).find((s) => s.id === subtaskId);
         dispatch(action);
         if (token && sub) {
-          apiFetch(`/tasks/${taskId}/subtasks/${subtaskId}`, {
+          offlineAwareApi(`/tasks/${taskId}/subtasks/${subtaskId}`, {
             method: "PATCH",
             body: JSON.stringify({ completed: !sub.completed }),
-          }).catch(() => {});
+          }, "subtask", subtaskId);
         }
         return;
       }
@@ -1342,10 +1372,10 @@ export function AppProvider({ children }) {
         if (token) {
           const { taskId: usId, subtaskId: usSubId, ...subUpdates } = action.payload;
           if (Object.keys(subUpdates).length > 0) {
-            apiFetch(`/tasks/${usId}/subtasks/${usSubId}`, {
+            offlineAwareApi(`/tasks/${usId}/subtasks/${usSubId}`, {
               method: "PATCH",
               body: JSON.stringify(subUpdates),
-            }).catch(() => {});
+            }, "subtask", usSubId);
           }
         }
         return;
@@ -1354,7 +1384,7 @@ export function AppProvider({ children }) {
         dispatch(action);
         if (token) {
           const { taskId: dtId, subtaskId: dsId } = action.payload;
-          apiFetch(`/tasks/${dtId}/subtasks/${dsId}`, { method: "DELETE" }).catch(() => {});
+          offlineAwareApi(`/tasks/${dtId}/subtasks/${dsId}`, { method: "DELETE" }, "subtask", dsId);
         }
         return;
       }
@@ -1366,10 +1396,10 @@ export function AppProvider({ children }) {
         dispatch(enhancedAction);
         if (token) {
           const { name, type, color } = action.payload;
-          apiFetch("/categories", {
+          offlineAwareApi("/categories", {
             method: "POST",
             body: JSON.stringify({ id: catId, name, type: type || "area", color: color || "gray", sortOrder: state.categories.length }),
-          }).catch(() => {});
+          }, "category", catId);
         }
         return;
       }
@@ -1383,10 +1413,10 @@ export function AppProvider({ children }) {
           if (type !== undefined) patch.type = type;
           if (color !== undefined) patch.color = color;
           if (Object.keys(patch).length > 0) {
-            apiFetch(`/categories/${ucId}`, {
+            offlineAwareApi(`/categories/${ucId}`, {
               method: "PUT",
               body: JSON.stringify(patch),
-            }).catch(() => {});
+            }, "category", ucId);
           }
         }
         return;
@@ -1395,15 +1425,30 @@ export function AppProvider({ children }) {
       case "DELETE_LABEL": {
         dispatch(action);
         if (token) {
-          apiFetch(`/categories/${action.payload}`, { method: "DELETE" }).catch(() => {});
+          offlineAwareApi(`/categories/${action.payload}`, { method: "DELETE" }, "category", action.payload);
         }
         return;
+      }
+      case "ADD_FOCUS_MINUTES": {
+        dispatch(action);
+        // Track gamification delta for offline merge
+        if (!navigator.onLine && action.payload) {
+          const mins = typeof action.payload === "number" ? action.payload : action.payload.minutes || 0;
+          addGamificationDelta("focusMinutesToday", mins);
+          addGamificationDelta("focusMinutesThisWeek", mins);
+          addGamificationDelta("focusMinutesThisMonth", mins);
+          addGamificationDelta("totalFocusMinutes", mins);
+          addGamificationDelta("focusBlocksToday", 1);
+          addGamificationDelta("focusBlocksThisWeek", 1);
+          addGamificationDelta("xp", mins * 2);
+        }
+        break;
       }
       default:
         dispatch(action);
         break;
     }
-  }, [state.tasks, state.categories]); // eslint-disable-line
+  }, [state.tasks, state.categories, offlineAwareApi]); // eslint-disable-line
 
   // Sync stats after any state change that might affect them
   useEffect(() => {

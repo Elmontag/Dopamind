@@ -888,5 +888,19 @@
     "retry": "Retry",
     "databaseOk": "Database connected",
     "databaseError": "Database connection failed"
+  },
+  "sync": {
+    "conflictTitle": "Sync Conflict",
+    "conflictSubtitle": "Conflict {current} of {total} – Which version should be kept?",
+    "localVersion": "Offline version (PWA)",
+    "serverVersion": "Web version (Server)",
+    "keepThis": "Keep this version",
+    "alreadyExists": "Already exists on server",
+    "syncing": "Syncing...",
+    "syncComplete": "Sync complete",
+    "syncFailed": "Sync failed",
+    "offlineMailDisabled": "Mail is not available offline",
+    "offlineCalendarSaved": "Event will be uploaded on reconnect",
+    "calendarCollision": "Event already exists on server"
   }
 }
