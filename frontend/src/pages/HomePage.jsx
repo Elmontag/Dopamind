@@ -124,18 +124,17 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   // Scan all scheduled task times to expand blocks when tasks fall outside the assistance window
   let taskMinStart = workStart;
   let taskMaxEnd = workEnd;
-  const parseScheduledMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
   for (const task of tasks) {
     if (task.completed) continue;
     if (task.scheduledTime) {
-      const min = parseScheduledMin(task.scheduledTime);
+      const min = parseTimeToMin(task.scheduledTime);
       if (min < taskMinStart) taskMinStart = min;
       if (min + 1 > taskMaxEnd) taskMaxEnd = min + 1;
     }
     for (const sub of (task.subtasks || [])) {
       if (sub.completed) continue;
       if (sub.scheduledTime) {
-        const min = parseScheduledMin(sub.scheduledTime);
+        const min = parseTimeToMin(sub.scheduledTime);
         if (min < taskMinStart) taskMinStart = min;
         if (min + 1 > taskMaxEnd) taskMaxEnd = min + 1;
       }
@@ -160,13 +159,13 @@ function BlockDayView({ t, tasks, events, settings, isToday, energyLevel, onComp
   const blockIds = blocks.map((b) => b.id);
   const getItemBlock = (item) => {
     if (item.timeOfDay && blockIds.includes(item.timeOfDay)) return item.timeOfDay;
-    if (item.timeOfDay) return blocks[0]?.id || "morning";
+    // For "exact" timeOfDay (or any unrecognised value), fall through to scheduledTime lookup
     if (item.scheduledTime) {
-      const [h, m] = item.scheduledTime.split(":").map(Number);
-      const min = h * 60 + (m || 0);
+      const min = parseTimeToMin(item.scheduledTime);
       const block = blocks.find((b) => min >= b.start && min < b.end);
       return block?.id || blocks[blocks.length - 1]?.id || "morning";
     }
+    if (item.timeOfDay) return blocks[0]?.id || "morning";
     return currentBlockId || blocks[0]?.id || "morning";
   };
 
