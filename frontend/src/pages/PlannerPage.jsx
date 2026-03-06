@@ -168,7 +168,7 @@ export default function PlannerPage() {
       <div className="glass-card p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
           <div>
-            <h2 className="text-base font-bold">{t("nav.planner")}</h2>
+            <h2 className="text-xl font-semibold">{t("nav.planner")}</h2>
           </div>
           <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 flex-wrap">
             {/* View switcher */}
@@ -177,7 +177,7 @@ export default function PlannerPage() {
                 <button
                   key={v}
                   onClick={() => setPlanView(v)}
-                  className={`px-2 py-0.5 rounded text-[10px] transition-all ${
+                  className={`px-2 py-0.5 rounded text-[10px] lg:text-xs transition-all ${
                     planView === v
                       ? "bg-white dark:bg-white/15 text-accent font-bold shadow-sm"
                       : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
@@ -257,7 +257,7 @@ export default function PlannerPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{task.text}</p>
                     {task.estimatedMinutes && (
-                      <p className="text-[10px] text-muted-light dark:text-muted-dark">~{task.estimatedMinutes}{t("common.min")}</p>
+                      <p className="text-xs text-muted-light dark:text-muted-dark">~{task.estimatedMinutes}{t("common.min")}</p>
                     )}
                     {task.subtasks && task.subtasks.filter((s) => !s.completed).length > 0 && (
                       <div className="mt-1 space-y-0.5">
@@ -268,7 +268,7 @@ export default function PlannerPage() {
                               className="w-3 h-3 rounded border border-gray-300 dark:border-white/20 flex-shrink-0 hover:border-success hover:bg-success/10 transition-colors"
                               aria-label={t("tasks.complete")}
                             />
-                            <span className="text-[10px] text-muted-light dark:text-muted-dark truncate">{sub.text}</span>
+                            <span className="text-xs text-muted-light dark:text-muted-dark truncate">{sub.text}</span>
                           </div>
                         ))}
                       </div>
@@ -322,9 +322,9 @@ export default function PlannerPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-accent truncate">{event.title}</p>
-                    <p className="text-[10px] text-accent/70 font-medium">{t("calendar.allDay")}</p>
+                    <p className="text-xs text-accent/70 font-medium">{t("calendar.allDay")}</p>
                     {event.location && (
-                      <p className="text-[10px] text-accent/60 flex items-center gap-0.5 mt-0.5 truncate"><MapPin className="w-2.5 h-2.5 flex-shrink-0" />{event.location}</p>
+                      <p className="text-xs text-accent/60 flex items-center gap-0.5 mt-0.5 truncate"><MapPin className="w-2.5 h-2.5 flex-shrink-0" />{event.location}</p>
                     )}
                   </div>
                   <button
@@ -351,12 +351,12 @@ export default function PlannerPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{event.title}</p>
                     {event.start && (
-                      <p className="text-[10px] text-muted-light dark:text-muted-dark font-mono mt-0.5">
+                      <p className="text-xs text-muted-light dark:text-muted-dark font-mono mt-0.5">
                         {event.start} – {event.end}
                       </p>
                     )}
                     {event.location && (
-                      <p className="text-[10px] text-muted-light dark:text-muted-dark flex items-center gap-0.5 mt-0.5 truncate"><MapPin className="w-2.5 h-2.5 flex-shrink-0" />{event.location}</p>
+                      <p className="text-xs text-muted-light dark:text-muted-dark flex items-center gap-0.5 mt-0.5 truncate"><MapPin className="w-2.5 h-2.5 flex-shrink-0" />{event.location}</p>
                     )}
                     {event.description && (
                       <p className="text-xs text-muted-light dark:text-muted-dark mt-1 truncate">{event.description}</p>
