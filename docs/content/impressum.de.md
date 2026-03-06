@@ -2,17 +2,19 @@
 
 Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz):
 
-**[Vor- und Nachname / Firmenname]**
-[Straße und Hausnummer]
-[PLZ Ort]
-[Land]
+**Ludwig Montag**
+In den Benden 5
+53894 Mechernich
+Germany
 
 ### Kontakt
-E-Mail: [E-Mail-Adresse]
+E-Mail: ludwig@die-montags.eu
 
 ### Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV
-[Vor- und Nachname]
-[Adresse wie oben]
+Ludwig Montag
+In den Benden 5
+53894 Mechernich
+Germany
 
 ### Haftungsausschluss
 

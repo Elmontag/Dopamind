@@ -2,17 +2,19 @@
 
 Information according to § 5 DDG (German Digital Services Act):
 
-**[Full Name / Company Name]**
-[Street and Number]
-[Postal Code City]
-[Country]
+**Ludwig Montag**
+In den Benden 5
+53894 Mechernich
+Germany
 
 ### Contact
-Email: [email address]
+Email: ludwig@die-montags.eu
 
 ### Responsible for content according to § 18 Abs. 2 MStV
-[Full Name]
-[Address as above]
+Ludwig Montag
+In den Benden 5
+53894 Mechernich
+Germany
 
 ### Disclaimer
 
