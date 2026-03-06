@@ -20,7 +20,7 @@ function reducer(state, action) {
     case "SET_ERROR":
       return { ...state, loading: false, error: action.payload };
     case "SET_MAILS":
-      return { ...state, mails: action.payload.mails, total: action.payload.total, loading: false };
+      return { ...state, mails: Array.isArray(action.payload.mails) ? action.payload.mails : [], total: action.payload.total ?? 0, loading: false };
     case "SELECT_MAIL":
       return { ...state, selectedMail: action.payload };
     case "SET_FOLDER":
@@ -58,7 +58,16 @@ export function MailProvider({ children }) {
     dispatch({ type: "SET_FOLDER", payload: folder });
     try {
       const result = await mailService.fetchMails(folder, masterTag, limit, offset);
-      dispatch({ type: "SET_MAILS", payload: { mails: result.mails, total: result.total } });
+      // Handle both new { mails, total } shape and old bare-array responses gracefully
+      let mails, total;
+      if (Array.isArray(result)) {
+        mails = result;
+        total = result.length;
+      } else {
+        mails = Array.isArray(result?.mails) ? result.mails : [];
+        total = result?.total ?? mails.length;
+      }
+      dispatch({ type: "SET_MAILS", payload: { mails, total } });
     } catch (err) {
       dispatch({ type: "SET_ERROR", payload: err.message });
     }
