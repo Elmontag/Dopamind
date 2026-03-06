@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 const { initDb, getPool } = require("./db/database");
 const { authenticate } = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
@@ -73,6 +74,21 @@ app.use("/api/stats", authenticate, statsRoutes);
 app.use("/api/achievements", authenticate, achievementRoutes);
 app.use("/api/focus-blocks", authenticate, focusBlockRoutes);
 app.use("/api/categories", authenticate, categoryRoutes);
+
+// Swagger UI — served unless explicitly disabled via DISABLE_DOCS=true
+if (process.env.DISABLE_DOCS !== "true") {
+  try {
+    const swaggerUi = require("swagger-ui-express");
+    const YAML = require("yamljs");
+    const swaggerDoc = YAML.load(path.join(__dirname, "openapi.yaml"));
+    app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
+      customSiteTitle: "Dopamind API Docs",
+    }));
+    console.log("Swagger UI available at /api/docs");
+  } catch (err) {
+    console.warn("Swagger UI could not be loaded:", err.message);
+  }
+}
 
 app.get("/api/health", async (_req, res) => {
   const status = {
