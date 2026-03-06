@@ -75,8 +75,8 @@ export default function TaskFormModal({ t, onSubmit, onClose, isSubtask, inherit
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-card p-6 max-w-lg w-full mx-4 space-y-4 max-h-[90vh] overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] pb-16 lg:pb-0 bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card p-6 max-w-lg w-full mx-4 space-y-4 max-h-[calc(90vh-4rem)] lg:max-h-[90vh] overflow-y-auto animate-fade-in">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold">{title || (isEdit ? (isSubtask ? t("tasks.editSubtask") : t("common.edit")) : (isSubtask ? t("tasks.createSubtask") : t("tasks.createTask")))}</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/10">
