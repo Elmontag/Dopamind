@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { apiFetch } from "../services/api";
 
 const SettingsContext = createContext();
 const STORAGE_KEY = "dopamind-settings";
@@ -113,6 +114,37 @@ export function SettingsProvider({ children }) {
     } catch {}
     return migrateSettings({ ...defaultSettings });
   });
+  const saveTimer = useRef(null);
+  const didLoad = useRef(false);
+
+  // Load settings from backend on mount
+  useEffect(() => {
+    if (didLoad.current) return;
+    didLoad.current = true;
+    const token = localStorage.getItem("dopamind-token");
+    if (!token) return;
+    apiFetch("/user-data/settings")
+      .then((res) => {
+        if (res.data && Object.keys(res.data).length > 0) {
+          const merged = migrateSettings(deepMerge(defaultSettings, res.data));
+          setSettings(merged);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const persistToBackend = useCallback((data) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const token = localStorage.getItem("dopamind-token");
+      if (!token) return;
+      apiFetch("/user-data/settings", {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      }).catch(() => {});
+    }, 500);
+  }, []);
 
   const updateSettings = useCallback((section, values) => {
     setSettings((prev) => {
@@ -121,9 +153,10 @@ export function SettingsProvider({ children }) {
         : { ...prev, [section]: values };
       const migrated = migrateSettings(next);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      persistToBackend(migrated);
       return migrated;
     });
-  }, []);
+  }, [persistToBackend]);
 
   const isMailConfigured = Boolean(settings.imap.host && settings.imap.user);
   const isCalendarConfigured = Boolean(settings.caldav.url && settings.caldav.user);

@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useRef, useEffect } from "react";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AppProvider } from "./context/AppContext";
 import { I18nProvider } from "./i18n/I18nContext";
@@ -25,6 +25,64 @@ import PlannerPage from "./pages/PlannerPage";
 import MailPage from "./pages/MailPage";
 import SettingsPage from "./pages/SettingsPage";
 import AchievementsPage from "./pages/AchievementsPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import SetupPage from "./pages/SetupPage";
+import AdminPage from "./pages/AdminPage";
+
+function ProtectedRoute({ children }) {
+  const { user, loading, setupNeeded } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-accent text-lg font-semibold">Dopamind</div>
+      </div>
+    );
+  }
+  if (setupNeeded) return <Navigate to="/setup" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const { user, isAdmin, loading, setupNeeded } = useAuth();
+  if (loading) return null;
+  if (setupNeeded) return <Navigate to="/setup" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return children;
+}
+
+function AuthRoute({ children }) {
+  const { user, loading, setupNeeded } = useAuth();
+  if (loading) return null;
+  if (setupNeeded) return <Navigate to="/setup" replace />;
+  if (user) return <Navigate to="/" replace />;
+  return children;
+}
+
+function RegisterRoute({ children }) {
+  const { user, loading, setupNeeded, registrationEnabled } = useAuth();
+  if (loading) return null;
+  if (setupNeeded) return <Navigate to="/setup" replace />;
+  if (user) return <Navigate to="/" replace />;
+  if (!registrationEnabled) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function SetupRoute({ children }) {
+  const { loading, setupNeeded } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-accent text-lg font-semibold">Dopamind</div>
+      </div>
+    );
+  }
+  if (!setupNeeded) return <Navigate to="/login" replace />;
+  return children;
+}
+
 // Scroll the main content area to top on every route change
 function ScrollToTop({ mainRef }) {
   const { pathname } = useLocation();
@@ -58,6 +116,7 @@ function AppLayout() {
                           <Route path="/mail" element={<MailPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
                           <Route path="/achievements" element={<AchievementsPage />} />
+                          <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
                         </Routes>
                       </main>
                       <footer className="hidden lg:block text-center py-4 text-[10px] text-muted-light dark:text-muted-dark">
@@ -90,10 +149,10 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <Routes>
-              <Route path="/login" element={<Navigate to="/" replace />} />
-              <Route path="/register" element={<Navigate to="/" replace />} />
-              <Route path="/setup" element={<Navigate to="/" replace />} />
-              <Route path="/*" element={<AppLayout />} />
+              <Route path="/setup" element={<SetupRoute><SetupPage /></SetupRoute>} />
+              <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
+              <Route path="/register" element={<RegisterRoute><RegisterPage /></RegisterRoute>} />
+              <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
             </Routes>
           </AuthProvider>
         </ThemeProvider>
