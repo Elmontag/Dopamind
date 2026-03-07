@@ -1,5 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useRef, useCallback } from "react";
-import { apiFetch } from "../services/api";
+import { createContext, useContext, useReducer, useEffect, useCallback } from "react";
 import dailyChallengesData from "../data/dailyChallenges.json";
 
 const AppContext = createContext();
@@ -1060,122 +1059,6 @@ export function AppProvider({ children }) {
     } catch {}
     return init;
   });
-  const statsTimer = useRef(null);
-  const didLoad = useRef(false);
-  // Track which achievement IDs have been synced to avoid duplicate POSTs
-  const syncedAchievements = useRef(new Set());
-
-  // Load state from backend on mount — prefer new granular endpoints, fall back to legacy blob
-  useEffect(() => {
-    if (didLoad.current) return;
-    didLoad.current = true;
-    const token = localStorage.getItem("dopamind-token");
-    if (!token) return;
-
-    Promise.all([
-      apiFetch("/tasks").catch(() => null),
-      apiFetch("/stats").catch(() => null),
-      apiFetch("/achievements").catch(() => null),
-      apiFetch("/categories").catch(() => null),
-    ]).then(([tasksRes, statsRes, achievementsRes, categoriesRes]) => {
-      // Use the new granular API if it responded
-      if (Array.isArray(tasksRes)) {
-        const loadPayload = {};
-
-        // If API returned tasks, use them. If API returned empty but localStorage has tasks,
-        // keep localStorage tasks (handles offline-first / pre-migration scenarios).
-        const localTasks = state.tasks;
-        if (tasksRes.length > 0 || localTasks.length === 0) {
-          // Map tasks from API shape back to app state shape
-          loadPayload.tasks = tasksRes.map((t) => ({
-            id: t.id,
-            text: t.text,
-            priority: t.priority || "medium",
-            energyCost: t.energyCost || "medium",
-            estimatedMinutes: t.estimatedMinutes || 0,
-            sizeCategory: t.sizeCategory || null,
-            completed: t.completed || false,
-            completedAt: t.completedAt || null,
-            createdAt: t.createdAt || Date.now(),
-            deadline: t.deadline || null,
-            timeOfDay: t.timeOfDay || null,
-            scheduledTime: t.scheduledTime || null,
-            scheduledDate: t.scheduledDate || null,
-            category: t.category || null,
-            mailRef: t.mailRef || null,
-            blockSortIndex: t.blockSortIndex || undefined,
-            tags: t.tags || [],
-            subtasks: (t.subtasks || []).map((s) => ({
-              id: s.id,
-              text: s.text,
-              completed: s.completed || false,
-              completedAt: s.completedAt || null,
-              estimatedMinutes: s.estimatedMinutes || 0,
-              scheduledTime: s.scheduledTime || null,
-              scheduledDate: s.scheduledDate || null,
-              energyCost: s.energyCost || t.energyCost || "medium",
-              timeOfDay: s.timeOfDay || null,
-              priority: s.priority || t.priority || "medium",
-              deadline: s.deadline || null,
-              category: s.category || t.category || null,
-              tags: s.tags || [],
-              sizeCategory: s.sizeCategory || null,
-            })),
-          }));
-        }
-
-        if (statsRes && typeof statsRes.xp === "number") {
-          loadPayload.xp = statsRes.xp;
-          loadPayload.level = statsRes.level || 1;
-          loadPayload.currentStreakDays = statsRes.currentStreakDays || 0;
-          loadPayload.longestStreakDays = statsRes.longestStreak || 0;
-          loadPayload.completedToday = statsRes.completedToday || 0;
-          loadPayload.completedThisWeek = statsRes.completedThisWeek || 0;
-          loadPayload.completedThisMonth = statsRes.completedThisMonth || 0;
-          loadPayload.completedThisYear = statsRes.completedThisYear || 0;
-          loadPayload.lastActiveDate = statsRes.lastCompletedDate || null;
-        }
-
-        if (achievementsRes && Array.isArray(achievementsRes)) {
-          loadPayload.unlockedAchievements = achievementsRes.map((a) => a.id);
-          // Track already synced achievements
-          achievementsRes.forEach((a) => syncedAchievements.current.add(a.id));
-        }
-
-        // Categories: use backend data if available; otherwise migrate from localStorage to backend
-        if (Array.isArray(categoriesRes) && categoriesRes.length > 0) {
-          loadPayload.categories = categoriesRes;
-        } else {
-          // Backend has no categories yet – keep current (localStorage) categories and save them
-          const localCategories = state.categories && state.categories.length > 0
-            ? state.categories
-            : DEFAULT_CATEGORIES;
-          loadPayload.categories = localCategories;
-          // Migrate to backend so they persist from now on
-          localCategories.forEach((cat, idx) => {
-            apiFetch("/categories", {
-              method: "POST",
-              body: JSON.stringify({ id: cat.id, name: cat.name, type: cat.type || "area", color: cat.color || "gray", sortOrder: idx }),
-            }).catch(() => {});
-          });
-        }
-
-        dispatch({ type: "LOAD_STATE", payload: loadPayload });
-      } else {
-        // Fall back to legacy blob endpoint
-        apiFetch("/user-data/app_state")
-          .then((res) => {
-            if (res.data && Object.keys(res.data).length > 0) {
-              dispatch({ type: "LOAD_STATE", payload: res.data });
-              if (Array.isArray(res.data.unlockedAchievements)) {
-                res.data.unlockedAchievements.forEach((id) => syncedAchievements.current.add(id));
-              }
-            }
-          })
-          .catch(() => {});
-      }
-    });
-  }, []);
 
   useEffect(() => {
     dispatch({ type: "RESET_DAILY" });
@@ -1186,232 +1069,29 @@ export function AppProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Debounced stats sync – only syncs numeric stats, not tasks (those use direct API calls)
-  const syncStats = useCallback((newState) => {
-    if (statsTimer.current) clearTimeout(statsTimer.current);
-    statsTimer.current = setTimeout(() => {
-      const token = localStorage.getItem("dopamind-token");
-      if (!token) return;
-      apiFetch("/stats", {
-        method: "PATCH",
-        body: JSON.stringify({
-          xp: newState.xp,
-          level: newState.level,
-          currentStreakDays: newState.currentStreakDays,
-          longestStreak: newState.longestStreakDays,
-          completedToday: newState.completedToday,
-          completedThisWeek: newState.completedThisWeek,
-          completedThisMonth: newState.completedThisMonth,
-          completedThisYear: newState.completedThisYear,
-          lastCompletedDate: newState.lastActiveDate || null,
-        }),
-      }).catch(() => {});
-    }, 2000);
-  }, []);
-
-  // Sync newly unlocked achievements to backend
-  useEffect(() => {
-    const token = localStorage.getItem("dopamind-token");
-    if (!token || !Array.isArray(state.unlockedAchievements)) return;
-    for (const achId of state.unlockedAchievements) {
-      if (!syncedAchievements.current.has(achId)) {
-        syncedAchievements.current.add(achId);
-        apiFetch("/achievements", {
-          method: "POST",
-          body: JSON.stringify({ id: achId }),
-        }).catch(() => {});
-      }
-    }
-  }, [state.unlockedAchievements]);
-
-  // Wrapped dispatch: dispatches locally + fires granular API calls as side effects
+  // Wrapped dispatch: pre-generates IDs for new entities, then dispatches locally
   const apiDispatch = useCallback((action) => {
-    const token = localStorage.getItem("dopamind-token");
-
     switch (action.type) {
       case "ADD_TASK": {
-        // Pre-generate ID so reducer and API use the same one
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const enhancedAction = { ...action, payload: { ...action.payload, id } };
-        dispatch(enhancedAction);
-        if (token) {
-          const { text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
-            timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags } = action.payload;
-          apiFetch("/tasks", {
-            method: "POST",
-            body: JSON.stringify({
-              id, text, priority, energyCost, estimatedMinutes, sizeCategory, deadline,
-              timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags: tags || [],
-            }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "COMPLETE_TASK": {
-        dispatch(action);
-        if (token) {
-          apiFetch(`/tasks/${action.payload}`, {
-            method: "PATCH",
-            body: JSON.stringify({ completed: true, completedAt: new Date().toISOString() }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "REOPEN_TASK": {
-        dispatch(action);
-        if (token) {
-          apiFetch(`/tasks/${action.payload}`, {
-            method: "PATCH",
-            body: JSON.stringify({ completed: false, completedAt: null }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "DELETE_TASK": {
-        dispatch(action);
-        if (token) {
-          apiFetch(`/tasks/${action.payload}`, { method: "DELETE" }).catch(() => {});
-        }
-        return;
-      }
-      case "UPDATE_TASK": {
-        dispatch(action);
-        if (token) {
-          const { id: taskId, text, priority, energyCost, estimatedMinutes, sizeCategory,
-            deadline, timeOfDay, scheduledTime, scheduledDate, category, mailRef, tags,
-            blockSortIndex, completed, completedAt } = action.payload;
-          const patch = {};
-          if (text !== undefined) patch.text = text;
-          if (priority !== undefined) patch.priority = priority;
-          if (energyCost !== undefined) patch.energyCost = energyCost;
-          if (estimatedMinutes !== undefined) patch.estimatedMinutes = estimatedMinutes;
-          if (sizeCategory !== undefined) patch.sizeCategory = sizeCategory;
-          if (deadline !== undefined) patch.deadline = deadline;
-          if (timeOfDay !== undefined) patch.timeOfDay = timeOfDay;
-          if (scheduledTime !== undefined) patch.scheduledTime = scheduledTime;
-          if (scheduledDate !== undefined) patch.scheduledDate = scheduledDate;
-          if (category !== undefined) patch.category = category;
-          if (mailRef !== undefined) patch.mailRef = mailRef;
-          if (tags !== undefined) patch.tags = tags;
-          if (blockSortIndex !== undefined) patch.blockSortIndex = blockSortIndex;
-          if (completed !== undefined) patch.completed = completed;
-          if (completedAt !== undefined) patch.completedAt = completedAt;
-          if (Object.keys(patch).length > 0) {
-            apiFetch(`/tasks/${taskId}`, {
-              method: "PATCH",
-              body: JSON.stringify(patch),
-            }).catch(() => {});
-          }
-        }
+        dispatch({ ...action, payload: { ...action.payload, id } });
         return;
       }
       case "ADD_SUBTASK": {
-        // Pre-generate ID so reducer and API use the same one
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const enhancedAction = { ...action, payload: { ...action.payload, id } };
-        dispatch(enhancedAction);
-        if (token) {
-          const { taskId, text, estimatedMinutes, scheduledTime, scheduledDate,
-            energyCost, timeOfDay, priority, deadline, category, tags, sizeCategory } = action.payload;
-          apiFetch(`/tasks/${taskId}/subtasks`, {
-            method: "POST",
-            body: JSON.stringify({
-              id, text, estimatedMinutes, scheduledTime, scheduledDate,
-              energyCost, timeOfDay, priority, deadline, category, tags: tags || [], sizeCategory,
-            }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "TOGGLE_SUBTASK": {
-        const { taskId, subtaskId } = action.payload;
-        // Read current state before dispatch to know the current value
-        const task = state.tasks.find((t) => t.id === taskId);
-        const sub = task && (task.subtasks || []).find((s) => s.id === subtaskId);
-        dispatch(action);
-        if (token && sub) {
-          apiFetch(`/tasks/${taskId}/subtasks/${subtaskId}`, {
-            method: "PATCH",
-            body: JSON.stringify({ completed: !sub.completed }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "UPDATE_SUBTASK": {
-        dispatch(action);
-        if (token) {
-          const { taskId: usId, subtaskId: usSubId, ...subUpdates } = action.payload;
-          if (Object.keys(subUpdates).length > 0) {
-            apiFetch(`/tasks/${usId}/subtasks/${usSubId}`, {
-              method: "PATCH",
-              body: JSON.stringify(subUpdates),
-            }).catch(() => {});
-          }
-        }
-        return;
-      }
-      case "DELETE_SUBTASK": {
-        dispatch(action);
-        if (token) {
-          const { taskId: dtId, subtaskId: dsId } = action.payload;
-          apiFetch(`/tasks/${dtId}/subtasks/${dsId}`, { method: "DELETE" }).catch(() => {});
-        }
+        dispatch({ ...action, payload: { ...action.payload, id } });
         return;
       }
       case "ADD_CATEGORY":
       case "ADD_LABEL": {
-        // Pre-generate ID so reducer and API use the same one
         const catId = Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
-        const enhancedAction = { ...action, payload: { ...action.payload, id: catId } };
-        dispatch(enhancedAction);
-        if (token) {
-          const { name, type, color } = action.payload;
-          apiFetch("/categories", {
-            method: "POST",
-            body: JSON.stringify({ id: catId, name, type: type || "area", color: color || "gray", sortOrder: state.categories.length }),
-          }).catch(() => {});
-        }
-        return;
-      }
-      case "UPDATE_CATEGORY":
-      case "UPDATE_LABEL": {
-        dispatch(action);
-        if (token) {
-          const { id: ucId, name, type, color } = action.payload;
-          const patch = {};
-          if (name !== undefined) patch.name = name;
-          if (type !== undefined) patch.type = type;
-          if (color !== undefined) patch.color = color;
-          if (Object.keys(patch).length > 0) {
-            apiFetch(`/categories/${ucId}`, {
-              method: "PUT",
-              body: JSON.stringify(patch),
-            }).catch(() => {});
-          }
-        }
-        return;
-      }
-      case "DELETE_CATEGORY":
-      case "DELETE_LABEL": {
-        dispatch(action);
-        if (token) {
-          apiFetch(`/categories/${action.payload}`, { method: "DELETE" }).catch(() => {});
-        }
+        dispatch({ ...action, payload: { ...action.payload, id: catId } });
         return;
       }
       default:
         dispatch(action);
-        break;
     }
-  }, [state.tasks, state.categories]); // eslint-disable-line
-
-  // Sync stats after any state change that might affect them
-  useEffect(() => {
-    const token = localStorage.getItem("dopamind-token");
-    if (!token) return;
-    syncStats(state);
-  }, [state.xp, state.level, state.currentStreakDays, state.completedToday,
-    state.completedThisWeek, state.completedThisMonth, state.completedThisYear]); // eslint-disable-line
+  }, []);
 
   return (
     <AppContext.Provider value={{ state, dispatch: apiDispatch, xpForLevel, xpForNextLevel }}>

@@ -1,5 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useCallback, useRef } from "react";
-import { apiFetch } from "../services/api";
+import { createContext, useContext, useReducer, useEffect, useCallback } from "react";
 
 const ResourceMonitorContext = createContext();
 const STORAGE_KEY = "dopamind-resource-monitor";
@@ -198,47 +197,9 @@ export function ResourceMonitorProvider({ children }) {
     } catch {}
     return init;
   });
-  const saveTimer = useRef(null);
-  const didLoad = useRef(false);
-
-  // Load from backend on mount
-  useEffect(() => {
-    if (didLoad.current) return;
-    didLoad.current = true;
-    const token = localStorage.getItem("dopamind-token");
-    if (!token) return;
-    // Try new endpoint first, fall back to legacy
-    apiFetch("/user-data/resource_monitor")
-      .then((res) => {
-        if (res.data && Object.keys(res.data).length > 0) {
-          dispatch({ type: "LOAD_STATE", payload: res.data });
-        } else {
-          // Fallback: load legacy time_tracking data and migrate
-          return apiFetch("/user-data/time_tracking").then((legacyRes) => {
-            if (legacyRes.data && Object.keys(legacyRes.data).length > 0) {
-              const migrated = migrateLegacyState(legacyRes.data);
-              if (Object.keys(migrated).length > 0) {
-                dispatch({ type: "LOAD_STATE", payload: migrated });
-              }
-            }
-          });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Persist to localStorage + debounced backend sync
+  // Persist to localStorage on every state change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const token = localStorage.getItem("dopamind-token");
-      if (!token) return;
-      apiFetch("/user-data/resource_monitor", {
-        method: "PUT",
-        body: JSON.stringify({ data: state }),
-      }).catch(() => {});
-    }, 1000);
   }, [state]);
 
   // Auto-check vacation end
@@ -258,18 +219,6 @@ export function ResourceMonitorProvider({ children }) {
 
   const recordFocusBlock = useCallback((block) => {
     dispatch({ type: "RECORD_FOCUS_BLOCK", payload: block });
-    // Sync focus block to relational endpoint (fire-and-forget)
-    const token = localStorage.getItem("dopamind-token");
-    if (token && block && block.start) {
-      const durationMs = (block.end || Date.now()) - block.start;
-      const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-      const date = new Date(block.start).toISOString().slice(0, 10);
-      const startTime = new Date(block.start).toTimeString().slice(0, 5);
-      apiFetch("/focus-blocks", {
-        method: "POST",
-        body: JSON.stringify({ date, startTime, durationMinutes, type: "focus" }),
-      }).catch((err) => console.warn("Failed to sync focus block:", err));
-    }
   }, []);
 
   const isAbsent = !!state.absenceMode;
