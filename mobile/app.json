@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Dopamind",
+    "slug": "dopamind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f0f17"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dopamind.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f0f17"
+      },
+      "package": "com.dopamind.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C63FF"
+        }
+      ]
+    ],
+    "scheme": "dopamind",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
