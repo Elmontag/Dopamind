@@ -18,6 +18,8 @@
     "mailparser": "^3.7.1",
     "nodemailer": "^6.9.8",
     "pg": "^8.13.1",
-    "uuid": "^13.0.0"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
+    "yamljs": "^0.3.0"
   }
 }
