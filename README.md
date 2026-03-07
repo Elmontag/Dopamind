@@ -1,89 +1,89 @@
 # Dopamind
 
-Self-hosted task planning application with prioritisation assistance, energy-aware scheduling and gamification.
+A natively compiled, fully offline Android productivity app built with Flutter. No backend, no server, no login – all data lives in SQLite on the device.
 
 ## Description
 
-Dopamind is a web-based productivity tool designed for users who struggle with task overload, unclear priorities or maintaining a structured workday. It assigns tasks to time blocks based on priority and energy level, integrates with external IMAP and CalDAV servers, and tracks progress through a gamification system.
+Dopamind is a personal task and focus manager designed for users who struggle with task overload, unclear priorities or maintaining a structured workday. It assigns tasks to time blocks based on priority and energy level, optionally reads from the native Android calendar and an IMAP mailbox, and motivates through a gamification system.
 
-The application consists of a React frontend, a Node.js/Express backend, a PostgreSQL database, and an optional Nginx reverse proxy. All components are available as Docker images.
+Everything runs locally on the device. The only optional internet connection is IMAP mail retrieval.
 
 ## Features
 
-- Prioritisation assistant: one highlighted next-step task at a time
-- Energy-level-based scheduling: tasks assigned to morning, midday or evening blocks based on their energy demand
-- Automatic day and schedule structuring
-- CalDAV integration for calendar synchronisation (optional)
-- IMAP integration for email-to-task conversion (optional)
-- Gamification: XP, 10 level ranks, 25+ achievements, streak multiplier
-- Compassion Mode: absence logging suppresses XP penalties
-- Self-hosted: no cloud dependency, no subscription
-- AES-256-GCM encryption for stored IMAP and CalDAV credentials
-- Setup wizard on first start
+- **Task management**: CRUD with priority (Muss sein / Wichtig / Wäre schön), energy cost, deadlines, subtasks, tags, categories, drag-and-drop reordering
+- **Home screen**: one highlighted "Next Task", morning / afternoon / evening energy blocks, daily energy check-in
+- **Compassion Mode**: "Not my day" button suppresses XP streak penalties during sick days or holidays
+- **Focus Timer (Pomodoro)**: 25 / 45 / 60 min, task-specific, flow-detection when you keep going after the timer
+- **Gamification**: XP system, 10 level ranks, 25+ achievements, streak multiplier (up to 2×), reward toast + confetti
+- **Native Android calendar**: displays device calendar events via `device_calendar`; calendar selection in Settings
+- **IMAP mail** (optional): inbox browsing, mail-to-task conversion, secure credential storage via `flutter_secure_storage`
+- **Planner screen**: week and month overview combining tasks and calendar events
+- **Achievements screen**: XP progress bar, achievement badges, weekly heatmap, focus-time stats
+- **Settings**: dark / light mode, language (DE / EN), working hours, gamification toggles, JSON backup / restore
+- **Offline-first**: all data stored in SQLite via Drift; no network required
 
 ## Requirements
 
-- Docker and Docker Compose (recommended), or
-- Node.js >= 18, PostgreSQL >= 14
+- Flutter 3.22 or later
+- Android SDK (min. Android 6.0, API 23)
+- A connected Android device or emulator
 
-## Quick Start (Docker)
-
-```bash
-git clone https://github.com/Elmontag/Dopamind.git
-cd Dopamind
-cp .env.example .env
-# Edit .env: set JWT_SECRET and ENCRYPTION_KEY
-# Generate values: openssl rand -hex 32
-docker-compose up --build
-```
-
-Services after startup:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
-- Nginx proxy: http://localhost
-
-The setup wizard runs automatically on first start.
-
-## Quick Start (without Docker)
+## Build
 
 ```bash
-# PostgreSQL must be running
-createdb dopamind
+cd flutter_app
 
-# Backend
-cd backend
-npm install
-export JWT_SECRET="$(openssl rand -hex 32)"
-export ENCRYPTION_KEY="$(openssl rand -hex 32)"
-export DATABASE_URL="postgresql://user:pass@localhost:5432/dopamind"
-node server.js
+# Install dependencies
+flutter pub get
 
-# Frontend (separate terminal)
-cd frontend
-npm install
-npm start
+# Generate Drift database code and Riverpod providers
+dart run build_runner build --delete-conflicting-outputs
+
+# Run on a connected device or emulator
+flutter run
 ```
 
-## Environment Variables
+## Project Layout
 
-| Variable | Required | Description |
-|---|---|---|
-| `JWT_SECRET` | Yes | JWT signing key, minimum 32 characters |
-| `ENCRYPTION_KEY` | Yes | Key for AES-256-GCM encryption of stored credentials |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `JWT_EXPIRES_IN` | No | Token expiry, default `24h` |
-| `CORS_ORIGIN` | No | Allowed origin for CORS, set to your domain in production |
-| `POSTGRES_USER` | No | PostgreSQL user (Docker Compose) |
-| `POSTGRES_PASSWORD` | No | PostgreSQL password (Docker Compose) |
-| `POSTGRES_DB` | No | PostgreSQL database name (Docker Compose) |
+```
+flutter_app/
+├── pubspec.yaml
+├── android/                        # Android project files and AndroidManifest.xml
+└── lib/
+    ├── main.dart                   # App entry point, ProviderScope
+    ├── app.dart                    # MaterialApp, GoRouter, ThemeData
+    ├── core/
+    │   ├── theme/                  # AppTheme (dark/light), AppColors
+    │   ├── l10n/                   # ARB translation files (de, en)
+    │   └── router/                 # GoRouter route definitions
+    ├── data/
+    │   ├── database/               # Drift SQLite database, tables, DAOs
+    │   ├── models/                 # Plain Dart model classes
+    │   └── repositories/           # Repository abstractions + Riverpod providers
+    ├── domain/
+    │   ├── gamification/           # XP, level, achievement, streak logic
+    │   └── scheduler/              # Energy-block day scheduling algorithm
+    ├── features/
+    │   ├── home/                   # Today view: energy blocks, Next Task, check-in
+    │   ├── tasks/                  # Task list with drag-and-drop and form modal
+    │   ├── planner/                # Week / month planner
+    │   ├── achievements/           # Stats, XP bar, achievement badges
+    │   ├── mail/                   # IMAP mail list and detail
+    │   └── settings/               # App settings screen
+    └── shared/
+        ├── providers/              # Theme, locale, settings providers
+        └── widgets/                # GlassCard, PrimaryButton, RewardToast, MicroConfetti, FocusTimer
+```
 
-## Security
+## Permissions (AndroidManifest.xml)
 
-- Set strong random values for `JWT_SECRET` and `ENCRYPTION_KEY` before first start.
-- Change default PostgreSQL credentials.
-- Set `CORS_ORIGIN` to your actual domain in production.
-- Use HTTPS with a valid certificate in production.
-- Configure regular PostgreSQL backups.
+| Permission | Purpose |
+|---|---|
+| `INTERNET` | Optional IMAP mail retrieval |
+| `READ_CALENDAR` / `WRITE_CALENDAR` | Native device calendar access |
+| `POST_NOTIFICATIONS` | Deadline reminders and focus-timer alerts |
+| `RECEIVE_BOOT_COMPLETED` | Reschedule notifications after reboot |
+| `VIBRATE` | Haptic feedback on timer completion |
 
 ## License
 
