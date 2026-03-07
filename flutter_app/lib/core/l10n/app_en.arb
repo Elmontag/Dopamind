@@ -1,0 +1,195 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Dopamind",
+  "navHome": "Today",
+  "navTasks": "Tasks",
+  "navPlanner": "Planner",
+  "navAchievements": "Achievements",
+  "navMail": "Mail",
+  "navSettings": "Settings",
+
+  "taskPriorityHigh": "Must do",
+  "taskPriorityMedium": "Important",
+  "taskPriorityLow": "Nice to have",
+
+  "energyHigh": "High Energy",
+  "energyMedium": "Normal Energy",
+  "energyLow": "Low Energy",
+
+  "blockMorning": "Morning",
+  "blockAfternoon": "Afternoon",
+  "blockEvening": "Evening",
+
+  "nextTask": "Next Task",
+  "noTasksToday": "No tasks for today",
+
+  "energyCheckin": "How is your energy today?",
+  "energyCheckinSubtitle": "This helps with day planning",
+  "skipCheckin": "Skip",
+
+  "compassionModeTitle": "Not my day",
+  "compassionModeSubtitle": "XP penalty suppressed",
+  "notMyDayButton": "Not my day",
+  "absenceTypeSick": "Sick",
+  "absenceTypeVacation": "Vacation",
+
+  "addTask": "Add task",
+  "editTask": "Edit task",
+  "deleteTask": "Delete task",
+  "completeTask": "Complete task",
+  "reopenTask": "Reopen task",
+  "moveToTomorrow": "Move to tomorrow",
+
+  "taskText": "Task",
+  "taskTextHint": "What do you want to accomplish?",
+  "taskDeadline": "Deadline",
+  "taskScheduledDate": "Date",
+  "taskScheduledTime": "Time of day",
+  "taskEstimatedMinutes": "Estimated duration (min)",
+  "taskTags": "Tags",
+  "taskCategory": "Category",
+  "taskEnergyCost": "Energy cost",
+  "taskPriority": "Priority",
+
+  "subtaskAdd": "Add subtask",
+  "subtaskPlaceholder": "New subtask…",
+
+  "scheduledTimeMorning": "Morning",
+  "scheduledTimeAfternoon": "Afternoon",
+  "scheduledTimeEvening": "Evening",
+  "scheduledTimeExact": "Exact",
+
+  "focusTimerTitle": "Focus Timer",
+  "focusTimerStart": "Start",
+  "focusTimerPause": "Pause",
+  "focusTimerStop": "Stop",
+  "focusTimerDone": "Focus session complete!",
+  "focusTimerXpGained": "+{xp} XP",
+  "@focusTimerXpGained": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "focusTimerFlowDetected": "Flow mode active – keep going!",
+  "focusTimerSelectTask": "Select task",
+
+  "plannerTitle": "Planner",
+  "plannerWeekView": "Week",
+  "plannerMonthView": "Month",
+
+  "achievementsTitle": "Achievements",
+  "achievementsXp": "{xp} XP",
+  "@achievementsXp": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "achievementsLevel": "Level {level}",
+  "@achievementsLevel": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "achievementsStreak": "{days} day streak",
+  "@achievementsStreak": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "achievementsLocked": "Not yet unlocked",
+  "achievementsUnlocked": "Unlocked",
+
+  "mailTitle": "Mail",
+  "mailNoConfig": "No IMAP connection configured",
+  "mailConfigureButton": "Configure IMAP",
+  "mailConvertToTask": "Save as task",
+  "mailMarkImportant": "Important",
+  "mailMarkTodo": "Todo",
+  "mailMarkWaiting": "Waiting",
+  "mailMarkDone": "Done",
+  "mailDelete": "Delete",
+  "mailInbox": "Inbox",
+
+  "settingsTitle": "Settings",
+  "settingsTheme": "Theme",
+  "settingsThemeDark": "Dark",
+  "settingsThemeLight": "Light",
+  "settingsThemeSystem": "System",
+  "settingsLanguage": "Language",
+  "settingsLanguageDe": "German",
+  "settingsLanguageEn": "English",
+  "settingsAssistanceWindow": "Work Window",
+  "settingsWorkStart": "Start",
+  "settingsWorkEnd": "End",
+  "settingsActiveDays": "Active days",
+  "settingsGamification": "Gamification",
+  "settingsXpEnabled": "XP enabled",
+  "settingsConfettiEnabled": "Confetti effect",
+  "settingsSoundEnabled": "Sounds",
+  "settingsImap": "IMAP Settings",
+  "settingsImapHost": "Host",
+  "settingsImapPort": "Port",
+  "settingsImapUser": "User",
+  "settingsImapPassword": "Password",
+  "settingsImapTls": "Use TLS",
+  "settingsImapSave": "Save",
+  "settingsImapTest": "Test connection",
+  "settingsCalendar": "Calendar",
+  "settingsCalendarPermission": "Grant calendar permission",
+  "settingsCalendarNone": "No calendars selected",
+  "settingsBackup": "Backup",
+  "settingsExport": "Export data",
+  "settingsImport": "Import data",
+  "settingsImportSuccess": "Import successful",
+  "settingsImportError": "Import failed",
+  "settingsSizeMappings": "Size estimates",
+  "settingsSizeQuick": "Quick",
+  "settingsSizeShort": "Short",
+  "settingsSizeMedium": "Medium",
+  "settingsSizeLong": "Long",
+
+  "confirmDelete": "Confirm deletion",
+  "confirmDeleteMessage": "Really delete this task?",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "save": "Save",
+  "close": "Close",
+  "done": "Done",
+  "edit": "Edit",
+  "delete": "Delete",
+  "add": "Add",
+
+  "xpGained": "+{xp} XP",
+  "@xpGained": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "levelUp": "Level {level} reached!",
+  "@levelUp": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+
+  "overdue": "Overdue",
+  "dueSoon": "Due soon",
+  "dueToday": "Due today",
+
+  "calendarPermissionRequired": "Calendar permission required",
+  "calendarPermissionMessage": "Please grant the app access to your calendar in Settings.",
+  "calendarGrantPermission": "Grant permission",
+
+  "weekDayMon": "Mon",
+  "weekDayTue": "Tue",
+  "weekDayWed": "Wed",
+  "weekDayThu": "Thu",
+  "weekDayFri": "Fri",
+  "weekDaySat": "Sat",
+  "weekDaySun": "Sun",
+
+  "statsWeeklyCompleted": "Completed this week",
+  "statsTotalFocusTime": "Total focus time",
+  "statsCompletedThisMonth": "Completed this month",
+  "statsFilter": "Time range",
+  "statsFilterWeek": "Week",
+  "statsFilterMonth": "Month",
+  "statsFilterYear": "Year",
+
+  "notificationDeadlineTitle": "Deadline tomorrow",
+  "notificationDeadlineBody": "Task \"{title}\" is due tomorrow.",
+  "@notificationDeadlineBody": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "notificationFocusTitle": "Focus session complete!",
+  "notificationFocusBody": "+20 XP for your focus session."
+}

@@ -1,0 +1,197 @@
+{
+  "@@locale": "de",
+
+  "appTitle": "Dopamind",
+  "@appTitle": { "description": "App title" },
+
+  "navHome": "Heute",
+  "navTasks": "Aufgaben",
+  "navPlanner": "Planer",
+  "navAchievements": "Erfolge",
+  "navMail": "Mail",
+  "navSettings": "Einstellungen",
+
+  "taskPriorityHigh": "Muss sein",
+  "taskPriorityMedium": "Wichtig",
+  "taskPriorityLow": "Wäre schön",
+
+  "energyHigh": "Hohe Energie",
+  "energyMedium": "Normale Energie",
+  "energyLow": "Niedrige Energie",
+
+  "blockMorning": "Morgen",
+  "blockAfternoon": "Mittag",
+  "blockEvening": "Abend",
+
+  "nextTask": "Nächste Aufgabe",
+  "noTasksToday": "Keine Aufgaben für heute",
+
+  "energyCheckin": "Wie ist deine Energie heute?",
+  "energyCheckinSubtitle": "Das hilft bei der Tagesplanung",
+  "skipCheckin": "Überspringen",
+
+  "compassionModeTitle": "Nicht mein Tag",
+  "compassionModeSubtitle": "XP-Strafe unterdrückt",
+  "notMyDayButton": "Nicht mein Tag",
+  "absenceTypeSick": "Krank",
+  "absenceTypeVacation": "Urlaub",
+
+  "addTask": "Aufgabe hinzufügen",
+  "editTask": "Aufgabe bearbeiten",
+  "deleteTask": "Aufgabe löschen",
+  "completeTask": "Aufgabe abschließen",
+  "reopenTask": "Aufgabe wieder öffnen",
+  "moveToTomorrow": "Auf morgen verschieben",
+
+  "taskText": "Aufgabe",
+  "taskTextHint": "Was möchtest du erledigen?",
+  "taskDeadline": "Deadline",
+  "taskScheduledDate": "Datum",
+  "taskScheduledTime": "Tageszeit",
+  "taskEstimatedMinutes": "Geschätzte Dauer (min)",
+  "taskTags": "Tags",
+  "taskCategory": "Kategorie",
+  "taskEnergyCost": "Energieaufwand",
+  "taskPriority": "Priorität",
+
+  "subtaskAdd": "Teilaufgabe hinzufügen",
+  "subtaskPlaceholder": "Neue Teilaufgabe…",
+
+  "scheduledTimeMorning": "Morgens",
+  "scheduledTimeAfternoon": "Mittags",
+  "scheduledTimeEvening": "Abends",
+  "scheduledTimeExact": "Genau",
+
+  "focusTimerTitle": "Fokus-Timer",
+  "focusTimerStart": "Starten",
+  "focusTimerPause": "Pausieren",
+  "focusTimerStop": "Beenden",
+  "focusTimerDone": "Fokus-Session abgeschlossen!",
+  "focusTimerXpGained": "+{xp} XP",
+  "@focusTimerXpGained": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "focusTimerFlowDetected": "Flow-Modus aktiv – weiter so!",
+  "focusTimerSelectTask": "Aufgabe auswählen",
+
+  "plannerTitle": "Planer",
+  "plannerWeekView": "Woche",
+  "plannerMonthView": "Monat",
+
+  "achievementsTitle": "Erfolge",
+  "achievementsXp": "{xp} XP",
+  "@achievementsXp": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "achievementsLevel": "Level {level}",
+  "@achievementsLevel": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "achievementsStreak": "{days} Tage Streak",
+  "@achievementsStreak": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "achievementsLocked": "Noch nicht freigeschaltet",
+  "achievementsUnlocked": "Freigeschaltet",
+
+  "mailTitle": "Mail",
+  "mailNoConfig": "Keine IMAP-Verbindung konfiguriert",
+  "mailConfigureButton": "IMAP konfigurieren",
+  "mailConvertToTask": "Als Aufgabe speichern",
+  "mailMarkImportant": "Wichtig",
+  "mailMarkTodo": "Todo",
+  "mailMarkWaiting": "Wartet",
+  "mailMarkDone": "Erledigt",
+  "mailDelete": "Löschen",
+  "mailInbox": "Posteingang",
+
+  "settingsTitle": "Einstellungen",
+  "settingsTheme": "Design",
+  "settingsThemeDark": "Dunkel",
+  "settingsThemeLight": "Hell",
+  "settingsThemeSystem": "System",
+  "settingsLanguage": "Sprache",
+  "settingsLanguageDe": "Deutsch",
+  "settingsLanguageEn": "Englisch",
+  "settingsAssistanceWindow": "Arbeitsfenster",
+  "settingsWorkStart": "Beginn",
+  "settingsWorkEnd": "Ende",
+  "settingsActiveDays": "Aktive Tage",
+  "settingsGamification": "Gamification",
+  "settingsXpEnabled": "XP aktiviert",
+  "settingsConfettiEnabled": "Konfetti-Effekt",
+  "settingsSoundEnabled": "Sounds",
+  "settingsImap": "IMAP-Einstellungen",
+  "settingsImapHost": "Host",
+  "settingsImapPort": "Port",
+  "settingsImapUser": "Benutzer",
+  "settingsImapPassword": "Passwort",
+  "settingsImapTls": "TLS verwenden",
+  "settingsImapSave": "Speichern",
+  "settingsImapTest": "Verbindung testen",
+  "settingsCalendar": "Kalender",
+  "settingsCalendarPermission": "Kalender-Berechtigung erteilen",
+  "settingsCalendarNone": "Keine Kalender ausgewählt",
+  "settingsBackup": "Backup",
+  "settingsExport": "Daten exportieren",
+  "settingsImport": "Daten importieren",
+  "settingsImportSuccess": "Import erfolgreich",
+  "settingsImportError": "Import fehlgeschlagen",
+  "settingsSizeMappings": "Größen-Schätzungen",
+  "settingsSizeQuick": "Schnell",
+  "settingsSizeShort": "Kurz",
+  "settingsSizeMedium": "Mittel",
+  "settingsSizeLong": "Lang",
+
+  "confirmDelete": "Löschen bestätigen",
+  "confirmDeleteMessage": "Soll diese Aufgabe wirklich gelöscht werden?",
+  "cancel": "Abbrechen",
+  "confirm": "Bestätigen",
+  "save": "Speichern",
+  "close": "Schließen",
+  "done": "Fertig",
+  "edit": "Bearbeiten",
+  "delete": "Löschen",
+  "add": "Hinzufügen",
+
+  "xpGained": "+{xp} XP",
+  "@xpGained": {
+    "placeholders": { "xp": { "type": "int" } }
+  },
+  "levelUp": "Level {level} erreicht!",
+  "@levelUp": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+
+  "overdue": "Überfällig",
+  "dueSoon": "Bald fällig",
+  "dueToday": "Heute fällig",
+
+  "calendarPermissionRequired": "Kalender-Berechtigung erforderlich",
+  "calendarPermissionMessage": "Bitte erteile der App Zugriff auf deinen Kalender in den Einstellungen.",
+  "calendarGrantPermission": "Berechtigung erteilen",
+
+  "weekDayMon": "Mo",
+  "weekDayTue": "Di",
+  "weekDayWed": "Mi",
+  "weekDayThu": "Do",
+  "weekDayFri": "Fr",
+  "weekDaySat": "Sa",
+  "weekDaySun": "So",
+
+  "statsWeeklyCompleted": "Diese Woche abgeschlossen",
+  "statsTotalFocusTime": "Gesamte Fokuszeit",
+  "statsCompletedThisMonth": "Diesen Monat abgeschlossen",
+  "statsFilter": "Zeitraum",
+  "statsFilterWeek": "Woche",
+  "statsFilterMonth": "Monat",
+  "statsFilterYear": "Jahr",
+
+  "notificationDeadlineTitle": "Deadline morgen",
+  "notificationDeadlineBody": "Aufgabe \"{title}\" ist morgen fällig.",
+  "@notificationDeadlineBody": {
+    "placeholders": { "title": { "type": "String" } }
+  },
+  "notificationFocusTitle": "Fokus-Session abgeschlossen!",
+  "notificationFocusBody": "+20 XP für deine Fokus-Session."
+}
