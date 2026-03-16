@@ -73,9 +73,11 @@ npm start
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `JWT_EXPIRES_IN` | No | Token expiry, default `24h` |
 | `CORS_ORIGIN` | No | Allowed origin for CORS, set to your domain in production |
+| `HTTP_PORT` | No | Host HTTP port for use in production, e.g. behind a reverse proxy |
 | `POSTGRES_USER` | No | PostgreSQL user (Docker Compose) |
 | `POSTGRES_PASSWORD` | No | PostgreSQL password (Docker Compose) |
 | `POSTGRES_DB` | No | PostgreSQL database name (Docker Compose) |
+| `POSTGRES_VOLUME` | No | PostgreSQL database persistent host path (Docker Compose) |
 
 ## Security
 
